@@ -1,9 +1,11 @@
 use anyhow::{Context, Result};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
+use chrono::Utc;
 use serde_json::Value;
 
 use super::pkce::generate_pkce_pair;
 use super::types::{CharacterInfo, TokenResponse};
+use crate::db::{self, Pool};
 
 const EVE_SSO_BASE_URL: &str = "https://login.eveonline.com/v2/oauth";
 const EVE_SSO_TOKEN_URL: &str = "https://login.eveonline.com/v2/oauth/token";
@@ -74,6 +76,79 @@ pub async fn exchange_code_for_tokens(
         .context("Failed to parse token response")?;
 
     Ok(token_response)
+}
+
+pub async fn refresh_access_token(
+    client_id: &str,
+    refresh_token: &str,
+) -> Result<TokenResponse> {
+    let params = [
+        ("grant_type", "refresh_token"),
+        ("refresh_token", refresh_token),
+        ("client_id", client_id),
+    ];
+
+    let client = reqwest::Client::new();
+    let response = client
+        .post(EVE_SSO_TOKEN_URL)
+        .form(&params)
+        .send()
+        .await
+        .context("Failed to send token refresh request")?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+        anyhow::bail!("Token refresh failed with status {}: {}", status, text);
+    }
+
+    let token_response: TokenResponse = response
+        .json()
+        .await
+        .context("Failed to parse token refresh response")?;
+
+    Ok(token_response)
+}
+
+pub async fn ensure_valid_access_token(
+    pool: &Pool,
+    character_id: i64,
+) -> Result<String> {
+    let tokens = db::get_tokens(pool, character_id)
+        .await
+        .context("Failed to retrieve tokens from database")?;
+
+    let tokens = tokens.ok_or_else(|| {
+        anyhow::anyhow!("No tokens found for character_id: {}", character_id)
+    })?;
+
+    let now = Utc::now().timestamp();
+    let is_expired = tokens.expires_at <= now;
+
+    if is_expired {
+        let client_id = std::env::var("EVE_CLIENT_ID")
+            .context("EVE_CLIENT_ID environment variable not set")?;
+
+        let token_response = refresh_access_token(&client_id, &tokens.refresh_token)
+            .await
+            .context("Failed to refresh access token")?;
+
+        let new_expires_at = Utc::now().timestamp() + token_response.expires_in;
+
+        db::update_tokens(
+            pool,
+            character_id,
+            &token_response.access_token,
+            &token_response.refresh_token,
+            new_expires_at,
+        )
+        .await
+        .context("Failed to update tokens in database")?;
+
+        Ok(token_response.access_token)
+    } else {
+        Ok(tokens.access_token)
+    }
 }
 
 pub fn extract_character_from_jwt(access_token: &str) -> Result<CharacterInfo> {
