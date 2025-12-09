@@ -51,12 +51,12 @@ export function CharacterCard({
   return (
     <Card
       className={cn(
-        "cursor-pointer transition-all hover:shadow-md",
+        "cursor-pointer transition-all hover:shadow-md py-4",
         isSelected && "bg-muted/50"
       )}
       onClick={onClick}
     >
-      <div className="flex items-center gap-3 p-4">
+      <div className="flex items-center gap-3 px-4">
         <img
           src={portraitUrl}
           alt={character.character_name}
