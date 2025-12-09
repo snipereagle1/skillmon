@@ -1,79 +1,35 @@
 import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCharacters } from "@/hooks/tauri/useCharacters";
+import { useSkillQueues } from "@/hooks/tauri/useSkillQueues";
+import type { CharacterSkillQueue } from "@/types/tauri";
 import { CharacterCard } from "./CharacterCard";
 import { SkillQueue } from "./SkillQueue";
 
-interface Character {
-  character_id: number;
-  character_name: string;
-}
-
-interface SkillQueueItem {
-  skill_id: number;
-  queue_position: number;
-  finished_level: number;
-  start_date: string | null;
-  finish_date: string | null;
-  training_start_sp: number | null;
-  level_start_sp: number | null;
-  level_end_sp: number | null;
-}
-
-interface CharacterSkillQueue {
-  character_id: number;
-  character_name: string;
-  skill_queue: SkillQueueItem[];
-}
-
 export function CharactersTab() {
-  const [characters, setCharacters] = useState<Character[]>([]);
-  const [skillQueues, setSkillQueues] = useState<CharacterSkillQueue[]>([]);
+  const { data: characters = [], isLoading: isLoadingCharacters, error: charactersError } = useCharacters();
+  const { data: skillQueues = [], isLoading: isLoadingQueues } = useSkillQueues();
   const [selectedCharacterId, setSelectedCharacterId] = useState<number | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const queryClient = useQueryClient();
 
-  const loadCharacters = async () => {
-    try {
-      const chars = await invoke<Character[]>("get_characters");
-      setCharacters(chars);
-      setSelectedCharacterId((prev) => {
-        if (prev === null && chars.length > 0) {
-          return chars[0].character_id;
-        }
-        return prev;
-      });
-    } catch (err) {
-      console.error("Error loading characters:", err);
-      setError(err instanceof Error ? err.message : "Failed to load characters");
-    }
-  };
-
-  const loadSkillQueues = async () => {
-    try {
-      const queues = await invoke<CharacterSkillQueue[]>("get_skill_queues");
-      setSkillQueues(queues);
-    } catch (err) {
-      console.error("Error loading skill queues:", err);
-    }
-  };
+  const isLoading = isLoadingCharacters || isLoadingQueues;
+  const error = charactersError;
 
   useEffect(() => {
-    const loadData = async () => {
-      setIsLoading(true);
-      setError(null);
-      await Promise.all([loadCharacters(), loadSkillQueues()]);
-      setIsLoading(false);
-    };
+    if (characters.length > 0 && selectedCharacterId === null) {
+      setSelectedCharacterId(characters[0].character_id);
+    }
+  }, [characters, selectedCharacterId]);
 
-    loadData();
-
+  useEffect(() => {
     let unlistenFn: (() => void) | null = null;
     const setupAuthListener = async () => {
       try {
         const { listen } = await import("@tauri-apps/api/event");
         const unlisten = await listen("auth-success", async () => {
           await new Promise((resolve) => setTimeout(resolve, 500));
-          await loadData();
+          queryClient.invalidateQueries({ queryKey: ["characters"] });
+          queryClient.invalidateQueries({ queryKey: ["skillQueues"] });
         });
         unlistenFn = unlisten;
       } catch (error) {
@@ -88,7 +44,7 @@ export function CharactersTab() {
         unlistenFn();
       }
     };
-  }, []);
+  }, [queryClient]);
 
   const selectedCharacter = characters.find(
     (c) => c.character_id === selectedCharacterId
@@ -108,7 +64,7 @@ export function CharactersTab() {
   if (error) {
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-destructive">Error: {error}</p>
+        <p className="text-destructive">Error: {error instanceof Error ? error.message : "Failed to load characters"}</p>
       </div>
     );
   }

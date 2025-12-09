@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useStartEveLogin } from "@/hooks/tauri/useStartEveLogin";
 import {
   Dialog,
   DialogContent,
@@ -20,9 +20,8 @@ export function AddCharacterDialog({
   onOpenChange,
   onSuccess,
 }: AddCharacterDialogProps) {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [authUrl, setAuthUrl] = useState<string | null>(null);
+  const loginMutation = useStartEveLogin();
 
   useEffect(() => {
     if (!open) return;
@@ -33,8 +32,7 @@ export function AddCharacterDialog({
         const { listen } = await import("@tauri-apps/api/event");
         const unlisten = await listen("auth-success", () => {
           setAuthUrl(null);
-          setError(null);
-          setIsLoading(false);
+          loginMutation.reset();
           onOpenChange(false);
           if (onSuccess) {
             onSuccess();
@@ -53,25 +51,20 @@ export function AddCharacterDialog({
         unlistenFn();
       }
     };
-  }, [open, onOpenChange, onSuccess]);
+  }, [open, onOpenChange, onSuccess, loginMutation]);
 
   const handleLogin = async () => {
-    setIsLoading(true);
-    setError(null);
     setAuthUrl(null);
     try {
-      const result = await invoke<string>("start_eve_login");
+      const result = await loginMutation.mutateAsync();
       const urlMatch = result.match(/https:\/\/[^\s]+/);
       if (urlMatch) {
         setAuthUrl(urlMatch[0]);
       } else {
         setAuthUrl(result);
       }
-    } catch (err: any) {
-      const errorMessage = err?.message || err?.toString() || "Failed to start login";
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
+    } catch (err) {
+      // Error is handled by react-query and displayed via loginMutation.error
     }
   };
 
@@ -95,13 +88,15 @@ export function AddCharacterDialog({
         <div className="space-y-4">
           <Button
             onClick={handleLogin}
-            disabled={isLoading}
+            disabled={loginMutation.isPending}
             className="w-full"
           >
-            {isLoading ? "Opening browser..." : "Login with EVE Online"}
+            {loginMutation.isPending ? "Opening browser..." : "Login with EVE Online"}
           </Button>
-          {error && (
-            <p className="text-sm text-destructive">{error}</p>
+          {loginMutation.isError && (
+            <p className="text-sm text-destructive">
+              {loginMutation.error instanceof Error ? loginMutation.error.message : "Failed to start login"}
+            </p>
           )}
           {authUrl && (
             <div className="space-y-2 p-4 bg-muted rounded-md">

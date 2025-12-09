@@ -1,36 +1,14 @@
-import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
-
-interface Character {
-  character_id: number;
-  character_name: string;
-}
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useCharacters } from "@/hooks/tauri/useCharacters";
+import { useLogoutCharacter } from "@/hooks/tauri/useLogoutCharacter";
 
 export function CharacterList() {
-  const [characters, setCharacters] = useState<Character[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadCharacters = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      console.log("CharacterList: Loading characters...");
-      const chars = await invoke<Character[]>("get_characters");
-      console.log("CharacterList: Loaded characters:", chars);
-      setCharacters(chars);
-    } catch (err) {
-      console.error("CharacterList: Error loading characters:", err);
-      setError(err instanceof Error ? err.message : "Failed to load characters");
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { data: characters = [], isLoading, error } = useCharacters();
+  const logoutMutation = useLogoutCharacter();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    loadCharacters();
-
-    // Listen for auth success events to refresh the list
     let unlistenFn: (() => void) | null = null;
 
     const setupAuthListener = async () => {
@@ -42,10 +20,9 @@ export function CharacterList() {
           console.log("CharacterList: Full event object:", JSON.stringify(event, null, 2));
           console.log("CharacterList: Character ID:", event.payload);
           console.log("CharacterList: Refreshing character list...");
-          // Small delay to ensure database write is complete
           await new Promise(resolve => setTimeout(resolve, 500));
-          console.log("CharacterList: Delay complete, loading characters...");
-          await loadCharacters();
+          console.log("CharacterList: Delay complete, invalidating queries...");
+          queryClient.invalidateQueries({ queryKey: ["characters"] });
           console.log("CharacterList: ===== Character list refreshed =====");
         });
         console.log("CharacterList: Auth listener set up successfully, waiting for events...");
@@ -53,7 +30,6 @@ export function CharacterList() {
       } catch (error) {
         console.error("CharacterList: Failed to setup auth listener:", error);
         console.error("CharacterList: Error details:", error);
-        // If we're not in Tauri, this is expected - just log and continue
         if (error instanceof Error && error.message.includes("Tauri")) {
           console.log("CharacterList: Not in Tauri environment (expected in browser dev)");
         }
@@ -67,14 +43,13 @@ export function CharacterList() {
         unlistenFn();
       }
     };
-  }, []);
+  }, [queryClient]);
 
   const handleLogout = async (characterId: number) => {
     try {
-      await invoke("logout_character", { characterId });
-      await loadCharacters();
+      await logoutMutation.mutateAsync(characterId);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to logout character");
+      console.error("Failed to logout character:", err);
     }
   };
 
@@ -83,7 +58,7 @@ export function CharacterList() {
   }
 
   if (error) {
-    return <p className="text-red-600">Error: {error}</p>;
+    return <p className="text-red-600">Error: {error instanceof Error ? error.message : "Failed to load characters"}</p>;
   }
 
   if (characters.length === 0) {
@@ -95,7 +70,7 @@ export function CharacterList() {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">Authenticated Characters</h2>
         <button
-          onClick={loadCharacters}
+          onClick={() => queryClient.invalidateQueries({ queryKey: ["characters"] })}
           className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
         >
           Refresh

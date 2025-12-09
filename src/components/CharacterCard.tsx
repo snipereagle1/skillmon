@@ -1,21 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-
-interface SkillQueueItem {
-  skill_id: number;
-  queue_position: number;
-  finished_level: number;
-  start_date: string | null;
-  finish_date: string | null;
-  training_start_sp: number | null;
-  level_start_sp: number | null;
-  level_end_sp: number | null;
-}
-
-interface Character {
-  character_id: number;
-  character_name: string;
-}
+import type { Character, SkillQueueItem } from "@/types/tauri";
 
 interface CharacterCardProps {
   character: Character;

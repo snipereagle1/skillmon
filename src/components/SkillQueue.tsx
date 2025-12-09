@@ -1,23 +1,8 @@
-import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useSkillQueues } from "@/hooks/tauri/useSkillQueues";
+import type { SkillQueueItem, CharacterSkillQueue } from "@/types/tauri";
 import { intervalToDuration } from "date-fns";
-
-interface SkillQueueItem {
-  skill_id: number;
-  queue_position: number;
-  finished_level: number;
-  start_date: string | null;
-  finish_date: string | null;
-  training_start_sp: number | null;
-  level_start_sp: number | null;
-  level_end_sp: number | null;
-}
-
-interface CharacterSkillQueue {
-  character_id: number;
-  character_name: string;
-  skill_queue: SkillQueueItem[];
-}
 
 function formatTimeRemaining(finishDate: string | null): string {
   if (!finishDate) return "Paused";
@@ -172,34 +157,17 @@ interface SkillQueueProps {
 }
 
 export function SkillQueue({ characterId }: SkillQueueProps = {}) {
-  const [queues, setQueues] = useState<CharacterSkillQueue[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-
-  const loadQueues = async () => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const data = await invoke<CharacterSkillQueue[]>("get_skill_queues");
-      setQueues(data);
-    } catch (err) {
-      console.error("Failed to load skill queues:", err);
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  const { data: queues = [], isLoading, error } = useSkillQueues();
+  const queryClient = useQueryClient();
 
   useEffect(() => {
-    loadQueues();
-
     let unlistenFn: (() => void) | null = null;
     const setupListener = async () => {
       try {
         const { listen } = await import("@tauri-apps/api/event");
         const unlisten = await listen("auth-success", async () => {
           await new Promise(resolve => setTimeout(resolve, 500));
-          await loadQueues();
+          queryClient.invalidateQueries({ queryKey: ["skillQueues"] });
         });
         unlistenFn = unlisten;
       } catch (error) {
@@ -212,14 +180,14 @@ export function SkillQueue({ characterId }: SkillQueueProps = {}) {
     return () => {
       if (unlistenFn) unlistenFn();
     };
-  }, []);
+  }, [queryClient]);
 
   if (isLoading) {
     return <p className="text-muted-foreground">Loading skill queues...</p>;
   }
 
   if (error) {
-    return <p className="text-destructive">Error: {error}</p>;
+    return <p className="text-destructive">Error: {error instanceof Error ? error.message : "Failed to load skill queues"}</p>;
   }
 
   if (characterId !== undefined && characterId !== null) {
@@ -239,7 +207,7 @@ export function SkillQueue({ characterId }: SkillQueueProps = {}) {
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-xl font-bold">Skill Queues</h2>
         <button
-          onClick={loadQueues}
+          onClick={() => queryClient.invalidateQueries({ queryKey: ["skillQueues"] })}
           className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
         >
           Refresh

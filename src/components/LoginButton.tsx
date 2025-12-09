@@ -1,30 +1,22 @@
 import { useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { useStartEveLogin } from "@/hooks/tauri/useStartEveLogin";
 
 export function LoginButton() {
-  const [isLoading, setIsLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [authUrl, setAuthUrl] = useState<string | null>(null);
+  const loginMutation = useStartEveLogin();
 
   const handleLogin = async () => {
-    setIsLoading(true);
-    setError(null);
     setAuthUrl(null);
     try {
-      const result = await invoke<string>("start_eve_login");
-      // Extract URL from the result message
+      const result = await loginMutation.mutateAsync();
       const urlMatch = result.match(/https:\/\/[^\s]+/);
       if (urlMatch) {
         setAuthUrl(urlMatch[0]);
       } else {
         setAuthUrl(result);
       }
-    } catch (err: any) {
-      // Extract the actual error message from Tauri's error format
-      const errorMessage = err?.message || err?.toString() || "Failed to start login";
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
+    } catch (err) {
+      // Error is handled by react-query and displayed via loginMutation.error
     }
   };
 
@@ -40,12 +32,16 @@ export function LoginButton() {
     <div className="space-y-3">
       <button
         onClick={handleLogin}
-        disabled={isLoading}
+        disabled={loginMutation.isPending}
         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
       >
-        {isLoading ? "Opening browser..." : "Login with EVE Online"}
+        {loginMutation.isPending ? "Opening browser..." : "Login with EVE Online"}
       </button>
-      {error && <p className="text-red-600 mt-2">{error}</p>}
+      {loginMutation.isError && (
+        <p className="text-red-600 mt-2">
+          {loginMutation.error instanceof Error ? loginMutation.error.message : "Failed to start login"}
+        </p>
+      )}
       {authUrl && (
         <div className="mt-4 p-4 bg-gray-100 rounded border border-gray-300">
           <p className="text-sm font-semibold mb-2 text-gray-700">Authentication URL:</p>
