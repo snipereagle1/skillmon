@@ -28,3 +28,5 @@ dist-ssr
 src-tauri/src/esi/client.rs
 src-tauri/src/esi/types.rs
 src-tauri/src/esi/openapi.json
+sde/*.jsonl
+eve-online-static-data-*.zip
