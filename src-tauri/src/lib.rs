@@ -379,9 +379,8 @@ async fn get_cached_character_skills(
     let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
 
     if let Some((cached_body, _)) = &cached_entry {
-        let cached_data: esi::CharactersCharacterIdSkillsGet =
-            serde_json::from_str(cached_body)
-                .context("Failed to deserialize cached character skills")?;
+        let cached_data: esi::CharactersCharacterIdSkillsGet = serde_json::from_str(cached_body)
+            .context("Failed to deserialize cached character skills")?;
 
         let skills_data: Vec<(i64, i64, i64, i64)> = cached_data
             .skills
@@ -479,8 +478,8 @@ async fn get_cached_character_skills(
         cache::set_cached_response(pool, &cache_key, etag.as_deref(), expires_at, &body_str)
             .await?;
 
-        let data: esi::CharactersCharacterIdSkillsGet = serde_json::from_str(&body_str)
-            .context("Failed to deserialize character skills")?;
+        let data: esi::CharactersCharacterIdSkillsGet =
+            serde_json::from_str(&body_str).context("Failed to deserialize character skills")?;
 
         let skills_data: Vec<(i64, i64, i64, i64)> = data
             .skills
@@ -541,7 +540,7 @@ async fn get_skill_names(
     Ok(skill_names)
 }
 
-async fn get_type_names(
+async fn get_type_names_helper(
     pool: &db::Pool,
     type_ids: &[i64],
 ) -> Result<HashMap<i64, String>, String> {
@@ -589,8 +588,7 @@ async fn get_cached_character_clones(
 
     if let Some((cached_body, _)) = &cached_entry {
         let cached_data: esi::CharactersCharacterIdClonesGet =
-            serde_json::from_str(cached_body)
-                .context("Failed to deserialize cached clones")?;
+            serde_json::from_str(cached_body).context("Failed to deserialize cached clones")?;
         return Ok(Some(cached_data));
     }
 
@@ -672,8 +670,7 @@ async fn get_cached_character_implants(
 
     if let Some((cached_body, _)) = &cached_entry {
         let cached_data: esi::CharactersCharacterIdImplantsGet =
-            serde_json::from_str(cached_body)
-                .context("Failed to deserialize cached implants")?;
+            serde_json::from_str(cached_body).context("Failed to deserialize cached implants")?;
         return Ok(Some(cached_data));
     }
 
@@ -754,9 +751,8 @@ async fn get_cached_station_info(
     let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
 
     if let Some((cached_body, _)) = &cached_entry {
-        let cached_data: esi::UniverseStationsStationIdGet =
-            serde_json::from_str(cached_body)
-                .context("Failed to deserialize cached station info")?;
+        let cached_data: esi::UniverseStationsStationIdGet = serde_json::from_str(cached_body)
+            .context("Failed to deserialize cached station info")?;
         return Ok(Some(cached_data));
     }
 
@@ -801,9 +797,8 @@ async fn get_cached_station_info(
 
     if status.as_u16() == 304 {
         if let Some((cached_body, _)) = cache::get_cached_response(pool, &cache_key).await? {
-            let cached_data: esi::UniverseStationsStationIdGet =
-                serde_json::from_str(&cached_body)
-                    .context("Failed to deserialize cached station info")?;
+            let cached_data: esi::UniverseStationsStationIdGet = serde_json::from_str(&cached_body)
+                .context("Failed to deserialize cached station info")?;
             return Ok(Some(cached_data));
         }
     }
@@ -837,9 +832,8 @@ async fn get_cached_structure_info(
     let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
 
     if let Some((cached_body, _)) = &cached_entry {
-        let cached_data: esi::UniverseStructuresStructureIdGet =
-            serde_json::from_str(cached_body)
-                .context("Failed to deserialize cached structure info")?;
+        let cached_data: esi::UniverseStructuresStructureIdGet = serde_json::from_str(cached_body)
+            .context("Failed to deserialize cached structure info")?;
         return Ok(Some(cached_data));
     }
 
@@ -1155,7 +1149,9 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
 
             let is_currently_training = skill_item.queue_position == 0 || {
                 let now = chrono::Utc::now();
-                if let (Some(start_str), Some(finish_str)) = (&skill_item.start_date, &skill_item.finish_date) {
+                if let (Some(start_str), Some(finish_str)) =
+                    (&skill_item.start_date, &skill_item.finish_date)
+                {
                     if let (Ok(start), Ok(finish)) = (
                         chrono::DateTime::parse_from_rfc3339(start_str),
                         chrono::DateTime::parse_from_rfc3339(finish_str),
@@ -1171,17 +1167,15 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
                 }
             };
 
-
             let mut progress_sp = if is_currently_training {
                 let base_sp = known_sp
                     .or(skill_item.training_start_sp)
                     .or(skill_item.level_start_sp)
                     .unwrap_or(0);
 
-                if let (Some(start_str), Some(finish_str)) = (
-                    &skill_item.start_date,
-                    &skill_item.finish_date,
-                ) {
+                if let (Some(start_str), Some(finish_str)) =
+                    (&skill_item.start_date, &skill_item.finish_date)
+                {
                     if let (Ok(start), Ok(finish)) = (
                         chrono::DateTime::parse_from_rfc3339(start_str),
                         chrono::DateTime::parse_from_rfc3339(finish_str),
@@ -1195,7 +1189,8 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
                             let elapsed_duration = (now - start_utc).num_seconds() as f64;
 
                             if total_duration > 0.0 && elapsed_duration > 0.0 {
-                                let total_sp_needed = skill_item.level_end_sp.unwrap_or(0) - skill_item.level_start_sp.unwrap_or(0);
+                                let total_sp_needed = skill_item.level_end_sp.unwrap_or(0)
+                                    - skill_item.level_start_sp.unwrap_or(0);
                                 let progress_ratio = elapsed_duration / total_duration;
                                 let sp_gained = (total_sp_needed as f64 * progress_ratio) as i64;
                                 let calculated_sp = base_sp + sp_gained;
@@ -1228,7 +1223,6 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
                     .or(skill_item.level_start_sp)
                     .unwrap_or(0)
             };
-
 
             if is_currently_training {
                 if let Some(level_end) = skill_item.level_end_sp {
@@ -1297,7 +1291,6 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
                         };
                         let sp_per_min = calculate_sp_per_minute(primary_value, secondary_value);
                         skill_item.sp_per_minute = Some(sp_per_min);
-
                     }
                 }
             }
@@ -1349,10 +1342,12 @@ async fn get_clones(
         if let Some(obj) = jump_clone.as_object() {
             let clone_id = obj.get("jump_clone_id").and_then(|v| v.as_i64());
             let location_id = obj.get("location_id").and_then(|v| v.as_i64()).unwrap_or(0);
-            let location_type_str = obj.get("location_type")
+            let location_type_str = obj
+                .get("location_type")
                 .and_then(|v| v.as_str())
                 .unwrap_or("station");
-            let implants = obj.get("implants")
+            let implants = obj
+                .get("implants")
                 .and_then(|v| v.as_array())
                 .map(|arr| arr.iter().filter_map(|v| v.as_i64()).collect::<Vec<_>>())
                 .unwrap_or_default();
@@ -1363,7 +1358,9 @@ async fn get_clones(
                 location_type_str,
                 location_id,
                 character_id,
-            ).await.unwrap_or_else(|_| "Unknown Location".to_string());
+            )
+            .await
+            .unwrap_or_else(|_| "Unknown Location".to_string());
 
             clones_to_store.push((
                 clone_id,
@@ -1387,7 +1384,9 @@ async fn get_clones(
         ) {
             let location_type_str = match location_type {
                 esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Station => "station",
-                esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Structure => "structure",
+                esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Structure => {
+                    "structure"
+                }
             };
 
             let location_name = resolve_clone_location(
@@ -1396,14 +1395,15 @@ async fn get_clones(
                 location_type_str,
                 location_id,
                 character_id,
-            ).await.unwrap_or_else(|_| "Unknown Location".to_string());
+            )
+            .await
+            .unwrap_or_else(|_| "Unknown Location".to_string());
 
             if !current_implants_sorted.is_empty() {
-                let matched_clone_id = db::find_clone_by_implants(
-                    &*pool,
-                    character_id,
-                    &current_implants_sorted,
-                ).await.map_err(|e| format!("Failed to find clone by implants: {}", e))?;
+                let matched_clone_id =
+                    db::find_clone_by_implants(&*pool, character_id, &current_implants_sorted)
+                        .await
+                        .map_err(|e| format!("Failed to find clone by implants: {}", e))?;
 
                 if let Some(matched_id) = matched_clone_id {
                     sqlx::query("UPDATE clones SET location_type = ?, location_id = ?, location_name = ?, is_current = 1 WHERE id = ?")
@@ -1423,7 +1423,7 @@ async fn get_clones(
                         location_id,
                         Some(location_name),
                         true,
-                        current_implants_sorted,
+                        current_implants_sorted.clone(),
                     ));
                 }
             }
@@ -1431,11 +1431,10 @@ async fn get_clones(
     }
 
     if !current_clone_matched && !current_implants_sorted.is_empty() {
-        let matched_clone_id = db::find_clone_by_implants(
-            &*pool,
-            character_id,
-            &current_implants_sorted,
-        ).await.map_err(|e| format!("Failed to find clone by implants: {}", e))?;
+        let matched_clone_id =
+            db::find_clone_by_implants(&*pool, character_id, &current_implants_sorted)
+                .await
+                .map_err(|e| format!("Failed to find clone by implants: {}", e))?;
 
         if let Some(matched_id) = matched_clone_id {
             sqlx::query("UPDATE clones SET is_current = 1 WHERE id = ?")
@@ -1449,8 +1448,12 @@ async fn get_clones(
                 home_location.location_type.as_ref(),
             ) {
                 let location_type_str = match location_type {
-                    esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Station => "station",
-                    esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Structure => "structure",
+                    esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Station => {
+                        "station"
+                    }
+                    esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Structure => {
+                        "structure"
+                    }
                 };
 
                 let location_name = resolve_clone_location(
@@ -1459,7 +1462,9 @@ async fn get_clones(
                     location_type_str,
                     location_id,
                     character_id,
-                ).await.unwrap_or_else(|_| "Unknown Location".to_string());
+                )
+                .await
+                .unwrap_or_else(|_| "Unknown Location".to_string());
 
                 clones_to_store.push((
                     None,
@@ -1512,7 +1517,7 @@ async fn resolve_clone_location(
     client: &reqwest::Client,
     location_type: &str,
     location_id: i64,
-    character_id: i64,
+    _character_id: i64,
 ) -> Result<String> {
     match location_type {
         "station" => {
@@ -1522,15 +1527,14 @@ async fn resolve_clone_location(
                 Ok(format!("Station {}", location_id))
             }
         }
-        "structure" => {
-            match get_cached_structure_info(pool, client, location_id).await {
-                Ok(Some(structure)) => {
-                    Ok(format!("{} - {}", structure.solar_system_id, structure.name))
-                }
-                Ok(None) => Ok("Inaccessible Structure".to_string()),
-                Err(_) => Ok("Inaccessible Structure".to_string()),
-            }
-        }
+        "structure" => match get_cached_structure_info(pool, client, location_id).await {
+            Ok(Some(structure)) => Ok(format!(
+                "{} - {}",
+                structure.solar_system_id, structure.name
+            )),
+            Ok(None) => Ok("Inaccessible Structure".to_string()),
+            Err(_) => Ok("Inaccessible Structure".to_string()),
+        },
         _ => Ok(format!("Unknown Location {}", location_id)),
     }
 }
@@ -1552,7 +1556,7 @@ async fn get_type_names(
     pool: State<'_, db::Pool>,
     type_ids: Vec<i64>,
 ) -> Result<HashMap<i64, String>, String> {
-    get_type_names(&*pool, &type_ids).await
+    get_type_names_helper(&*pool, &type_ids).await
 }
 
 #[tauri::command]
@@ -1582,7 +1586,9 @@ async fn get_character_skills_with_groups(
         let mut result = HashMap::new();
         if let Ok(access_token) = auth::ensure_valid_access_token(&*pool, character_id).await {
             if let Ok(client) = create_authenticated_client(&access_token) {
-                if let Ok(Some(queue_data)) = get_cached_skill_queue(&*pool, &client, character_id).await {
+                if let Ok(Some(queue_data)) =
+                    get_cached_skill_queue(&*pool, &client, character_id).await
+                {
                     for item in queue_data {
                         if let Some(obj) = item.as_object() {
                             if let (Some(skill_id), Some(finished_level)) = (
@@ -1625,7 +1631,10 @@ async fn get_character_skills_with_groups(
     let mut groups_response = Vec::new();
 
     for group in &skill_groups {
-        let skills_in_group = skills_by_group.get(&group.group_id).cloned().unwrap_or_default();
+        let skills_in_group = skills_by_group
+            .get(&group.group_id)
+            .cloned()
+            .unwrap_or_default();
         let mut total_levels = 0i64;
         let mut trained_levels = 0i64;
         let mut has_trained_skills = false;

@@ -9,12 +9,13 @@ CREATE TABLE IF NOT EXISTS clones (
   location_name TEXT,
   is_current INTEGER NOT NULL DEFAULT 0,
   updated_at INTEGER NOT NULL,
-  FOREIGN KEY (character_id) REFERENCES characters(character_id),
-  UNIQUE(character_id, clone_id) WHERE clone_id IS NOT NULL
+  FOREIGN KEY (character_id) REFERENCES characters(character_id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_clones_character_id ON clones(character_id);
 CREATE INDEX IF NOT EXISTS idx_clones_is_current ON clones(character_id, is_current);
+-- Partial unique index: ensure unique (character_id, clone_id) when clone_id is not NULL
+CREATE UNIQUE INDEX IF NOT EXISTS idx_clones_unique_clone_id ON clones(character_id, clone_id) WHERE clone_id IS NOT NULL;
 
 -- Clone implants junction table
 CREATE TABLE IF NOT EXISTS clone_implants (

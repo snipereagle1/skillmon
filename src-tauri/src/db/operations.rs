@@ -1,6 +1,6 @@
 use anyhow::Result;
 use serde::Serialize;
-use sqlx::FromRow;
+use sqlx::{FromRow, Row};
 
 use super::Pool;
 
@@ -154,7 +154,10 @@ pub struct CharacterAttributes {
     pub last_remap_date: Option<String>,
 }
 
-pub async fn get_character_attributes(pool: &Pool, character_id: i64) -> Result<Option<CharacterAttributes>> {
+pub async fn get_character_attributes(
+    pool: &Pool,
+    character_id: i64,
+) -> Result<Option<CharacterAttributes>> {
     let attributes = sqlx::query_as::<_, CharacterAttributes>(
         "SELECT character_id, charisma, intelligence, memory, perception, willpower, bonus_remaps, accrued_remap_cooldown_date, last_remap_date FROM character_attributes WHERE character_id = ?",
     )
@@ -276,7 +279,10 @@ pub struct SkillGroupInfo {
     pub category_id: i64,
 }
 
-pub async fn get_skill_groups_for_category(pool: &Pool, category_id: i64) -> Result<Vec<SkillGroupInfo>> {
+pub async fn get_skill_groups_for_category(
+    pool: &Pool,
+    category_id: i64,
+) -> Result<Vec<SkillGroupInfo>> {
     let groups = sqlx::query_as::<_, SkillGroupInfo>(
         "SELECT group_id, name as group_name, category_id FROM sde_groups WHERE category_id = ? AND published = 1 ORDER BY name",
     )
@@ -332,7 +338,15 @@ pub async fn get_clone_implants(pool: &Pool, clone_db_id: i64) -> Result<Vec<Clo
 pub async fn set_character_clones(
     pool: &Pool,
     character_id: i64,
-    clones: &[(Option<i64>, Option<String>, String, i64, Option<String>, bool, Vec<i64>)],
+    clones: &[(
+        Option<i64>,
+        Option<String>,
+        String,
+        i64,
+        Option<String>,
+        bool,
+        Vec<i64>,
+    )],
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
 
@@ -341,11 +355,13 @@ pub async fn set_character_clones(
         .execute(&mut *tx)
         .await?;
 
-    for (clone_id, name, location_type, location_id, location_name, is_current, implant_type_ids) in clones {
+    for (clone_id, name, location_type, location_id, location_name, is_current, implant_type_ids) in
+        clones
+    {
         let now = chrono::Utc::now().timestamp();
 
-        let clone_db_id = if let Some(esi_clone_id) = clone_id {
-            let existing = sqlx::query_scalar::<_, Option<i64>>(
+        let clone_db_id: i64 = if let Some(esi_clone_id) = clone_id {
+            let existing = sqlx::query_scalar::<_, i64>(
                 "SELECT id FROM clones WHERE character_id = ? AND clone_id = ?",
             )
             .bind(character_id)
@@ -381,10 +397,9 @@ pub async fn set_character_clones(
                 .bind(now)
                 .execute(&mut *tx)
                 .await?;
-                let id = sqlx::query_scalar::<_, i64>("SELECT last_insert_rowid()")
+                sqlx::query_scalar::<_, i64>("SELECT last_insert_rowid()")
                     .fetch_one(&mut *tx)
-                    .await?;
-                id
+                    .await?
             }
         } else {
             sqlx::query(
@@ -400,10 +415,9 @@ pub async fn set_character_clones(
             .bind(now)
             .execute(&mut *tx)
             .await?;
-            let id = sqlx::query_scalar::<_, i64>("SELECT last_insert_rowid()")
+            sqlx::query_scalar::<_, i64>("SELECT last_insert_rowid()")
                 .fetch_one(&mut *tx)
-                .await?;
-            id
+                .await?
         };
 
         sqlx::query("DELETE FROM clone_implants WHERE clone_id = ?")
@@ -452,7 +466,7 @@ pub async fn find_clone_by_implants(
     let mut query_builder: sqlx::QueryBuilder<sqlx::Sqlite> = sqlx::QueryBuilder::new(
         "SELECT c.id FROM clones c
          WHERE c.character_id = ?
-         AND (SELECT COUNT(*) FROM clone_implants ci WHERE ci.clone_id = c.id) = "
+         AND (SELECT COUNT(*) FROM clone_implants ci WHERE ci.clone_id = c.id) = ",
     );
     query_builder.push_bind(character_id);
     query_builder.push_bind(implant_count);
@@ -467,9 +481,7 @@ pub async fn find_clone_by_implants(
     query_builder.push(" ORDER BY c.updated_at DESC LIMIT 1");
 
     let query = query_builder.build();
-    let result = query
-        .fetch_optional(pool)
-        .await?;
+    let result = query.fetch_optional(pool).await?;
 
     Ok(result.map(|row| row.get(0)))
 }
