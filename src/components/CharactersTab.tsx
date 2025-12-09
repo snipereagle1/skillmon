@@ -5,6 +5,8 @@ import { useSkillQueues } from "@/hooks/tauri/useSkillQueues";
 import type { CharacterSkillQueue } from "@/types/tauri";
 import { CharacterCard } from "./CharacterCard";
 import { SkillQueue } from "./SkillQueue";
+import { Skills } from "./Skills";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export function CharactersTab() {
   const { data: characters = [], isLoading: isLoadingCharacters, error: charactersError } = useCharacters();
@@ -93,9 +95,22 @@ export function CharactersTab() {
           )}
         </div>
       </div>
-      <div className="flex-1 border rounded-lg p-4 overflow-y-auto">
+      <div className="flex-1 border rounded-lg overflow-hidden flex flex-col">
         {selectedCharacter ? (
-          <SkillQueue characterId={selectedCharacterId} />
+          <Tabs defaultValue="skill-queue" className="flex flex-col flex-1 overflow-hidden">
+            <div className="border-b px-4 pt-2">
+              <TabsList>
+                <TabsTrigger value="skill-queue">Skill Queue</TabsTrigger>
+                <TabsTrigger value="skills">Skills</TabsTrigger>
+              </TabsList>
+            </div>
+            <TabsContent value="skill-queue" className="flex-1 overflow-auto p-4 m-0">
+              <SkillQueue characterId={selectedCharacterId} />
+            </TabsContent>
+            <TabsContent value="skills" className="flex-1 overflow-hidden m-0">
+              <Skills characterId={selectedCharacterId} />
+            </TabsContent>
+          </Tabs>
         ) : (
           <div className="flex items-center justify-center h-full">
             <p className="text-muted-foreground">Select a character to view skill queue</p>

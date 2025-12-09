@@ -35,3 +35,30 @@ export interface CharacterSkillQueue {
   attributes?: CharacterAttributes | null;
 }
 
+export interface CharacterSkill {
+  skill_id: number;
+  skill_name: string;
+  group_id: number;
+  group_name: string;
+  trained_skill_level: number;
+  active_skill_level: number;
+  skillpoints_in_skill: number;
+  is_in_queue: boolean;
+  queue_level?: number;
+  is_injected: boolean;
+}
+
+export interface SkillGroup {
+  group_id: number;
+  group_name: string;
+  total_levels: number;
+  trained_levels: number;
+  has_trained_skills: boolean;
+}
+
+export interface CharacterSkillsResponse {
+  character_id: number;
+  skills: CharacterSkill[];
+  groups: SkillGroup[];
+}
+
