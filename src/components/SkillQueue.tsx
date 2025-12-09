@@ -61,7 +61,7 @@ function SkillQueueEntry({ skill }: { skill: SkillQueueItem }) {
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <LevelIndicator level={skill.finished_level} />
           <span className="text-foreground font-medium truncate">
-            Skill #{skill.skill_id} {levelRoman}
+            {skill.skill_name || `Skill #${skill.skill_id}`} {levelRoman}
           </span>
         </div>
         <span className={`text-sm whitespace-nowrap ${isTraining ? 'text-green-400 font-medium' : 'text-muted-foreground'}`}>
