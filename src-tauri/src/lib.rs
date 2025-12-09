@@ -4,10 +4,13 @@ use std::sync::Mutex;
 use anyhow::{Context, Result};
 use chrono::Utc;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
+use reqwest::header::{ACCEPT_LANGUAGE, IF_NONE_MATCH};
 use serde::Serialize;
+use serde_plain;
 use tauri::{Emitter, Listener, Manager, State};
 
 mod auth;
+mod cache;
 mod db;
 mod esi;
 
@@ -102,6 +105,90 @@ fn create_authenticated_client(access_token: &str) -> Result<reqwest::Client> {
         .context("Failed to build HTTP client")
 }
 
+async fn get_cached_skill_queue(
+    pool: &db::Pool,
+    client: &reqwest::Client,
+    character_id: i64,
+) -> Result<Option<esi::CharactersCharacterIdSkillqueueGet>> {
+    let endpoint_path = format!("characters/{}/skillqueue", character_id);
+    let cache_key = cache::build_cache_key(&endpoint_path, character_id);
+
+    let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
+
+    if let Some((cached_body, _)) = &cached_entry {
+        let cached_data: esi::CharactersCharacterIdSkillqueueGet =
+            serde_json::from_str(cached_body)
+                .context("Failed to deserialize cached skill queue")?;
+        return Ok(Some(cached_data));
+    }
+
+    let mut request = esi::GetCharactersCharacterIdSkillqueueRequest {
+        character_id,
+        x_compatibility_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+        ..Default::default()
+    };
+
+    if let Some((_, Some(etag))) = cached_entry {
+        request.if_none_match = Some(etag);
+    }
+
+    let url = esi::BASE_URL
+        .parse::<reqwest::Url>()
+        .context("Invalid base URL")?
+        .join(&request.render_path()?)
+        .context("Failed to construct request URL")?;
+
+    let mut req_builder = client.get(url);
+    if let Some(value) = request.accept_language.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header(ACCEPT_LANGUAGE, header_value);
+    }
+    if let Some(value) = request.if_none_match.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header(IF_NONE_MATCH, header_value);
+    }
+    {
+        let header_value = HeaderValue::from_str(
+            &serde_plain::to_string(&request.x_compatibility_date)?,
+        )?;
+        req_builder = req_builder.header("x-compatibility-date", header_value);
+    }
+    if let Some(value) = request.x_tenant.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header("x-tenant", header_value);
+    }
+
+    let response = req_builder.send().await?;
+    let status = response.status();
+    let headers = response.headers().clone();
+
+    if status.as_u16() == 304 {
+        if let Some((cached_body, _)) = cache::get_cached_response(pool, &cache_key).await? {
+            let cached_data: esi::CharactersCharacterIdSkillqueueGet =
+                serde_json::from_str(&cached_body)
+                    .context("Failed to deserialize cached skill queue")?;
+            return Ok(Some(cached_data));
+        }
+    }
+
+    if status.is_success() {
+        let body_bytes = response.bytes().await?;
+        let body_str = String::from_utf8_lossy(&body_bytes);
+
+        let etag = cache::extract_etag(&headers);
+        let expires_at = cache::extract_expires(&headers);
+
+        cache::set_cached_response(pool, &cache_key, etag.as_deref(), expires_at, &body_str)
+            .await?;
+
+        let data: esi::CharactersCharacterIdSkillqueueGet =
+            serde_json::from_str(&body_str).context("Failed to deserialize skill queue")?;
+        return Ok(Some(data));
+    }
+
+    Ok(None)
+}
+
 #[tauri::command]
 async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkillQueue>, String> {
     let characters = db::get_all_characters(&*pool)
@@ -126,21 +213,8 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
         let client = create_authenticated_client(&access_token)
             .map_err(|e| format!("Failed to create client: {}", e))?;
 
-        let esi_client =
-            esi::EveStableInfrastructureEsiTranquilityClient::with_client(esi::BASE_URL, client)
-                .map_err(|e| format!("Failed to create ESI client: {}", e))?;
-
-        let request = esi::GetCharactersCharacterIdSkillqueueRequest {
-            character_id: character.character_id,
-            x_compatibility_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
-            ..Default::default()
-        };
-
-        match esi_client
-            .get_characters_character_id_skillqueue(request)
-            .await
-        {
-            Ok(esi::GetCharactersCharacterIdSkillqueueResponse::Ok(queue_data)) => {
+        match get_cached_skill_queue(&*pool, &client, character.character_id).await {
+            Ok(Some(queue_data)) => {
                 let skill_queue: Vec<SkillQueueItem> = queue_data
                     .into_iter()
                     .filter_map(|item| {
@@ -172,10 +246,10 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
                     skill_queue,
                 });
             }
-            Ok(esi::GetCharactersCharacterIdSkillqueueResponse::Unknown(err)) => {
+            Ok(None) => {
                 eprintln!(
-                    "ESI error for character {}: {:?}",
-                    character.character_id, err
+                    "Failed to fetch skill queue for character {}: No data returned",
+                    character.character_id
                 );
             }
             Err(e) => {
