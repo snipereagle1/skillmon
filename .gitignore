@@ -23,3 +23,8 @@ dist-ssr
 *.sln
 *.sw?
 .specstory/
+
+# Generated ESI code
+src-tauri/src/esi/client.rs
+src-tauri/src/esi/types.rs
+src-tauri/src/esi/openapi.json

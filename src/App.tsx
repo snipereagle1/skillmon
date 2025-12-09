@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { LoginButton } from "./components/LoginButton";
 import { CharacterList } from "./components/CharacterList";
+import { SkillQueue } from "./components/SkillQueue";
 import "./App.css";
 
 function App() {
@@ -53,6 +54,10 @@ function App() {
 
           <div className="bg-white p-6 rounded-lg shadow">
             <CharacterList />
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow">
+            <SkillQueue />
           </div>
         </div>
       </div>
