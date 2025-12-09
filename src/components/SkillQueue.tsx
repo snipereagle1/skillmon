@@ -40,13 +40,13 @@ function SkillQueueEntry({ skill }: { skill: SkillQueueItem }) {
   const isTraining = skill.queue_position === 0;
 
   return (
-    <div className={`p-2 border-b last:border-b-0 ${isTraining ? 'bg-blue-50' : ''}`}>
+    <div className={`p-2 border-b last:border-b-0 ${isTraining ? 'bg-primary/10 dark:bg-primary/20' : ''}`}>
       <div className="flex justify-between items-center">
         <div>
           <span className="font-medium">Skill #{skill.skill_id}</span>
-          <span className="ml-2 text-gray-600">Level {skill.finished_level}</span>
+          <span className="ml-2 text-muted-foreground">Level {skill.finished_level}</span>
         </div>
-        <span className={`text-sm ${isTraining ? 'text-blue-600 font-medium' : 'text-gray-500'}`}>
+        <span className={`text-sm ${isTraining ? 'text-primary font-medium' : 'text-muted-foreground'}`}>
           {formatTimeRemaining(skill.finish_date)}
         </span>
       </div>
@@ -62,15 +62,15 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
 
   return (
     <div className="border rounded-lg overflow-hidden">
-      <div className="bg-gray-100 p-3 flex justify-between items-center">
+      <div className="bg-muted p-3 flex justify-between items-center">
         <h3 className="font-semibold">{queue.character_name}</h3>
-        <span className="text-sm text-gray-600">
+        <span className="text-sm text-muted-foreground">
           {queue.skill_queue.length} skills • {totalTime} total
         </span>
       </div>
       <div className="max-h-64 overflow-y-auto">
         {queue.skill_queue.length === 0 ? (
-          <p className="p-3 text-gray-500 text-center">No skills in queue</p>
+          <p className="p-3 text-muted-foreground text-center">No skills in queue</p>
         ) : (
           queue.skill_queue.map((skill, idx) => (
             <SkillQueueEntry key={`${skill.skill_id}-${idx}`} skill={skill} />
@@ -81,7 +81,11 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
   );
 }
 
-export function SkillQueue() {
+interface SkillQueueProps {
+  characterId?: number | null;
+}
+
+export function SkillQueue({ characterId }: SkillQueueProps = {}) {
   const [queues, setQueues] = useState<CharacterSkillQueue[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -125,15 +129,23 @@ export function SkillQueue() {
   }, []);
 
   if (isLoading) {
-    return <p className="text-gray-500">Loading skill queues...</p>;
+    return <p className="text-muted-foreground">Loading skill queues...</p>;
   }
 
   if (error) {
-    return <p className="text-red-600">Error: {error}</p>;
+    return <p className="text-destructive">Error: {error}</p>;
+  }
+
+  if (characterId !== undefined && characterId !== null) {
+    const queue = queues.find(q => q.character_id === characterId);
+    if (!queue) {
+      return <p className="text-muted-foreground">No skill queue found for this character.</p>;
+    }
+    return <CharacterQueue queue={queue} />;
   }
 
   if (queues.length === 0) {
-    return <p className="text-gray-500">No characters with skill queues found.</p>;
+    return <p className="text-muted-foreground">No characters with skill queues found.</p>;
   }
 
   return (

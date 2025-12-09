@@ -1,8 +1,5 @@
 import { useEffect } from "react";
-import { LoginButton } from "./components/LoginButton";
-import { CharacterList } from "./components/CharacterList";
-import { SkillQueue } from "./components/SkillQueue";
-import "./App.css";
+import { TabLayout } from "./components/TabLayout";
 
 function App() {
   useEffect(() => {
@@ -15,7 +12,6 @@ function App() {
           console.log("App: ===== AUTH SUCCESS EVENT RECEIVED =====");
           console.log("App: Full event object:", JSON.stringify(event, null, 2));
           console.log("App: Character ID:", event.payload);
-          // CharacterList component will handle refreshing itself
         });
 
         console.log("App: Auth listener set up successfully");
@@ -31,7 +27,6 @@ function App() {
         };
       } catch (error) {
         console.error("App: Failed to setup auth listeners:", error);
-        // If we're not in Tauri, this is expected - just log and continue
         if (error instanceof Error && error.message.includes("Tauri")) {
           console.log("App: Not in Tauri environment (expected in browser dev)");
         }
@@ -42,26 +37,9 @@ function App() {
   }, []);
 
   return (
-    <main className="min-h-screen bg-gray-50 p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold mb-8 text-gray-900">SkillMon - EVE Online Character Training Monitor</h1>
-
-        <div className="space-y-6">
-          <div className="bg-white p-6 rounded-lg shadow">
-            <h2 className="text-xl font-semibold mb-4 text-gray-800">Authentication</h2>
-            <LoginButton />
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow">
-            <CharacterList />
-          </div>
-
-          <div className="bg-white p-6 rounded-lg shadow">
-            <SkillQueue />
-          </div>
-        </div>
-      </div>
-    </main>
+    <div className="h-screen w-screen bg-background text-foreground">
+      <TabLayout />
+    </div>
   );
 }
 
