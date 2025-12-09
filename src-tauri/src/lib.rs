@@ -94,6 +94,7 @@ pub struct SkillQueueItem {
     pub training_start_sp: Option<i64>,
     pub level_start_sp: Option<i64>,
     pub level_end_sp: Option<i64>,
+    pub current_sp: Option<i64>,
     pub sp_per_minute: Option<f64>,
     pub primary_attribute: Option<i64>,
     pub secondary_attribute: Option<i64>,
@@ -331,6 +332,143 @@ async fn get_cached_character_attributes(
     Ok(None)
 }
 
+async fn get_cached_character_skills(
+    pool: &db::Pool,
+    client: &reqwest::Client,
+    character_id: i64,
+) -> Result<Option<esi::CharactersCharacterIdSkillsGet>> {
+    let endpoint_path = format!("characters/{}/skills", character_id);
+    let cache_key = cache::build_cache_key(&endpoint_path, character_id);
+
+    let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
+
+    if let Some((cached_body, _)) = &cached_entry {
+        let cached_data: esi::CharactersCharacterIdSkillsGet =
+            serde_json::from_str(cached_body)
+                .context("Failed to deserialize cached character skills")?;
+
+        let skills_data: Vec<(i64, i64, i64, i64)> = cached_data
+            .skills
+            .iter()
+            .filter_map(|skill| {
+                let obj = skill.as_object()?;
+                Some((
+                    obj.get("skill_id")?.as_i64()?,
+                    obj.get("active_skill_level")?.as_i64()?,
+                    obj.get("skillpoints_in_skill")?.as_i64()?,
+                    obj.get("trained_skill_level")?.as_i64()?,
+                ))
+            })
+            .collect();
+        db::set_character_skills(pool, character_id, &skills_data)
+            .await
+            .ok();
+
+        return Ok(Some(cached_data));
+    }
+
+    let mut request = esi::GetCharactersCharacterIdSkillsRequest {
+        character_id,
+        x_compatibility_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+        ..Default::default()
+    };
+
+    if let Some((_, Some(etag))) = cached_entry {
+        request.if_none_match = Some(etag);
+    }
+
+    let url = esi::BASE_URL
+        .parse::<reqwest::Url>()
+        .context("Invalid base URL")?
+        .join(&request.render_path()?)
+        .context("Failed to construct request URL")?;
+
+    let mut req_builder = client.get(url);
+    if let Some(value) = request.accept_language.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header(ACCEPT_LANGUAGE, header_value);
+    }
+    if let Some(value) = request.if_none_match.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header(IF_NONE_MATCH, header_value);
+    }
+    {
+        let header_value =
+            HeaderValue::from_str(&serde_plain::to_string(&request.x_compatibility_date)?)?;
+        req_builder = req_builder.header("x-compatibility-date", header_value);
+    }
+    if let Some(value) = request.x_tenant.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header("x-tenant", header_value);
+    }
+
+    let response = req_builder.send().await?;
+    let status = response.status();
+    let headers = response.headers().clone();
+
+    if status.as_u16() == 304 {
+        if let Some((cached_body, _)) = cache::get_cached_response(pool, &cache_key).await? {
+            let cached_data: esi::CharactersCharacterIdSkillsGet =
+                serde_json::from_str(&cached_body)
+                    .context("Failed to deserialize cached character skills")?;
+
+            let skills_data: Vec<(i64, i64, i64, i64)> = cached_data
+                .skills
+                .iter()
+                .filter_map(|skill| {
+                    let obj = skill.as_object()?;
+                    Some((
+                        obj.get("skill_id")?.as_i64()?,
+                        obj.get("active_skill_level")?.as_i64()?,
+                        obj.get("skillpoints_in_skill")?.as_i64()?,
+                        obj.get("trained_skill_level")?.as_i64()?,
+                    ))
+                })
+                .collect();
+            db::set_character_skills(pool, character_id, &skills_data)
+                .await
+                .ok();
+
+            return Ok(Some(cached_data));
+        }
+    }
+
+    if status.is_success() {
+        let body_bytes = response.bytes().await?;
+        let body_str = String::from_utf8_lossy(&body_bytes);
+
+        let etag = cache::extract_etag(&headers);
+        let expires_at = cache::extract_expires(&headers);
+
+        cache::set_cached_response(pool, &cache_key, etag.as_deref(), expires_at, &body_str)
+            .await?;
+
+        let data: esi::CharactersCharacterIdSkillsGet = serde_json::from_str(&body_str)
+            .context("Failed to deserialize character skills")?;
+
+        let skills_data: Vec<(i64, i64, i64, i64)> = data
+            .skills
+            .iter()
+            .filter_map(|skill| {
+                let obj = skill.as_object()?;
+                Some((
+                    obj.get("skill_id")?.as_i64()?,
+                    obj.get("active_skill_level")?.as_i64()?,
+                    obj.get("skillpoints_in_skill")?.as_i64()?,
+                    obj.get("trained_skill_level")?.as_i64()?,
+                ))
+            })
+            .collect();
+        db::set_character_skills(pool, character_id, &skills_data)
+            .await
+            .ok();
+
+        return Ok(Some(data));
+    }
+
+    Ok(None)
+}
+
 async fn get_skill_names(
     pool: &db::Pool,
     skill_ids: &[i64],
@@ -451,6 +589,7 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
 
     let mut results = Vec::new();
     let mut all_skill_ids = Vec::new();
+    let mut character_skill_sp: HashMap<i64, HashMap<i64, i64>> = HashMap::new();
 
     for character in characters {
         let access_token =
@@ -513,6 +652,17 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
                 }
             };
 
+        get_cached_character_skills(&*pool, &client, character.character_id)
+            .await
+            .ok();
+        let mut skill_sp_map: HashMap<i64, i64> = HashMap::new();
+        if let Ok(skills) = db::get_character_skills(&*pool, character.character_id).await {
+            for skill in skills {
+                skill_sp_map.insert(skill.skill_id, skill.skillpoints_in_skill);
+            }
+        }
+        character_skill_sp.insert(character.character_id, skill_sp_map);
+
         match get_cached_skill_queue(&*pool, &client, character.character_id).await {
             Ok(Some(queue_data)) => {
                 let skill_queue: Vec<SkillQueueItem> = queue_data
@@ -520,11 +670,12 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
                     .filter_map(|item| {
                         let obj = item.as_object()?;
                         let skill_id = obj.get("skill_id")?.as_i64()?;
+                        let queue_pos = obj.get("queue_position")?.as_i64()? as i32;
                         all_skill_ids.push(skill_id);
                         Some(SkillQueueItem {
                             skill_id,
                             skill_name: None,
-                            queue_position: obj.get("queue_position")?.as_i64()? as i32,
+                            queue_position: queue_pos,
                             finished_level: obj.get("finished_level")?.as_i64()? as i32,
                             start_date: obj
                                 .get("start_date")
@@ -539,6 +690,7 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
                                 .and_then(|v| v.as_i64()),
                             level_start_sp: obj.get("level_start_sp").and_then(|v| v.as_i64()),
                             level_end_sp: obj.get("level_end_sp").and_then(|v| v.as_i64()),
+                            current_sp: None,
                             sp_per_minute: None,
                             primary_attribute: None,
                             secondary_attribute: None,
@@ -584,9 +736,122 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
 
     for result in &mut results {
         let char_attrs = &result.attributes;
+        let mut skill_progress_map: HashMap<i64, i64> = HashMap::new();
+        let skill_known_sp = character_skill_sp
+            .get(&result.character_id)
+            .map(|m| m.clone())
+            .unwrap_or_default();
         for skill_item in &mut result.skill_queue {
             if let Some(name) = skill_names.get(&skill_item.skill_id) {
                 skill_item.skill_name = Some(name.clone());
+            }
+
+            let known_sp = skill_known_sp.get(&skill_item.skill_id).copied();
+            let current_tracker = skill_progress_map.get(&skill_item.skill_id).copied();
+
+            let is_currently_training = skill_item.queue_position == 0 || {
+                let now = chrono::Utc::now();
+                if let (Some(start_str), Some(finish_str)) = (&skill_item.start_date, &skill_item.finish_date) {
+                    if let (Ok(start), Ok(finish)) = (
+                        chrono::DateTime::parse_from_rfc3339(start_str),
+                        chrono::DateTime::parse_from_rfc3339(finish_str),
+                    ) {
+                        let start_utc = start.with_timezone(&chrono::Utc);
+                        let finish_utc = finish.with_timezone(&chrono::Utc);
+                        now >= start_utc && now < finish_utc
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            };
+
+
+            let mut progress_sp = if is_currently_training {
+                let base_sp = known_sp
+                    .or(skill_item.training_start_sp)
+                    .or(skill_item.level_start_sp)
+                    .unwrap_or(0);
+
+                if let (Some(start_str), Some(finish_str)) = (
+                    &skill_item.start_date,
+                    &skill_item.finish_date,
+                ) {
+                    if let (Ok(start), Ok(finish)) = (
+                        chrono::DateTime::parse_from_rfc3339(start_str),
+                        chrono::DateTime::parse_from_rfc3339(finish_str),
+                    ) {
+                        let start_utc = start.with_timezone(&chrono::Utc);
+                        let finish_utc = finish.with_timezone(&chrono::Utc);
+                        let now = chrono::Utc::now();
+
+                        if now >= start_utc && now < finish_utc {
+                            let total_duration = (finish_utc - start_utc).num_seconds() as f64;
+                            let elapsed_duration = (now - start_utc).num_seconds() as f64;
+
+                            if total_duration > 0.0 && elapsed_duration > 0.0 {
+                                let total_sp_needed = skill_item.level_end_sp.unwrap_or(0) - skill_item.level_start_sp.unwrap_or(0);
+                                let progress_ratio = elapsed_duration / total_duration;
+                                let sp_gained = (total_sp_needed as f64 * progress_ratio) as i64;
+                                let calculated_sp = base_sp + sp_gained;
+
+                                if let Some(level_end) = skill_item.level_end_sp {
+                                    if calculated_sp > level_end {
+                                        level_end
+                                    } else {
+                                        calculated_sp
+                                    }
+                                } else {
+                                    calculated_sp
+                                }
+                            } else {
+                                base_sp
+                            }
+                        } else {
+                            base_sp
+                        }
+                    } else {
+                        base_sp
+                    }
+                } else {
+                    base_sp
+                }
+            } else {
+                current_tracker
+                    .or(known_sp)
+                    .or(skill_item.training_start_sp)
+                    .or(skill_item.level_start_sp)
+                    .unwrap_or(0)
+            };
+
+
+            if is_currently_training {
+                if let Some(level_end) = skill_item.level_end_sp {
+                    if progress_sp > level_end {
+                        progress_sp = level_end;
+                    }
+                }
+            } else {
+                if let Some(level_start) = skill_item.level_start_sp {
+                    if progress_sp < level_start {
+                        progress_sp = level_start;
+                    }
+                }
+                if let Some(level_end) = skill_item.level_end_sp {
+                    if progress_sp > level_end {
+                        progress_sp = level_end;
+                    }
+                }
+            }
+
+            skill_item.current_sp = Some(progress_sp);
+
+            if let Some(level_end) = skill_item.level_end_sp {
+                let next_progress = std::cmp::max(progress_sp, level_end);
+                skill_progress_map.insert(skill_item.skill_id, next_progress);
+            } else {
+                skill_progress_map.insert(skill_item.skill_id, progress_sp);
             }
 
             if let Some(skill_attr) = skill_attributes.get(&skill_item.skill_id) {
@@ -628,6 +893,7 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
                         };
                         let sp_per_min = calculate_sp_per_minute(primary_value, secondary_value);
                         skill_item.sp_per_minute = Some(sp_per_min);
+
                     }
                 }
             }

@@ -21,6 +21,7 @@ export interface SkillQueueItem {
   training_start_sp: number | null;
   level_start_sp: number | null;
   level_end_sp: number | null;
+  current_sp?: number | null;
   sp_per_minute?: number | null;
   primary_attribute?: number | null;
   secondary_attribute?: number | null;
