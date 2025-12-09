@@ -1,0 +1,159 @@
+---
+globs:
+  - "src/**/*.tsx"
+  - "src/**/*.ts"
+alwaysApply: false
+---
+
+# Frontend Patterns
+
+## Data Fetching with React Query
+
+All data fetching uses `@tanstack/react-query` (React Query). Never use `fetch` or `axios` directly for Tauri commands.
+
+### Query Pattern
+
+```typescript
+import { useQuery } from "@tanstack/react-query";
+import { invoke } from "@tauri-apps/api/core";
+
+export function useMyData() {
+  return useQuery({
+    queryKey: ["myData"],
+    queryFn: async () => {
+      return await invoke<MyDataType>("my_command");
+    },
+  });
+}
+```
+
+### Query Keys
+
+Use descriptive, hierarchical query keys:
+- `["characters"]` - All characters
+- `["skillQueues"]` - All skill queues
+- `["character", characterId]` - Single character (if needed)
+
+## Tauri Commands
+
+Invoke Tauri commands using `invoke()` from `@tauri-apps/api/core`:
+
+```typescript
+import { invoke } from "@tauri-apps/api/core";
+
+const result = await invoke<ReturnType>("command_name", { arg1: value1 });
+```
+
+Commands are defined in `src-tauri/src/lib.rs` with the `#[tauri::command]` attribute.
+
+## Custom Hooks
+
+Custom hooks wrapping Tauri commands are located in `src/hooks/tauri/`:
+
+- `useCharacters.ts` - Fetch all characters
+- `useSkillQueues.ts` - Fetch all skill queues
+- `useStartEveLogin.ts` - Start EVE SSO login
+- `useLogoutCharacter.ts` - Logout a character
+
+### Hook Structure
+
+All data-fetching hooks follow this pattern:
+
+```typescript
+import { useQuery } from "@tanstack/react-query";
+import { invoke } from "@tauri-apps/api/core";
+import type { DataType } from "@/types/tauri";
+
+export function useMyData() {
+  return useQuery<DataType[]>({
+    queryKey: ["myData"],
+    queryFn: async () => {
+      return await invoke<DataType[]>("get_my_data");
+    },
+  });
+}
+```
+
+For mutations (commands that modify state), use `useMutation`:
+
+```typescript
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { invoke } from "@tauri-apps/api/core";
+
+export function useMyMutation() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (data: InputType) => {
+      return await invoke("my_mutation", data);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["myData"] });
+    },
+  });
+}
+```
+
+## Type Definitions
+
+TypeScript types matching Rust structs are in `src/types/tauri.ts`. These should match the `Serialize` structs in Rust.
+
+Example:
+```typescript
+export interface Character {
+  character_id: number;
+  character_name: string;
+}
+```
+
+## Components
+
+### shadcn/ui Components
+
+- **Location**: `src/components/ui/`
+- **Adding Components**: Always use the shadcn CLI: `pnpm dlx shadcn@latest add [component-name]`
+- **Never manually create** shadcn component files
+
+### Custom Components
+
+- **Location**: `src/components/`
+- **Naming**: PascalCase (e.g., `CharacterList.tsx`)
+- **Structure**: Functional components with TypeScript
+
+## Path Aliases
+
+Configured in `components.json` and `tsconfig.json`:
+
+- `@/components` → `src/components`
+- `@/lib` → `src/lib`
+- `@/hooks` → `src/hooks`
+- `@/components/ui` → `src/components/ui`
+
+Use these aliases instead of relative paths:
+
+```typescript
+// Good
+import { Button } from "@/components/ui/button";
+import { useCharacters } from "@/hooks/tauri/useCharacters";
+
+// Avoid
+import { Button } from "../../components/ui/button";
+```
+
+## Styling
+
+- **Framework**: Tailwind CSS
+- **Config**: Tailwind v4 with CSS variables (see `src/index.css`)
+- **Theme**: Uses shadcn/ui "new-york" style with slate base color
+- **Icons**: Lucide React (`lucide-react`)
+
+## Best Practices
+
+- Always use React Query for data fetching
+- Use custom hooks to encapsulate Tauri command invocations
+- Invalidate queries after mutations to refresh data
+- Use TypeScript types from `@/types/tauri` for type safety
+- Use path aliases for imports
+- Use shadcn CLI to add UI components
+- Follow React 19 patterns (functional components, hooks)
+- Handle loading and error states from React Query

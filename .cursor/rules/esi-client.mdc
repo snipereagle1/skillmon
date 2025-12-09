@@ -1,0 +1,131 @@
+---
+globs:
+  - "src-tauri/src/esi/**"
+  - "src-tauri/src/lib.rs"
+alwaysApply: false
+---
+
+# ESI Client System
+
+## Overview
+
+The ESI (EVE Swagger Interface) client is auto-generated from the EVE Online OpenAPI schema. It provides type-safe access to the EVE Online API.
+
+## Location
+
+- **Module**: `src-tauri/src/esi/`
+- **Files**:
+  - `mod.rs` - Module exports (`BASE_URL` and client types)
+  - `client.rs` - Generated client code (do not edit manually)
+  - `types.rs` - Generated type definitions (do not edit manually)
+  - `openapi.json` - Cached OpenAPI schema
+
+## Regenerating the Client
+
+Run the generation script:
+
+```bash
+./scripts/generate-esi.sh
+```
+
+This script:
+
+1. Downloads the latest OpenAPI schema
+2. Generates `types.rs` and `client.rs` using `oas3-gen`
+3. Adds necessary imports and suppresses unused code warnings
+
+**Important**: The generated files are not checked into version control. They are generated at build time. Only regenerate manually when the ESI API schema changes.
+
+## Usage Pattern
+
+### Base URL
+
+```rust
+use esi::BASE_URL;
+
+let url = BASE_URL.parse::<reqwest::Url>()?
+    .join("characters/12345/skillqueue")?;
+```
+
+### Request Types
+
+Import request types from the `esi` module:
+
+```rust
+use esi::GetCharactersCharacterIdSkillqueueRequest;
+
+let mut request = GetCharactersCharacterIdSkillqueueRequest {
+    character_id: 12345,
+    x_compatibility_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+    ..Default::default()
+};
+```
+
+### Response Types
+
+Response types are also available from the `esi` module:
+
+```rust
+use esi::CharactersCharacterIdSkillqueueGet;
+
+let response: CharactersCharacterIdSkillqueueGet = client.get(url).send().await?.json().await?;
+```
+
+## Authentication
+
+Create an authenticated HTTP client using the helper function:
+
+```rust
+fn create_authenticated_client(access_token: &str) -> Result<reqwest::Client> {
+    let mut headers = HeaderMap::new();
+    let auth_value = HeaderValue::from_str(&format!("Bearer {}", access_token))?;
+    headers.insert(AUTHORIZATION, auth_value);
+    reqwest::Client::builder()
+        .default_headers(headers)
+        .build()
+}
+```
+
+The access token comes from the `tokens` table in the database. See `src-tauri/src/lib.rs` for the implementation.
+
+## Caching
+
+ESI responses should always use the caching system to respect rate limits and ETag headers.
+
+### Cache Helpers
+
+Located in `src-tauri/src/cache/mod.rs`:
+
+- `cache::build_cache_key(endpoint, character_id)` - Build cache key
+- `cache::get_cached_response(pool, cache_key)` - Get cached response (returns body and ETag)
+- `cache::set_cached_response(pool, cache_key, etag, expires_at, response_body)` - Store response
+- `cache::extract_etag(headers)` - Extract ETag from response headers
+- `cache::extract_expires(headers)` - Extract expiration time from headers
+
+### Caching Pattern
+
+1. Build cache key: `format!("characters/{}/skillqueue", character_id)`
+2. Check cache: `get_cached_response(pool, cache_key)`
+3. If cached and not expired, return cached data
+4. If cached but expired, use ETag in `If-None-Match` header
+5. After API call, store response with `set_cached_response()`
+
+See `get_cached_skill_queue()` in `src-tauri/src/lib.rs` for a complete example.
+
+## Cache Table
+
+The `esi_cache` table stores:
+
+- `cache_key`: Unique identifier (e.g., `"characters/12345/skillqueue"`)
+- `etag`: ETag from response headers (for conditional requests)
+- `expires_at`: Unix timestamp when cache expires
+- `response_body`: JSON response body
+
+## Best Practices
+
+- Always use caching for ESI requests to minimize API calls
+- Include ETag in requests when available (`If-None-Match` header)
+- Handle 304 Not Modified responses (when ETag matches)
+- Respect cache expiration times from response headers
+- Use `x_compatibility_date` in requests for API versioning
+- Handle rate limiting (ESI returns 429 Too Many Requests)

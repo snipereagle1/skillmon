@@ -1,0 +1,119 @@
+---
+globs:
+  - "src-tauri/src/lib.rs"
+alwaysApply: false
+---
+
+# Tauri Commands
+
+## Location
+
+All Tauri commands are defined in `src-tauri/src/lib.rs` with the `#[tauri::command]` attribute.
+
+## Command Registration
+
+Commands are registered in the `invoke_handler![]` macro within the `run()` function:
+
+```rust
+.invoke_handler(tauri::generate_handler![
+    start_eve_login,
+    get_characters,
+    logout_character,
+    get_skill_queues,
+    refresh_sde
+])
+```
+
+## Command Signature Pattern
+
+All commands follow this pattern:
+
+```rust
+#[tauri::command]
+async fn command_name(
+    pool: State<'_, db::Pool>,
+    // other parameters
+) -> Result<ReturnType, String> {
+    // Implementation
+}
+```
+
+## State Access
+
+### Database Pool
+
+Access the database pool via Tauri State:
+
+```rust
+#[tauri::command]
+async fn my_command(pool: State<'_, db::Pool>) -> Result<Vec<MyType>, String> {
+    db::get_something(&*pool)
+        .await
+        .map_err(|e| format!("Error: {}", e))
+}
+```
+
+### Auth State Map
+
+For commands that need auth state:
+
+```rust
+#[tauri::command]
+async fn my_auth_command(
+    auth_states: State<'_, AuthStateMap>
+) -> Result<(), String> {
+    // Access auth_states
+}
+```
+
+### App Handle
+
+For commands that need app-level functionality (events, paths, etc.):
+
+```rust
+#[tauri::command]
+async fn my_command(app: tauri::AppHandle) -> Result<(), String> {
+    app.emit("event-name", payload)?;
+    // ...
+}
+```
+
+## Return Types
+
+Commands should return `Result<T, String>`:
+
+- `Ok(value)` for success
+- `Err(String)` for errors (error message is shown to user)
+
+Use `.map_err(|e| format!("Error: {}", e))` to convert `anyhow::Error` to `String`.
+
+## Error Handling
+
+Always handle errors gracefully:
+
+```rust
+#[tauri::command]
+async fn my_command(pool: State<'_, db::Pool>) -> Result<MyType, String> {
+    db::operation(&*pool)
+        .await
+        .map_err(|e| format!("Failed to perform operation: {}", e))
+}
+```
+
+## Adding New Commands
+
+1. Define the command function with `#[tauri::command]` attribute
+2. Add it to the `invoke_handler![]` macro in `run()`
+3. Create a corresponding TypeScript type in `src/types/tauri.ts`
+4. Create a custom hook in `src/hooks/tauri/` if it's a data-fetching command
+5. Use the hook in components
+
+## Best Practices
+
+- Keep commands focused on a single operation
+- Use descriptive names that match their purpose
+- Always return `Result<T, String>` for error handling
+- Access database via `State<'_, db::Pool>`
+- Use `async` for all commands (database and HTTP operations are async)
+- Convert `anyhow::Result` to `Result<T, String>` with `.map_err()`
+- Emit events when state changes that frontend should know about

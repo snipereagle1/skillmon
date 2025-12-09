@@ -1,0 +1,41 @@
+---
+alwaysApply: true
+---
+
+# Project Setup & Development
+
+## Environment Variables
+
+- **EVE_CLIENT_ID** (required): EVE Online SSO client ID for OAuth authentication
+- **EVE_CALLBACK_URL** (optional): OAuth callback URL, defaults to `http://localhost:1421/callback` for development
+
+## Development Commands
+
+- `pnpm dev` - Start Vite dev server for frontend development
+- `pnpm tauri dev` - Start full Tauri application with hot reload
+- `pnpm build` - Build frontend for production
+- `pnpm tauri build` - Build Tauri application
+
+## ESI Client Generation
+
+The ESI client is auto-generated from the EVE Online OpenAPI schema. Run `./scripts/generate-esi.sh` to regenerate. See the `esi-client` rule for detailed usage and patterns.
+
+**Note**: The generated files are not checked into version control. They are generated at build time.
+
+## Database
+
+- **Location**: SQLite database is automatically created in the Tauri app data directory
+- **Path**: Platform-specific (e.g., `~/.local/share/com.skillmon/database.sqlite` on Linux)
+- **Mode**: WAL (Write-Ahead Logging) mode for better concurrency
+- **Migrations**: Located in `src-tauri/migrations/` and automatically run on app startup
+
+## Database Migrations
+
+Migrations are SQL files in `src-tauri/migrations/` numbered sequentially:
+
+- `001_initial_schema.sql` - Characters and tokens tables
+- `002_esi_cache.sql` - ESI response caching
+- `003_sde_schema.sql` - Static Data Export tables
+- `004_character_attributes.sql` - Character attributes
+
+Migrations are automatically applied when the app starts via `sqlx::migrate!()` in `src-tauri/src/db/mod.rs`.

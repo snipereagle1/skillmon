@@ -1,0 +1,21 @@
+---
+alwaysApply: true
+---
+
+# Project Overview
+
+This is **skillmon**, an EVE Online skill monitoring application built as a Tauri desktop application.
+
+## Tech Stack
+
+- **Backend**: Rust with Tauri 2
+- **Frontend**: React 19 with TypeScript
+- **Database**: SQLite (via sqlx)
+- **Data Fetching**: TanStack Query (React Query)
+- **UI Components**: shadcn/ui
+- **Styling**: Tailwind CSS
+- **Package Manager**: pnpm
+
+## Purpose
+
+The application allows EVE Online players to monitor their character skill queues, track skill training progress, and manage multiple characters. It integrates with the EVE Swagger Interface (ESI) API to fetch real-time skill data and uses the EVE Online Static Data Export (SDE) for game item and skill information.

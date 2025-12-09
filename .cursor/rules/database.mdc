@@ -1,0 +1,72 @@
+---
+globs:
+  - "src-tauri/src/db/**"
+  - "src-tauri/migrations/**"
+alwaysApply: false
+---
+
+# Database Operations
+
+## Database Module Structure
+
+- **Initialization**: `src-tauri/src/db/mod.rs` - Sets up SQLite connection pool with WAL mode
+- **Operations**: `src-tauri/src/db/operations.rs` - All database CRUD operations
+- **Type**: `db::Pool` is an alias for `SqlitePool`
+
+## Database Access Pattern
+
+In Tauri commands, access the database pool via Tauri State:
+
+```rust
+#[tauri::command]
+async fn my_command(pool: State<'_, db::Pool>) -> Result<Vec<MyType>, String> {
+    // Use pool here
+    db::get_something(&*pool).await
+}
+```
+
+## Key Tables
+
+### Application Data
+
+- **characters**: Character metadata (character_id, character_name)
+- **tokens**: OAuth tokens for ESI API access (character_id, access_token, refresh_token, expires_at)
+- **character_attributes**: Character attribute data (intelligence, memory, perception, willpower, charisma)
+
+### Caching
+
+- **esi_cache**: Cached ESI API responses with ETag support (cache_key, etag, expires_at, response_body)
+
+**Note**: SDE tables are documented in the `sde-system` rule.
+
+## Database Operations
+
+All database operations are in `src-tauri/src/db/operations.rs`. Common operations:
+
+- `get_character(pool, character_id)` - Get single character
+- `get_all_characters(pool)` - Get all characters
+- `add_character(pool, character_id, character_name)` - Add new character
+- `update_character(pool, character_id, character_name)` - Update character name
+- `delete_character(pool, character_id)` - Delete character and tokens
+- `get_tokens(pool, character_id)` - Get OAuth tokens
+- `set_tokens(pool, character_id, access_token, refresh_token, expires_at)` - Store tokens
+- `update_tokens(pool, character_id, access_token, refresh_token, expires_at)` - Update tokens
+- `get_character_attributes(pool, character_id)` - Get character attributes
+- `set_character_attributes(pool, character_id, attributes)` - Store character attributes
+
+## Migration Pattern
+
+1. Create new SQL file in `src-tauri/migrations/` with next sequential number
+2. Use `CREATE TABLE IF NOT EXISTS` for new tables
+3. Use `ALTER TABLE` for schema changes
+4. Migrations are automatically applied on app startup
+5. Use `sqlx::migrate!()` macro which points to the migrations directory
+
+## Best Practices
+
+- Always use `sqlx::query_as!` or `sqlx::query_as::<_, Type>` for type-safe queries
+- Use transactions for multi-step operations
+- Use `?` operator for error propagation with `anyhow::Result`
+- Prefer `fetch_optional()` when a single row may or may not exist
+- Use `fetch_all()` for multiple rows
+- Bind parameters with `.bind()` to prevent SQL injection
