@@ -1,0 +1,94 @@
+---
+description: OAuth authentication flow and token management
+alwaysApply: false
+---
+
+# Authentication
+
+## Overview
+
+The application uses OAuth 2.0 with EVE Online's Single Sign-On (SSO) system to authenticate users and obtain access tokens for the ESI API.
+
+## OAuth Flow
+
+1. User initiates login via `start_eve_login` Tauri command
+2. Application generates OAuth URL with:
+   - Client ID from `EVE_CLIENT_ID` environment variable
+   - Scopes: `esi-skills.read_skills.v1`, `esi-skills.read_skillqueue.v1`
+   - Callback URL (dev: `http://localhost:1421/callback`, prod: `eveauth-skillmon://callback`)
+   - State parameter for CSRF protection
+3. Browser opens with OAuth URL
+4. User authorizes application on EVE SSO
+5. Callback received (HTTP server in dev, deep link in prod)
+6. Authorization code exchanged for access and refresh tokens
+7. Tokens stored in database `tokens` table
+8. Character information fetched and stored in `characters` table
+9. `auth-success` event emitted with character_id
+
+## Callback Handling
+
+### Development Mode
+- HTTP server on `localhost:1421` (configurable via `EVE_CALLBACK_URL`)
+- Started automatically in Tauri setup if callback URL starts with `http://`
+- See `src-tauri/src/auth/callback_server.rs`
+
+### Production Mode
+- Deep link: `eveauth-skillmon://callback`
+- Configured in `tauri.conf.json` under `plugins.deep-link.desktop.schemes`
+- Handled by `tauri-plugin-deep-link`
+
+## Auth State Management
+
+- **In-Memory**: `AuthStateMap` (Mutex<HashMap<String, AuthState>>) stores OAuth state during flow
+- **Persistent**: Tokens stored in `tokens` table with expiration
+- **State Key**: Random string used to prevent CSRF attacks
+
+## Token Storage
+
+Tokens are stored in the `tokens` table:
+- `character_id`: Primary key, references `characters` table
+- `access_token`: Bearer token for ESI API requests
+- `refresh_token`: Used to obtain new access tokens
+- `expires_at`: Unix timestamp when access token expires
+
+## Token Refresh
+
+Tokens are automatically refreshed when expired:
+- Check `expires_at` before making ESI requests
+- If expired, use `refresh_token` to get new `access_token`
+- Update `tokens` table with new tokens and expiration
+- See `src-tauri/src/auth/oauth.rs` for refresh logic
+
+## Character Information
+
+After successful authentication:
+- Character ID and name fetched from ESI `/characters/{character_id}/` endpoint
+- Stored in `characters` table
+- Character attributes (intelligence, memory, etc.) fetched and stored
+
+## Events
+
+- **auth-success**: Emitted with `character_id` (i64) when authentication succeeds
+- **auth-error**: Emitted with error message (String) when authentication fails
+
+Frontend listens to these events in `src/App.tsx` to update UI and refresh data.
+
+## Environment Variables
+
+- **EVE_CLIENT_ID** (required): OAuth client ID from EVE Developers portal
+- **EVE_CALLBACK_URL** (optional): Override default callback URL
+
+## Security Considerations
+
+- State parameter prevents CSRF attacks
+- Tokens stored securely in local database (not in memory)
+- Refresh tokens used to minimize exposure of access tokens
+- Deep link scheme is app-specific (`eveauth-skillmon://`)
+
+## Best Practices
+
+- Always check token expiration before making ESI requests
+- Refresh tokens automatically when expired
+- Handle authentication errors gracefully
+- Emit events to notify frontend of auth state changes
+- Store minimal data - only what's needed for API access

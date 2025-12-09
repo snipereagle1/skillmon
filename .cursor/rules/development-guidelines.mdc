@@ -1,0 +1,106 @@
+---
+alwaysApply: true
+---
+
+# Development Guidelines
+
+## Package Management
+
+**Always use pnpm**, never npm or yarn. The project uses `pnpm-lock.yaml` for dependency locking.
+
+```bash
+pnpm install          # Install dependencies
+pnpm add <package>    # Add dependency
+pnpm remove <package> # Remove dependency
+```
+
+## UI Components
+
+**Always use the shadcn CLI** to add components. Never manually create shadcn component files.
+
+```bash
+pnpm dlx shadcn@latest add button
+pnpm dlx shadcn@latest add dialog
+```
+
+Components are added to `src/components/ui/` automatically. The configuration is in `components.json`.
+
+## Database
+
+- **Use sqlx** with compile-time query checking
+- **Use transactions** for multi-step operations
+- **Use `anyhow::Result`** for error propagation in Rust
+- **Use `?` operator** for error handling
+- **Prefer type-safe queries** with `query_as!` or `query_as::<_, Type>`
+
+## ESI Requests
+
+- **Always use caching** helpers from `cache` module
+- **Include ETag** in requests when available
+- **Handle 304 Not Modified** responses
+- **Respect rate limits**
+
+See the `esi-client` rule for detailed caching patterns and examples.
+
+## Frontend Data Fetching
+
+- **Always use React Query** (`@tanstack/react-query`) for data fetching
+- **Never use `fetch` or `axios`** directly for Tauri commands
+- **Use custom hooks** in `src/hooks/tauri/` to wrap Tauri commands
+- **Invalidate queries** after mutations to refresh data
+
+See the `frontend-patterns` rule for detailed patterns and examples.
+
+## Tauri Commands
+
+- **Return `Result<T, String>`** for error handling
+- **Use `State<'_, db::Pool>`** to access database
+- **Use `async`** for all commands
+- **Convert errors** with `.map_err(|e| format!("Error: {}", e))`
+- **Emit events** when state changes that frontend should know about
+
+See the `tauri-commands` rule for detailed patterns and examples.
+
+## Error Handling
+
+- **Rust**: Use `anyhow::Result` internally, convert to `Result<T, String>` for Tauri commands
+- **TypeScript**: Handle errors from React Query (`error` state)
+- **User-facing errors**: Provide clear, actionable error messages
+
+## Code Style
+
+- **Rust**: Follow standard Rust conventions (snake_case, etc.)
+- **TypeScript**: Use TypeScript strict mode, prefer interfaces over types for objects
+- **React**: Use functional components, hooks, TypeScript
+- **Comments**: Only add comments for complex logic, not obvious code
+
+## Testing
+
+- Test database operations with actual SQLite database
+- Test ESI integration with mocked responses or test tokens
+- Test frontend components with React Query's testing utilities
+
+## Git Workflow
+
+- **Don't commit** generated files unnecessarily (ESI client files are generated at build time)
+- **Do commit** migration files
+- **Do commit** rule files (`.cursor/rules/`)
+
+## Environment Variables
+
+- **Never commit** `.env` files
+- **Document** required environment variables in rules
+- **Use** environment variables for sensitive data (client IDs, etc.)
+
+## Best Practices Summary
+
+1. Use pnpm for package management
+2. Use shadcn CLI for components
+3. Use sqlx for type-safe database queries
+4. Use React Query for all data fetching
+5. Use caching for ESI requests
+6. Return `Result<T, String>` from Tauri commands
+7. Follow existing patterns when adding new features
+8. Keep components and functions focused and small
+9. Use TypeScript types for type safety
+10. Handle errors gracefully with clear messages

@@ -1,0 +1,113 @@
+---
+globs:
+  - "src-tauri/src/sde.rs"
+  - "src-tauri/migrations/003_sde_schema.sql"
+alwaysApply: false
+---
+
+# SDE (Static Data Export) System
+
+## Overview
+
+The Static Data Export (SDE) system imports EVE Online game data including items, skills, attributes, and their relationships. This data is used to enrich ESI API responses with names, descriptions, and metadata.
+
+## Location
+
+- **Implementation**: `src-tauri/src/sde.rs`
+- **Schema**: `src-tauri/migrations/003_sde_schema.sql`
+
+## Auto-Refresh
+
+The SDE is automatically checked and refreshed on app startup via `sde::ensure_latest()` in the Tauri setup function. This runs in a background task and doesn't block app startup.
+
+## Data Source
+
+- **Metadata URL**: `https://developers.eveonline.com/static-data/tranquility/latest.jsonl`
+- **Download URL**: `https://developers.eveonline.com/static-data/tranquility/eve-online-static-data-{build}-jsonl.zip`
+- **Format**: JSONL (JSON Lines) - one JSON object per line
+
+## Imported Files
+
+The following files are imported from the SDE:
+- `categories.jsonl` - Item categories
+- `groups.jsonl` - Item groups
+- `types.jsonl` - Item types (skills, ships, modules, etc.)
+- `dogmaAttributes.jsonl` - Dogma attribute definitions
+- `dogmaEffects.jsonl` - Dogma effect definitions
+- `typeDogma.jsonl` - Type-to-dogma mappings
+- `characterAttributes.jsonl` - Character attribute definitions
+
+## Database Tables
+
+### Metadata
+- **sde_metadata**: Stores build number, release date, and import timestamp
+
+### Categories and Groups
+- **sde_categories**: Item categories (category_id, name, published)
+- **sde_groups**: Item groups (group_id, category_id, name, icon_id, published)
+
+### Types
+- **sde_types**: Item types including skills, ships, modules (type_id, group_id, category_id, name, description, etc.)
+
+### Dogma
+- **sde_dogma_attributes**: Attribute definitions (attribute_id, name, display_name, data_type, etc.)
+- **sde_dogma_effects**: Effect definitions (effect_id, name, effect_category_id, etc.)
+- **sde_type_dogma_attributes**: Type-to-attribute mappings with values
+- **sde_type_dogma_effects**: Type-to-effect mappings
+
+### Character Attributes
+- **sde_character_attributes**: Character attribute definitions (intelligence, memory, perception, willpower, charisma)
+
+### Skill Requirements
+- **sde_skill_requirements**: Skill prerequisite relationships (skill_type_id, required_skill_id, required_level)
+
+## Manual Refresh
+
+To manually trigger an SDE refresh, use the `refresh_sde` Tauri command:
+
+```rust
+#[tauri::command]
+async fn refresh_sde(app: tauri::AppHandle, pool: State<'_, db::Pool>) -> Result<(), String>
+```
+
+This calls `sde::force_refresh()` which bypasses the version check and always downloads the latest SDE.
+
+## Import Process
+
+1. Check `sde_metadata` table for current build number
+2. Fetch `latest.jsonl` to get latest build number
+3. If newer build exists, download ZIP file
+4. Extract JSONL files from ZIP
+5. Import data in a transaction:
+   - Clear existing tables
+   - Import categories
+   - Import groups
+   - Import types
+   - Import dogma attributes
+   - Import dogma effects
+   - Import type dogma mappings
+   - Import character attributes
+   - Update metadata
+6. Commit transaction
+
+## Usage
+
+Query SDE data to enrich ESI responses:
+
+```rust
+// Get skill name by type_id
+let skill_name = sqlx::query_scalar::<_, String>(
+    "SELECT name FROM sde_types WHERE type_id = ?"
+)
+.bind(skill_id)
+.fetch_optional(pool)
+.await?;
+```
+
+## Best Practices
+
+- SDE data is relatively static - only refreshes when CCP releases new builds
+- Use JOINs with SDE tables to enrich ESI data with names and descriptions
+- The `published` flag indicates if an item is visible in-game
+- Skill requirements are derived from dogma attributes during import
+- Always query SDE data from the database, never from files directly

@@ -1,0 +1,113 @@
+---
+alwaysApply: true
+---
+
+# Code Organization
+
+## Backend (Rust)
+
+Located in `src-tauri/src/`:
+
+### Core Files
+- **lib.rs**: Main entry point, Tauri application setup, all Tauri commands
+- **main.rs**: Entry point (minimal, delegates to lib.rs)
+- **sde.rs**: Static Data Export import and management
+
+### Modules
+
+#### `db/` - Database Operations
+- **mod.rs**: Database pool initialization, exports operations
+- **operations.rs**: All database CRUD operations (characters, tokens, attributes)
+
+#### `esi/` - ESI Client (Auto-Generated)
+- **mod.rs**: Module exports (`BASE_URL`, client types)
+- **client.rs**: Generated client code (do not edit)
+- **types.rs**: Generated type definitions (do not edit)
+- **openapi.json**: Cached OpenAPI schema
+
+#### `auth/` - OAuth Authentication
+- **oauth.rs**: OAuth flow, token exchange, token refresh
+- **callback_server.rs**: HTTP callback server for development
+
+#### `cache/` - ESI Response Caching
+- **mod.rs**: Cache key building, get/set cached responses, ETag extraction
+
+## Frontend (TypeScript/React)
+
+Located in `src/`:
+
+### Core Files
+- **main.tsx**: React application entry point
+- **App.tsx**: Root component, auth event listeners
+- **index.css**: Global styles, Tailwind CSS imports
+
+### Directories
+
+#### `components/`
+- **ui/**: shadcn/ui components (auto-generated, do not edit manually)
+- Custom components (e.g., `CharacterList.tsx`, `TabLayout.tsx`)
+
+#### `hooks/`
+- **tauri/**: Custom hooks wrapping Tauri commands
+  - `useCharacters.ts`
+  - `useSkillQueues.ts`
+  - `useStartEveLogin.ts`
+  - `useLogoutCharacter.ts`
+
+#### `lib/`
+- **utils.ts**: Utility functions (e.g., `cn()` for className merging)
+
+#### `types/`
+- **tauri.ts**: TypeScript types matching Rust structs
+
+#### `assets/`
+- Static assets (images, etc.)
+
+## Configuration Files
+
+### Root
+- **package.json**: Frontend dependencies and scripts
+- **pnpm-lock.yaml**: Lock file (use pnpm, not npm)
+- **tsconfig.json**: TypeScript configuration
+- **vite.config.ts**: Vite build configuration
+- **components.json**: shadcn/ui configuration
+- **tailwind.config.js**: Tailwind CSS configuration (if exists)
+
+### Tauri
+- **src-tauri/Cargo.toml**: Rust dependencies
+- **src-tauri/tauri.conf.json**: Tauri application configuration
+- **src-tauri/migrations/**: SQL migration files
+
+### Scripts
+- **scripts/generate-esi.sh**: ESI client generation script
+
+## File Naming Conventions
+
+- **Rust**: `snake_case.rs` for files, `snake_case` for functions/variables
+- **TypeScript/React**: `PascalCase.tsx` for components, `camelCase.ts` for utilities
+- **SQL Migrations**: `NNN_description.sql` (numbered sequentially)
+
+## Import Patterns
+
+### Rust
+```rust
+use crate::db;
+use crate::esi;
+use crate::cache;
+```
+
+### TypeScript
+```typescript
+import { Component } from "@/components/ui/component";
+import { useHook } from "@/hooks/tauri/useHook";
+import type { Type } from "@/types/tauri";
+```
+
+## Best Practices
+
+- Keep modules focused on a single responsibility
+- Use subdirectories for related functionality
+- Follow existing naming conventions
+- Place shared types in appropriate type files
+- Keep components small and composable
+- Use hooks to encapsulate data fetching logic
