@@ -1,49 +1,61 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import { invoke } from "@tauri-apps/api/core";
+import { useEffect } from "react";
+import { LoginButton } from "./components/LoginButton";
+import { CharacterList } from "./components/CharacterList";
 import "./App.css";
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState("");
-  const [name, setName] = useState("");
+  useEffect(() => {
+    const setupAuthListeners = async () => {
+      try {
+        const { listen } = await import("@tauri-apps/api/event");
+        console.log("App: Setting up auth-success listener...");
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke("greet", { name }));
-  }
+        const unlistenSuccess = await listen<number>("auth-success", (event) => {
+          console.log("App: ===== AUTH SUCCESS EVENT RECEIVED =====");
+          console.log("App: Full event object:", JSON.stringify(event, null, 2));
+          console.log("App: Character ID:", event.payload);
+          // CharacterList component will handle refreshing itself
+        });
+
+        console.log("App: Auth listener set up successfully");
+
+        const unlistenError = await listen<string>("auth-error", (event) => {
+          console.error("Auth error:", event.payload);
+          alert(`Authentication error: ${event.payload}`);
+        });
+
+        return () => {
+          unlistenSuccess();
+          unlistenError();
+        };
+      } catch (error) {
+        console.error("App: Failed to setup auth listeners:", error);
+        // If we're not in Tauri, this is expected - just log and continue
+        if (error instanceof Error && error.message.includes("Tauri")) {
+          console.log("App: Not in Tauri environment (expected in browser dev)");
+        }
+      }
+    };
+
+    setupAuthListeners();
+  }, []);
 
   return (
-    <main className="container">
-      <h1>Welcome to Tauri + React</h1>
+    <main className="min-h-screen bg-gray-50 p-8">
+      <div className="max-w-4xl mx-auto">
+        <h1 className="text-3xl font-bold mb-8 text-gray-900">SkillMon - EVE Online Character Training Monitor</h1>
 
-      <div className="row">
-        <a href="https://vite.dev" target="_blank">
-          <img src="/vite.svg" className="logo vite" alt="Vite logo" />
-        </a>
-        <a href="https://tauri.app" target="_blank">
-          <img src="/tauri.svg" className="logo tauri" alt="Tauri logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-lg shadow">
+            <h2 className="text-xl font-semibold mb-4 text-gray-800">Authentication</h2>
+            <LoginButton />
+          </div>
+
+          <div className="bg-white p-6 rounded-lg shadow">
+            <CharacterList />
+          </div>
+        </div>
       </div>
-      <p>Click on the Tauri, Vite, and React logos to learn more.</p>
-
-      <form
-        className="row"
-        onSubmit={(e) => {
-          e.preventDefault();
-          greet();
-        }}
-      >
-        <input
-          id="greet-input"
-          onChange={(e) => setName(e.currentTarget.value)}
-          placeholder="Enter a name..."
-        />
-        <button type="submit">Greet</button>
-      </form>
-      <p>{greetMsg}</p>
     </main>
   );
 }

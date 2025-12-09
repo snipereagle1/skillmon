@@ -1,9 +1,10 @@
 use anyhow::Result;
+use serde::Serialize;
 use sqlx::FromRow;
 
 use super::Pool;
 
-#[derive(Debug, FromRow)]
+#[derive(Debug, Clone, Serialize, FromRow)]
 pub struct Character {
     pub character_id: i64,
     pub character_name: String,
@@ -26,6 +27,16 @@ pub async fn get_character(pool: &Pool, character_id: i64) -> Result<Option<Char
     .await?;
 
     Ok(character)
+}
+
+pub async fn get_all_characters(pool: &Pool) -> Result<Vec<Character>> {
+    let characters = sqlx::query_as::<_, Character>(
+        "SELECT character_id, character_name FROM characters ORDER BY character_name",
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(characters)
 }
 
 pub async fn add_character(pool: &Pool, character_id: i64, character_name: &str) -> Result<()> {
