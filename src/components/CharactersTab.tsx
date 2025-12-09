@@ -6,6 +6,7 @@ import type { CharacterSkillQueue } from "@/types/tauri";
 import { CharacterCard } from "./CharacterCard";
 import { SkillQueue } from "./SkillQueue";
 import { Skills } from "./Skills";
+import { Clones } from "./Clones";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export function CharactersTab() {
@@ -32,6 +33,7 @@ export function CharactersTab() {
           await new Promise((resolve) => setTimeout(resolve, 500));
           queryClient.invalidateQueries({ queryKey: ["characters"] });
           queryClient.invalidateQueries({ queryKey: ["skillQueues"] });
+          queryClient.invalidateQueries({ queryKey: ["clones"] });
         });
         unlistenFn = unlisten;
       } catch (error) {
@@ -102,6 +104,7 @@ export function CharactersTab() {
               <TabsList>
                 <TabsTrigger value="skill-queue">Skill Queue</TabsTrigger>
                 <TabsTrigger value="skills">Skills</TabsTrigger>
+                <TabsTrigger value="clones">Clones</TabsTrigger>
               </TabsList>
             </div>
             <TabsContent value="skill-queue" className="flex-1 overflow-auto p-4 m-0">
@@ -109,6 +112,9 @@ export function CharactersTab() {
             </TabsContent>
             <TabsContent value="skills" className="flex-1 overflow-hidden m-0">
               <Skills characterId={selectedCharacterId} />
+            </TabsContent>
+            <TabsContent value="clones" className="flex-1 overflow-hidden m-0">
+              <Clones characterId={selectedCharacterId} />
             </TabsContent>
           </Tabs>
         ) : (

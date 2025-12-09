@@ -12,6 +12,8 @@ pub use operations::{
     update_character, update_tokens, Character, CharacterAttributes, CharacterSkill,
     get_character_attributes, get_character_skill, get_character_skills, set_character_attributes,
     set_character_skills, get_skill_groups_for_category, SkillGroupInfo,
+    Clone, CloneImplant, get_character_clones, get_clone_implants, set_character_clones,
+    update_clone_name, find_clone_by_implants,
 };
 
 pub type Pool = SqlitePool;

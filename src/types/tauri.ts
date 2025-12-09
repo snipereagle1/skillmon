@@ -62,3 +62,21 @@ export interface CharacterSkillsResponse {
   groups: SkillGroup[];
 }
 
+export interface Clone {
+  id: number;
+  character_id: number;
+  clone_id: number | null;
+  name: string | null;
+  location_type: string;
+  location_id: number;
+  location_name: string;
+  is_current: boolean;
+  implants: number[];
+}
+
+export interface CloneImplant {
+  clone_id: number;
+  implant_type_id: number;
+  slot: number | null;
+}
+

@@ -30,7 +30,13 @@ async fn start_eve_login(
     let callback_url = std::env::var("EVE_CALLBACK_URL")
         .unwrap_or_else(|_| "http://localhost:1421/callback".to_string());
 
-    let scopes = ["esi-skills.read_skills.v1", "esi-skills.read_skillqueue.v1"];
+    let scopes = [
+        "esi-skills.read_skills.v1",
+        "esi-skills.read_skillqueue.v1",
+        "esi-clones.read_clones.v1",
+        "esi-clones.read_implants.v1",
+        "esi-universe.read_structures.v1",
+    ];
 
     let (auth_url, auth_state) = auth::generate_auth_url(&client_id, &scopes, &callback_url);
 
@@ -535,6 +541,374 @@ async fn get_skill_names(
     Ok(skill_names)
 }
 
+async fn get_type_names(
+    pool: &db::Pool,
+    type_ids: &[i64],
+) -> Result<HashMap<i64, String>, String> {
+    if type_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let mut type_names = HashMap::new();
+
+    for chunk in type_ids.chunks(100) {
+        let mut query_builder: QueryBuilder<Sqlite> =
+            QueryBuilder::new("SELECT type_id, name FROM sde_types WHERE type_id IN (");
+
+        let mut separated = query_builder.separated(", ");
+        for type_id in chunk {
+            separated.push_bind(type_id);
+        }
+        separated.push_unseparated(")");
+
+        let query = query_builder.build();
+        let rows = query
+            .fetch_all(pool)
+            .await
+            .map_err(|e| format!("Failed to query type names: {}", e))?;
+
+        for row in rows {
+            let type_id: i64 = row.get(0);
+            let name: String = row.get(1);
+            type_names.insert(type_id, name);
+        }
+    }
+
+    Ok(type_names)
+}
+
+async fn get_cached_character_clones(
+    pool: &db::Pool,
+    client: &reqwest::Client,
+    character_id: i64,
+) -> Result<Option<esi::CharactersCharacterIdClonesGet>> {
+    let endpoint_path = format!("characters/{}/clones", character_id);
+    let cache_key = cache::build_cache_key(&endpoint_path, character_id);
+
+    let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
+
+    if let Some((cached_body, _)) = &cached_entry {
+        let cached_data: esi::CharactersCharacterIdClonesGet =
+            serde_json::from_str(cached_body)
+                .context("Failed to deserialize cached clones")?;
+        return Ok(Some(cached_data));
+    }
+
+    let mut request = esi::GetCharactersCharacterIdClonesRequest {
+        character_id,
+        x_compatibility_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+        ..Default::default()
+    };
+
+    if let Some((_, Some(etag))) = cached_entry {
+        request.if_none_match = Some(etag);
+    }
+
+    let url = esi::BASE_URL
+        .parse::<reqwest::Url>()
+        .context("Invalid base URL")?
+        .join(&request.render_path()?)
+        .context("Failed to construct request URL")?;
+
+    let mut req_builder = client.get(url);
+    if let Some(value) = request.accept_language.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header(ACCEPT_LANGUAGE, header_value);
+    }
+    if let Some(value) = request.if_none_match.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header(IF_NONE_MATCH, header_value);
+    }
+    {
+        let header_value =
+            HeaderValue::from_str(&serde_plain::to_string(&request.x_compatibility_date)?)?;
+        req_builder = req_builder.header("x-compatibility-date", header_value);
+    }
+    if let Some(value) = request.x_tenant.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header("x-tenant", header_value);
+    }
+
+    let response = req_builder.send().await?;
+    let status = response.status();
+    let headers = response.headers().clone();
+
+    if status.as_u16() == 304 {
+        if let Some((cached_body, _)) = cache::get_cached_response(pool, &cache_key).await? {
+            let cached_data: esi::CharactersCharacterIdClonesGet =
+                serde_json::from_str(&cached_body)
+                    .context("Failed to deserialize cached clones")?;
+            return Ok(Some(cached_data));
+        }
+    }
+
+    if status.is_success() {
+        let body_bytes = response.bytes().await?;
+        let body_str = String::from_utf8_lossy(&body_bytes);
+
+        let etag = cache::extract_etag(&headers);
+        let expires_at = cache::extract_expires(&headers);
+
+        cache::set_cached_response(pool, &cache_key, etag.as_deref(), expires_at, &body_str)
+            .await?;
+
+        let data: esi::CharactersCharacterIdClonesGet =
+            serde_json::from_str(&body_str).context("Failed to deserialize clones")?;
+        return Ok(Some(data));
+    }
+
+    Ok(None)
+}
+
+async fn get_cached_character_implants(
+    pool: &db::Pool,
+    client: &reqwest::Client,
+    character_id: i64,
+) -> Result<Option<esi::CharactersCharacterIdImplantsGet>> {
+    let endpoint_path = format!("characters/{}/implants", character_id);
+    let cache_key = cache::build_cache_key(&endpoint_path, character_id);
+
+    let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
+
+    if let Some((cached_body, _)) = &cached_entry {
+        let cached_data: esi::CharactersCharacterIdImplantsGet =
+            serde_json::from_str(cached_body)
+                .context("Failed to deserialize cached implants")?;
+        return Ok(Some(cached_data));
+    }
+
+    let mut request = esi::GetCharactersCharacterIdImplantsRequest {
+        character_id,
+        x_compatibility_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+        ..Default::default()
+    };
+
+    if let Some((_, Some(etag))) = cached_entry {
+        request.if_none_match = Some(etag);
+    }
+
+    let url = esi::BASE_URL
+        .parse::<reqwest::Url>()
+        .context("Invalid base URL")?
+        .join(&request.render_path()?)
+        .context("Failed to construct request URL")?;
+
+    let mut req_builder = client.get(url);
+    if let Some(value) = request.accept_language.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header(ACCEPT_LANGUAGE, header_value);
+    }
+    if let Some(value) = request.if_none_match.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header(IF_NONE_MATCH, header_value);
+    }
+    {
+        let header_value =
+            HeaderValue::from_str(&serde_plain::to_string(&request.x_compatibility_date)?)?;
+        req_builder = req_builder.header("x-compatibility-date", header_value);
+    }
+    if let Some(value) = request.x_tenant.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header("x-tenant", header_value);
+    }
+
+    let response = req_builder.send().await?;
+    let status = response.status();
+    let headers = response.headers().clone();
+
+    if status.as_u16() == 304 {
+        if let Some((cached_body, _)) = cache::get_cached_response(pool, &cache_key).await? {
+            let cached_data: esi::CharactersCharacterIdImplantsGet =
+                serde_json::from_str(&cached_body)
+                    .context("Failed to deserialize cached implants")?;
+            return Ok(Some(cached_data));
+        }
+    }
+
+    if status.is_success() {
+        let body_bytes = response.bytes().await?;
+        let body_str = String::from_utf8_lossy(&body_bytes);
+
+        let etag = cache::extract_etag(&headers);
+        let expires_at = cache::extract_expires(&headers);
+
+        cache::set_cached_response(pool, &cache_key, etag.as_deref(), expires_at, &body_str)
+            .await?;
+
+        let data: esi::CharactersCharacterIdImplantsGet =
+            serde_json::from_str(&body_str).context("Failed to deserialize implants")?;
+        return Ok(Some(data));
+    }
+
+    Ok(None)
+}
+
+async fn get_cached_station_info(
+    pool: &db::Pool,
+    client: &reqwest::Client,
+    station_id: i64,
+) -> Result<Option<esi::UniverseStationsStationIdGet>> {
+    let endpoint_path = format!("universe/stations/{}", station_id);
+    let cache_key = format!("{}:0", endpoint_path);
+
+    let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
+
+    if let Some((cached_body, _)) = &cached_entry {
+        let cached_data: esi::UniverseStationsStationIdGet =
+            serde_json::from_str(cached_body)
+                .context("Failed to deserialize cached station info")?;
+        return Ok(Some(cached_data));
+    }
+
+    let mut request = esi::GetUniverseStationsStationIdRequest {
+        station_id,
+        x_compatibility_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+        ..Default::default()
+    };
+
+    if let Some((_, Some(etag))) = cached_entry {
+        request.if_none_match = Some(etag);
+    }
+
+    let url = esi::BASE_URL
+        .parse::<reqwest::Url>()
+        .context("Invalid base URL")?
+        .join(&request.render_path()?)
+        .context("Failed to construct request URL")?;
+
+    let mut req_builder = client.get(url);
+    if let Some(value) = request.accept_language.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header(ACCEPT_LANGUAGE, header_value);
+    }
+    if let Some(value) = request.if_none_match.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header(IF_NONE_MATCH, header_value);
+    }
+    {
+        let header_value =
+            HeaderValue::from_str(&serde_plain::to_string(&request.x_compatibility_date)?)?;
+        req_builder = req_builder.header("x-compatibility-date", header_value);
+    }
+    if let Some(value) = request.x_tenant.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header("x-tenant", header_value);
+    }
+
+    let response = req_builder.send().await?;
+    let status = response.status();
+    let headers = response.headers().clone();
+
+    if status.as_u16() == 304 {
+        if let Some((cached_body, _)) = cache::get_cached_response(pool, &cache_key).await? {
+            let cached_data: esi::UniverseStationsStationIdGet =
+                serde_json::from_str(&cached_body)
+                    .context("Failed to deserialize cached station info")?;
+            return Ok(Some(cached_data));
+        }
+    }
+
+    if status.is_success() {
+        let body_bytes = response.bytes().await?;
+        let body_str = String::from_utf8_lossy(&body_bytes);
+
+        let etag = cache::extract_etag(&headers);
+        let expires_at = cache::extract_expires(&headers);
+
+        cache::set_cached_response(pool, &cache_key, etag.as_deref(), expires_at, &body_str)
+            .await?;
+
+        let data: esi::UniverseStationsStationIdGet =
+            serde_json::from_str(&body_str).context("Failed to deserialize station info")?;
+        return Ok(Some(data));
+    }
+
+    Ok(None)
+}
+
+async fn get_cached_structure_info(
+    pool: &db::Pool,
+    client: &reqwest::Client,
+    structure_id: i64,
+) -> Result<Option<esi::UniverseStructuresStructureIdGet>> {
+    let endpoint_path = format!("universe/structures/{}", structure_id);
+    let cache_key = format!("{}:0", endpoint_path);
+
+    let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
+
+    if let Some((cached_body, _)) = &cached_entry {
+        let cached_data: esi::UniverseStructuresStructureIdGet =
+            serde_json::from_str(cached_body)
+                .context("Failed to deserialize cached structure info")?;
+        return Ok(Some(cached_data));
+    }
+
+    let mut request = esi::GetUniverseStructuresStructureIdRequest {
+        structure_id,
+        x_compatibility_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+        ..Default::default()
+    };
+
+    if let Some((_, Some(etag))) = cached_entry {
+        request.if_none_match = Some(etag);
+    }
+
+    let url = esi::BASE_URL
+        .parse::<reqwest::Url>()
+        .context("Invalid base URL")?
+        .join(&request.render_path()?)
+        .context("Failed to construct request URL")?;
+
+    let mut req_builder = client.get(url);
+    if let Some(value) = request.accept_language.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header(ACCEPT_LANGUAGE, header_value);
+    }
+    if let Some(value) = request.if_none_match.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header(IF_NONE_MATCH, header_value);
+    }
+    {
+        let header_value =
+            HeaderValue::from_str(&serde_plain::to_string(&request.x_compatibility_date)?)?;
+        req_builder = req_builder.header("x-compatibility-date", header_value);
+    }
+    if let Some(value) = request.x_tenant.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header("x-tenant", header_value);
+    }
+
+    let response = req_builder.send().await?;
+    let status = response.status();
+    let headers = response.headers().clone();
+
+    if status.as_u16() == 304 {
+        if let Some((cached_body, _)) = cache::get_cached_response(pool, &cache_key).await? {
+            let cached_data: esi::UniverseStructuresStructureIdGet =
+                serde_json::from_str(&cached_body)
+                    .context("Failed to deserialize cached structure info")?;
+            return Ok(Some(cached_data));
+        }
+    }
+
+    if status.is_success() {
+        let body_bytes = response.bytes().await?;
+        let body_str = String::from_utf8_lossy(&body_bytes);
+
+        let etag = cache::extract_etag(&headers);
+        let expires_at = cache::extract_expires(&headers);
+
+        cache::set_cached_response(pool, &cache_key, etag.as_deref(), expires_at, &body_str)
+            .await?;
+
+        let data: esi::UniverseStructuresStructureIdGet =
+            serde_json::from_str(&body_str).context("Failed to deserialize structure info")?;
+        return Ok(Some(data));
+    }
+
+    Ok(None)
+}
+
 #[derive(Debug, Clone)]
 struct SkillAttributes {
     primary_attribute: Option<i64>,
@@ -933,6 +1307,254 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
     Ok(results)
 }
 
+#[derive(Debug, Clone, Serialize)]
+struct CloneResponse {
+    id: i64,
+    character_id: i64,
+    clone_id: Option<i64>,
+    name: Option<String>,
+    location_type: String,
+    location_id: i64,
+    location_name: String,
+    is_current: bool,
+    implants: Vec<i64>,
+}
+
+#[tauri::command]
+async fn get_clones(
+    pool: State<'_, db::Pool>,
+    character_id: i64,
+) -> Result<Vec<CloneResponse>, String> {
+    let access_token = auth::ensure_valid_access_token(&*pool, character_id)
+        .await
+        .map_err(|e| format!("Failed to get valid token: {}", e))?;
+
+    let client = create_authenticated_client(&access_token)
+        .map_err(|e| format!("Failed to create client: {}", e))?;
+
+    let clones_data = get_cached_character_clones(&*pool, &client, character_id)
+        .await
+        .map_err(|e| format!("Failed to fetch clones: {}", e))?
+        .ok_or_else(|| "No clones data returned".to_string())?;
+
+    let current_implants = get_cached_character_implants(&*pool, &client, character_id)
+        .await
+        .map_err(|e| format!("Failed to fetch implants: {}", e))?
+        .unwrap_or_default();
+
+    let mut clones_to_store = Vec::new();
+    let mut current_clone_matched = false;
+
+    for jump_clone in &clones_data.jump_clones {
+        if let Some(obj) = jump_clone.as_object() {
+            let clone_id = obj.get("jump_clone_id").and_then(|v| v.as_i64());
+            let location_id = obj.get("location_id").and_then(|v| v.as_i64()).unwrap_or(0);
+            let location_type_str = obj.get("location_type")
+                .and_then(|v| v.as_str())
+                .unwrap_or("station");
+            let implants = obj.get("implants")
+                .and_then(|v| v.as_array())
+                .map(|arr| arr.iter().filter_map(|v| v.as_i64()).collect::<Vec<_>>())
+                .unwrap_or_default();
+
+            let location_name = resolve_clone_location(
+                &*pool,
+                &client,
+                location_type_str,
+                location_id,
+                character_id,
+            ).await.unwrap_or_else(|_| "Unknown Location".to_string());
+
+            clones_to_store.push((
+                clone_id,
+                None,
+                location_type_str.to_string(),
+                location_id,
+                Some(location_name.clone()),
+                false,
+                implants.clone(),
+            ));
+        }
+    }
+
+    let mut current_implants_sorted = current_implants.clone();
+    current_implants_sorted.sort();
+
+    if let Some(home_location) = &clones_data.home_location {
+        if let (Some(location_id), Some(location_type)) = (
+            home_location.location_id,
+            home_location.location_type.as_ref(),
+        ) {
+            let location_type_str = match location_type {
+                esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Station => "station",
+                esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Structure => "structure",
+            };
+
+            let location_name = resolve_clone_location(
+                &*pool,
+                &client,
+                location_type_str,
+                location_id,
+                character_id,
+            ).await.unwrap_or_else(|_| "Unknown Location".to_string());
+
+            if !current_implants_sorted.is_empty() {
+                let matched_clone_id = db::find_clone_by_implants(
+                    &*pool,
+                    character_id,
+                    &current_implants_sorted,
+                ).await.map_err(|e| format!("Failed to find clone by implants: {}", e))?;
+
+                if let Some(matched_id) = matched_clone_id {
+                    sqlx::query("UPDATE clones SET location_type = ?, location_id = ?, location_name = ?, is_current = 1 WHERE id = ?")
+                        .bind(location_type_str)
+                        .bind(location_id)
+                        .bind(&location_name)
+                        .bind(matched_id)
+                        .execute(&*pool)
+                        .await
+                        .map_err(|e| format!("Failed to update matched clone: {}", e))?;
+                    current_clone_matched = true;
+                } else {
+                    clones_to_store.push((
+                        None,
+                        None,
+                        location_type_str.to_string(),
+                        location_id,
+                        Some(location_name),
+                        true,
+                        current_implants_sorted,
+                    ));
+                }
+            }
+        }
+    }
+
+    if !current_clone_matched && !current_implants_sorted.is_empty() {
+        let matched_clone_id = db::find_clone_by_implants(
+            &*pool,
+            character_id,
+            &current_implants_sorted,
+        ).await.map_err(|e| format!("Failed to find clone by implants: {}", e))?;
+
+        if let Some(matched_id) = matched_clone_id {
+            sqlx::query("UPDATE clones SET is_current = 1 WHERE id = ?")
+                .bind(matched_id)
+                .execute(&*pool)
+                .await
+                .map_err(|e| format!("Failed to update matched clone: {}", e))?;
+        } else if let Some(home_location) = &clones_data.home_location {
+            if let (Some(location_id), Some(location_type)) = (
+                home_location.location_id,
+                home_location.location_type.as_ref(),
+            ) {
+                let location_type_str = match location_type {
+                    esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Station => "station",
+                    esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Structure => "structure",
+                };
+
+                let location_name = resolve_clone_location(
+                    &*pool,
+                    &client,
+                    location_type_str,
+                    location_id,
+                    character_id,
+                ).await.unwrap_or_else(|_| "Unknown Location".to_string());
+
+                clones_to_store.push((
+                    None,
+                    None,
+                    location_type_str.to_string(),
+                    location_id,
+                    Some(location_name),
+                    true,
+                    current_implants_sorted,
+                ));
+            }
+        }
+    }
+
+    db::set_character_clones(&*pool, character_id, &clones_to_store)
+        .await
+        .map_err(|e| format!("Failed to store clones: {}", e))?;
+
+    let stored_clones = db::get_character_clones(&*pool, character_id)
+        .await
+        .map_err(|e| format!("Failed to get stored clones: {}", e))?;
+
+    let mut result = Vec::new();
+    for clone in stored_clones {
+        let implants = db::get_clone_implants(&*pool, clone.id)
+            .await
+            .map_err(|e| format!("Failed to get clone implants: {}", e))?
+            .into_iter()
+            .map(|i| i.implant_type_id)
+            .collect();
+
+        result.push(CloneResponse {
+            id: clone.id,
+            character_id: clone.character_id,
+            clone_id: clone.clone_id,
+            name: clone.name,
+            location_type: clone.location_type,
+            location_id: clone.location_id,
+            location_name: clone.location_name.unwrap_or_else(|| "Unknown".to_string()),
+            is_current: clone.is_current,
+            implants,
+        });
+    }
+
+    Ok(result)
+}
+
+async fn resolve_clone_location(
+    pool: &db::Pool,
+    client: &reqwest::Client,
+    location_type: &str,
+    location_id: i64,
+    character_id: i64,
+) -> Result<String> {
+    match location_type {
+        "station" => {
+            if let Some(station) = get_cached_station_info(pool, client, location_id).await? {
+                Ok(format!("{} - {}", station.system_id, station.name))
+            } else {
+                Ok(format!("Station {}", location_id))
+            }
+        }
+        "structure" => {
+            match get_cached_structure_info(pool, client, location_id).await {
+                Ok(Some(structure)) => {
+                    Ok(format!("{} - {}", structure.solar_system_id, structure.name))
+                }
+                Ok(None) => Ok("Inaccessible Structure".to_string()),
+                Err(_) => Ok("Inaccessible Structure".to_string()),
+            }
+        }
+        _ => Ok(format!("Unknown Location {}", location_id)),
+    }
+}
+
+#[tauri::command]
+async fn update_clone_name(
+    pool: State<'_, db::Pool>,
+    clone_id: i64,
+    name: Option<String>,
+) -> Result<(), String> {
+    db::update_clone_name(&*pool, clone_id, name.as_deref())
+        .await
+        .map_err(|e| format!("Failed to update clone name: {}", e))?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_type_names(
+    pool: State<'_, db::Pool>,
+    type_ids: Vec<i64>,
+) -> Result<HashMap<i64, String>, String> {
+    get_type_names(&*pool, &type_ids).await
+}
+
 #[tauri::command]
 async fn get_character_skills_with_groups(
     pool: State<'_, db::Pool>,
@@ -1247,7 +1869,10 @@ pub fn run() {
             logout_character,
             get_skill_queues,
             get_character_skills_with_groups,
-            refresh_sde
+            refresh_sde,
+            get_clones,
+            update_clone_name,
+            get_type_names
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
