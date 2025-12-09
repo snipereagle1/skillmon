@@ -94,6 +94,19 @@ pub struct SkillQueueItem {
     pub training_start_sp: Option<i64>,
     pub level_start_sp: Option<i64>,
     pub level_end_sp: Option<i64>,
+    pub sp_per_minute: Option<f64>,
+    pub primary_attribute: Option<i64>,
+    pub secondary_attribute: Option<i64>,
+    pub rank: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CharacterAttributesResponse {
+    pub charisma: i64,
+    pub intelligence: i64,
+    pub memory: i64,
+    pub perception: i64,
+    pub willpower: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -101,6 +114,7 @@ pub struct CharacterSkillQueue {
     pub character_id: i64,
     pub character_name: String,
     pub skill_queue: Vec<SkillQueueItem>,
+    pub attributes: Option<CharacterAttributesResponse>,
 }
 
 fn create_authenticated_client(access_token: &str) -> Result<reqwest::Client> {
@@ -198,7 +212,129 @@ async fn get_cached_skill_queue(
     Ok(None)
 }
 
-async fn get_skill_names(pool: &db::Pool, skill_ids: &[i64]) -> Result<HashMap<i64, String>, String> {
+async fn get_cached_character_attributes(
+    pool: &db::Pool,
+    client: &reqwest::Client,
+    character_id: i64,
+) -> Result<Option<esi::CharactersCharacterIdAttributesGet>> {
+    let endpoint_path = format!("characters/{}/attributes", character_id);
+    let cache_key = cache::build_cache_key(&endpoint_path, character_id);
+
+    let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
+
+    if let Some((cached_body, _)) = &cached_entry {
+        let cached_data: esi::CharactersCharacterIdAttributesGet =
+            serde_json::from_str(cached_body)
+                .context("Failed to deserialize cached character attributes")?;
+
+        db::set_character_attributes(
+            pool,
+            character_id,
+            cached_data.charisma,
+            cached_data.intelligence,
+            cached_data.memory,
+            cached_data.perception,
+            cached_data.willpower,
+            cached_data.bonus_remaps,
+            cached_data
+                .accrued_remap_cooldown_date
+                .as_ref()
+                .map(|d| d.to_rfc3339()),
+            cached_data.last_remap_date.as_ref().map(|d| d.to_rfc3339()),
+        )
+        .await
+        .ok();
+
+        return Ok(Some(cached_data));
+    }
+
+    let mut request = esi::GetCharactersCharacterIdAttributesRequest {
+        character_id,
+        x_compatibility_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
+        ..Default::default()
+    };
+
+    if let Some((_, Some(etag))) = cached_entry {
+        request.if_none_match = Some(etag);
+    }
+
+    let url = esi::BASE_URL
+        .parse::<reqwest::Url>()
+        .context("Invalid base URL")?
+        .join(&request.render_path()?)
+        .context("Failed to construct request URL")?;
+
+    let mut req_builder = client.get(url);
+    if let Some(value) = request.accept_language.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header(ACCEPT_LANGUAGE, header_value);
+    }
+    if let Some(value) = request.if_none_match.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header(IF_NONE_MATCH, header_value);
+    }
+    {
+        let header_value =
+            HeaderValue::from_str(&serde_plain::to_string(&request.x_compatibility_date)?)?;
+        req_builder = req_builder.header("x-compatibility-date", header_value);
+    }
+    if let Some(value) = request.x_tenant.as_ref() {
+        let header_value = HeaderValue::from_str(value.as_str())?;
+        req_builder = req_builder.header("x-tenant", header_value);
+    }
+
+    let response = req_builder.send().await?;
+    let status = response.status();
+    let headers = response.headers().clone();
+
+    if status.as_u16() == 304 {
+        if let Some((cached_body, _)) = cache::get_cached_response(pool, &cache_key).await? {
+            let cached_data: esi::CharactersCharacterIdAttributesGet =
+                serde_json::from_str(&cached_body)
+                    .context("Failed to deserialize cached character attributes")?;
+            return Ok(Some(cached_data));
+        }
+    }
+
+    if status.is_success() {
+        let body_bytes = response.bytes().await?;
+        let body_str = String::from_utf8_lossy(&body_bytes);
+
+        let etag = cache::extract_etag(&headers);
+        let expires_at = cache::extract_expires(&headers);
+
+        cache::set_cached_response(pool, &cache_key, etag.as_deref(), expires_at, &body_str)
+            .await?;
+
+        let data: esi::CharactersCharacterIdAttributesGet = serde_json::from_str(&body_str)
+            .context("Failed to deserialize character attributes")?;
+
+        db::set_character_attributes(
+            pool,
+            character_id,
+            data.charisma,
+            data.intelligence,
+            data.memory,
+            data.perception,
+            data.willpower,
+            data.bonus_remaps,
+            data.accrued_remap_cooldown_date
+                .as_ref()
+                .map(|d| d.to_rfc3339()),
+            data.last_remap_date.as_ref().map(|d| d.to_rfc3339()),
+        )
+        .await?;
+
+        return Ok(Some(data));
+    }
+
+    Ok(None)
+}
+
+async fn get_skill_names(
+    pool: &db::Pool,
+    skill_ids: &[i64],
+) -> Result<HashMap<i64, String>, String> {
     if skill_ids.is_empty() {
         return Ok(HashMap::new());
     }
@@ -206,9 +342,8 @@ async fn get_skill_names(pool: &db::Pool, skill_ids: &[i64]) -> Result<HashMap<i
     let mut skill_names = HashMap::new();
 
     for chunk in skill_ids.chunks(100) {
-        let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
-            "SELECT type_id, name FROM sde_types WHERE type_id IN ("
-        );
+        let mut query_builder: QueryBuilder<Sqlite> =
+            QueryBuilder::new("SELECT type_id, name FROM sde_types WHERE type_id IN (");
 
         let mut separated = query_builder.separated(", ");
         for skill_id in chunk {
@@ -230,6 +365,82 @@ async fn get_skill_names(pool: &db::Pool, skill_ids: &[i64]) -> Result<HashMap<i
     }
 
     Ok(skill_names)
+}
+
+#[derive(Debug, Clone)]
+struct SkillAttributes {
+    primary_attribute: Option<i64>,
+    secondary_attribute: Option<i64>,
+    rank: Option<i64>,
+}
+
+async fn get_skill_attributes(
+    pool: &db::Pool,
+    skill_ids: &[i64],
+) -> Result<HashMap<i64, SkillAttributes>, String> {
+    if skill_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let mut skill_attrs = HashMap::new();
+
+    for chunk in skill_ids.chunks(100) {
+        let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+            r#"
+            SELECT
+                tda.type_id,
+                MAX(CASE WHEN tda.attribute_id = 180 THEN tda.value END) as primary_attribute,
+                MAX(CASE WHEN tda.attribute_id = 181 THEN tda.value END) as secondary_attribute,
+                MAX(CASE WHEN tda.attribute_id = 275 THEN tda.value END) as rank
+            FROM sde_type_dogma_attributes tda
+            WHERE tda.type_id IN (
+            "#,
+        );
+
+        let mut separated = query_builder.separated(", ");
+        for skill_id in chunk {
+            separated.push_bind(skill_id);
+        }
+        separated.push_unseparated(") GROUP BY tda.type_id");
+
+        let query = query_builder.build();
+        let rows = query
+            .fetch_all(pool)
+            .await
+            .map_err(|e| format!("Failed to query skill attributes: {}", e))?;
+
+        for row in rows {
+            let type_id: i64 = row.get(0);
+            let primary: Option<f64> = row.get(1);
+            let secondary: Option<f64> = row.get(2);
+            let rank: Option<f64> = row.get(3);
+
+            skill_attrs.insert(
+                type_id,
+                SkillAttributes {
+                    primary_attribute: primary.map(|v| v as i64),
+                    secondary_attribute: secondary.map(|v| v as i64),
+                    rank: rank.map(|v| v as i64),
+                },
+            );
+        }
+    }
+
+    Ok(skill_attrs)
+}
+
+fn calculate_sp_per_minute(primary: i64, secondary: i64) -> f64 {
+    primary as f64 + (secondary as f64 / 2.0)
+}
+
+fn calculate_sp_for_level(rank: i64, level: i32) -> i64 {
+    if level < 1 || level > 5 {
+        return 0;
+    }
+    let base: f64 = 2.0;
+    let exponent = 2.5 * (level as f64 - 1.0);
+    let sp = base.powf(exponent) * 250.0 * rank as f64;
+    sp as i64
 }
 
 #[tauri::command]
@@ -257,6 +468,51 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
         let client = create_authenticated_client(&access_token)
             .map_err(|e| format!("Failed to create client: {}", e))?;
 
+        let character_attributes =
+            match get_cached_character_attributes(&*pool, &client, character.character_id).await {
+                Ok(Some(attrs)) => Some(CharacterAttributesResponse {
+                    charisma: attrs.charisma,
+                    intelligence: attrs.intelligence,
+                    memory: attrs.memory,
+                    perception: attrs.perception,
+                    willpower: attrs.willpower,
+                }),
+                Ok(None) => {
+                    if let Ok(Some(cached_attrs)) =
+                        db::get_character_attributes(&*pool, character.character_id).await
+                    {
+                        Some(CharacterAttributesResponse {
+                            charisma: cached_attrs.charisma,
+                            intelligence: cached_attrs.intelligence,
+                            memory: cached_attrs.memory,
+                            perception: cached_attrs.perception,
+                            willpower: cached_attrs.willpower,
+                        })
+                    } else {
+                        None
+                    }
+                }
+                Err(e) => {
+                    eprintln!(
+                        "Failed to fetch attributes for character {}: {}",
+                        character.character_id, e
+                    );
+                    if let Ok(Some(cached_attrs)) =
+                        db::get_character_attributes(&*pool, character.character_id).await
+                    {
+                        Some(CharacterAttributesResponse {
+                            charisma: cached_attrs.charisma,
+                            intelligence: cached_attrs.intelligence,
+                            memory: cached_attrs.memory,
+                            perception: cached_attrs.perception,
+                            willpower: cached_attrs.willpower,
+                        })
+                    } else {
+                        None
+                    }
+                }
+            };
+
         match get_cached_skill_queue(&*pool, &client, character.character_id).await {
             Ok(Some(queue_data)) => {
                 let skill_queue: Vec<SkillQueueItem> = queue_data
@@ -283,6 +539,10 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
                                 .and_then(|v| v.as_i64()),
                             level_start_sp: obj.get("level_start_sp").and_then(|v| v.as_i64()),
                             level_end_sp: obj.get("level_end_sp").and_then(|v| v.as_i64()),
+                            sp_per_minute: None,
+                            primary_attribute: None,
+                            secondary_attribute: None,
+                            rank: None,
                         })
                     })
                     .collect();
@@ -291,6 +551,7 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
                     character_id: character.character_id,
                     character_name: character.character_name,
                     skill_queue,
+                    attributes: character_attributes,
                 });
             }
             Ok(None) => {
@@ -308,15 +569,67 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
         }
     }
 
-    let unique_skill_ids: Vec<i64> = all_skill_ids.iter().copied().collect::<std::collections::HashSet<_>>().into_iter().collect();
+    let unique_skill_ids: Vec<i64> = all_skill_ids
+        .iter()
+        .copied()
+        .collect::<std::collections::HashSet<_>>()
+        .into_iter()
+        .collect();
     let skill_names = get_skill_names(&*pool, &unique_skill_ids)
         .await
         .map_err(|e| format!("Failed to get skill names: {}", e))?;
+    let skill_attributes = get_skill_attributes(&*pool, &unique_skill_ids)
+        .await
+        .map_err(|e| format!("Failed to get skill attributes: {}", e))?;
 
     for result in &mut results {
+        let char_attrs = &result.attributes;
         for skill_item in &mut result.skill_queue {
             if let Some(name) = skill_names.get(&skill_item.skill_id) {
                 skill_item.skill_name = Some(name.clone());
+            }
+
+            if let Some(skill_attr) = skill_attributes.get(&skill_item.skill_id) {
+                skill_item.primary_attribute = skill_attr.primary_attribute;
+                skill_item.secondary_attribute = skill_attr.secondary_attribute;
+                skill_item.rank = skill_attr.rank;
+
+                if let Some(attrs) = char_attrs {
+                    if let (Some(primary_attr_id), Some(secondary_attr_id)) =
+                        (skill_attr.primary_attribute, skill_attr.secondary_attribute)
+                    {
+                        let primary_value = match primary_attr_id {
+                            164 => attrs.charisma,     // Charisma dogma attribute
+                            165 => attrs.intelligence, // Intelligence dogma attribute
+                            166 => attrs.memory,       // Memory dogma attribute
+                            167 => attrs.perception,   // Perception dogma attribute
+                            168 => attrs.willpower,    // Willpower dogma attribute
+                            _ => {
+                                eprintln!(
+                                    "Unknown primary attribute ID: {} for skill {}",
+                                    primary_attr_id, skill_item.skill_id
+                                );
+                                0
+                            }
+                        };
+                        let secondary_value = match secondary_attr_id {
+                            164 => attrs.charisma,     // Charisma dogma attribute
+                            165 => attrs.intelligence, // Intelligence dogma attribute
+                            166 => attrs.memory,       // Memory dogma attribute
+                            167 => attrs.perception,   // Perception dogma attribute
+                            168 => attrs.willpower,    // Willpower dogma attribute
+                            _ => {
+                                eprintln!(
+                                    "Unknown secondary attribute ID: {} for skill {}",
+                                    secondary_attr_id, skill_item.skill_id
+                                );
+                                0
+                            }
+                        };
+                        let sp_per_min = calculate_sp_per_minute(primary_value, secondary_value);
+                        skill_item.sp_per_minute = Some(sp_per_min);
+                    }
+                }
             }
         }
     }

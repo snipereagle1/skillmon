@@ -3,6 +3,12 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSkillQueues } from "@/hooks/tauri/useSkillQueues";
 import type { SkillQueueItem, CharacterSkillQueue } from "@/types/tauri";
 import { intervalToDuration } from "date-fns";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 function formatTimeRemaining(finishDate: string | null): string {
   if (!finishDate) return "Paused";
@@ -36,6 +42,52 @@ function formatTimeRemaining(finishDate: string | null): string {
   return parts.join(" ");
 }
 
+function formatDurationFromHours(hours: number): string {
+  if (hours <= 0) return "0h";
+
+  const days = Math.floor(hours / 24);
+  const remainingHours = Math.floor(hours % 24);
+  const minutes = Math.floor((hours % 1) * 60);
+
+  const parts: string[] = [];
+
+  if (days > 0) {
+    parts.push(`${days}d`);
+  }
+  if (remainingHours > 0) {
+    parts.push(`${remainingHours}h`);
+  }
+  if (minutes > 0 && days === 0) {
+    parts.push(`${minutes}m`);
+  }
+
+  if (parts.length === 0) {
+    return "0h";
+  }
+
+  return parts.join(" ");
+}
+
+function calculateTimeToTrain(skill: SkillQueueItem): string | null {
+  if (!skill.sp_per_minute || skill.sp_per_minute <= 0) {
+    return null;
+  }
+
+  if (skill.level_start_sp === null || skill.level_end_sp === null) {
+    return null;
+  }
+
+  const remainingSP = skill.level_end_sp - (skill.training_start_sp || skill.level_start_sp);
+  if (remainingSP <= 0) {
+    return "Complete";
+  }
+
+  const spPerHour = skill.sp_per_minute * 60;
+  const hoursToTrain = remainingSP / spPerHour;
+
+  return formatDurationFromHours(hoursToTrain);
+}
+
 function LevelIndicator({ level }: { level: number }) {
   const squares = Array.from({ length: level }, (_, i) => (
     <div
@@ -54,19 +106,42 @@ function LevelIndicator({ level }: { level: number }) {
 function SkillQueueEntry({ skill }: { skill: SkillQueueItem }) {
   const isTraining = skill.queue_position === 0;
   const levelRoman = ["I", "II", "III", "IV", "V"][skill.finished_level - 1] || skill.finished_level.toString();
+  const spPerHour = skill.sp_per_minute ? skill.sp_per_minute * 60 : null;
+  const timeToTrain = calculateTimeToTrain(skill);
+  const completionTime = formatTimeRemaining(skill.finish_date);
 
   return (
     <div className={`px-4 py-3 border-b last:border-b-0 border-border/50 ${isTraining ? 'bg-primary/5' : ''}`}>
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <LevelIndicator level={skill.finished_level} />
-          <span className="text-foreground font-medium truncate">
-            {skill.skill_name || `Skill #${skill.skill_id}`} {levelRoman}
-          </span>
+          <div className="flex flex-col flex-1 min-w-0">
+            <span className="text-foreground font-medium truncate">
+              {skill.skill_name || `Skill #${skill.skill_id}`} {levelRoman}
+            </span>
+            {spPerHour !== null && spPerHour > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {spPerHour.toFixed(0)} SP/hour
+              </span>
+            )}
+          </div>
         </div>
-        <span className={`text-sm whitespace-nowrap ${isTraining ? 'text-green-400 font-medium' : 'text-muted-foreground'}`}>
-          {formatTimeRemaining(skill.finish_date)}
-        </span>
+        {timeToTrain !== null ? (
+          <Tooltip delayDuration={0}>
+            <TooltipTrigger asChild>
+              <span className={`text-sm whitespace-nowrap cursor-help ${isTraining ? 'text-green-400 font-medium' : 'text-muted-foreground'}`}>
+                {timeToTrain}
+              </span>
+            </TooltipTrigger>
+            <TooltipContent side="left">
+              <p>Completes: {completionTime}</p>
+            </TooltipContent>
+          </Tooltip>
+        ) : (
+          <span className={`text-sm whitespace-nowrap ${isTraining ? 'text-green-400 font-medium' : 'text-muted-foreground'}`}>
+            {completionTime}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -79,15 +154,32 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
   const calculateTotalTime = (): string => {
     if (queue.skill_queue.length === 0) return "0d 0h 0m";
 
-    const now = new Date();
-    const lastSkill = queue.skill_queue[queue.skill_queue.length - 1];
+    let totalHours = 0;
 
-    if (!lastSkill.finish_date) return "Paused";
+    for (const skill of queue.skill_queue) {
+      if (!skill.sp_per_minute || skill.sp_per_minute <= 0) {
+        continue;
+      }
 
-    const finish = new Date(lastSkill.finish_date);
-    if (finish <= now) return "Complete";
+      if (skill.level_start_sp === null || skill.level_end_sp === null) {
+        continue;
+      }
 
-    return formatTimeRemaining(lastSkill.finish_date);
+      const remainingSP = skill.level_end_sp - (skill.training_start_sp || skill.level_start_sp);
+      if (remainingSP <= 0) {
+        continue;
+      }
+
+      const spPerHour = skill.sp_per_minute * 60;
+      const hoursToTrain = remainingSP / spPerHour;
+      totalHours += hoursToTrain;
+    }
+
+    if (totalHours === 0) {
+      return "0d 0h 0m";
+    }
+
+    return formatDurationFromHours(totalHours);
   };
 
   const calculateTotalSP = (): number => {
@@ -106,24 +198,25 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
   const progressPercentage = Math.min((queueSize / MAX_QUEUE_SIZE) * 100, 100);
 
   return (
-    <div className="flex flex-col h-full bg-background">
-      <div className="px-4 py-3 border-b border-border">
-        <h2 className="text-lg font-semibold text-foreground">
-          Training Queue {queueSize}/{MAX_QUEUE_SIZE}
-        </h2>
-      </div>
+    <TooltipProvider>
+      <div className="flex flex-col h-full bg-background">
+        <div className="px-4 py-3 border-b border-border">
+          <h2 className="text-lg font-semibold text-foreground">
+            Training Queue {queueSize}/{MAX_QUEUE_SIZE}
+          </h2>
+        </div>
 
-      <div className="flex-1 overflow-y-auto">
-        {queue.skill_queue.length === 0 ? (
-          <div className="flex items-center justify-center h-full p-8">
-            <p className="text-muted-foreground">No skills in queue</p>
-          </div>
-        ) : (
-          queue.skill_queue.map((skill, idx) => (
-            <SkillQueueEntry key={`${skill.skill_id}-${idx}`} skill={skill} />
-          ))
-        )}
-      </div>
+        <div className="flex-1 overflow-y-auto">
+          {queue.skill_queue.length === 0 ? (
+            <div className="flex items-center justify-center h-full p-8">
+              <p className="text-muted-foreground">No skills in queue</p>
+            </div>
+          ) : (
+            queue.skill_queue.map((skill, idx) => (
+              <SkillQueueEntry key={`${skill.skill_id}-${idx}`} skill={skill} />
+            ))
+          )}
+        </div>
 
       <div className="border-t border-border bg-muted/30 px-4 py-3 space-y-3">
         <div className="text-sm text-green-400">
@@ -148,7 +241,8 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </TooltipProvider>
   );
 }
 

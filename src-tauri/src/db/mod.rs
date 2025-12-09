@@ -9,7 +9,8 @@ use tauri::Manager;
 pub mod operations;
 pub use operations::{
     add_character, delete_character, get_all_characters, get_character, get_tokens, set_tokens,
-    update_character, update_tokens, Character,
+    update_character, update_tokens, Character, CharacterAttributes,
+    get_character_attributes, set_character_attributes,
 };
 
 pub type Pool = SqlitePool;
