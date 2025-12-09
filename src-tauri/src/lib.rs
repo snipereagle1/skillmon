@@ -13,6 +13,7 @@ mod auth;
 mod cache;
 mod db;
 mod esi;
+mod sde;
 
 type AuthStateMap = Mutex<HashMap<String, auth::AuthState>>;
 
@@ -72,6 +73,13 @@ async fn logout_character(pool: State<'_, db::Pool>, character_id: i64) -> Resul
     db::delete_character(&*pool, character_id)
         .await
         .map_err(|e| format!("Failed to delete character: {}", e))
+}
+
+#[tauri::command]
+async fn refresh_sde(app: tauri::AppHandle, pool: State<'_, db::Pool>) -> Result<(), String> {
+    sde::force_refresh(&app, &*pool)
+        .await
+        .map_err(|e| format!("Failed to refresh SDE: {}", e))
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -373,6 +381,15 @@ pub fn run() {
                 app.manage(pool);
                 app.manage(AuthStateMap::default());
 
+                // Kick off background SDE import/refresh
+                let pool = app.state::<db::Pool>().inner().clone();
+                let app_handle_for_sde = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Err(err) = sde::ensure_latest(&app_handle_for_sde, &pool).await {
+                        eprintln!("SDE import failed: {}", err);
+                    }
+                });
+
                 // Start HTTP callback server for dev mode (if using HTTP callback)
                 let callback_url = std::env::var("EVE_CALLBACK_URL")
                     .unwrap_or_else(|_| "http://localhost:1421/callback".to_string());
@@ -443,7 +460,8 @@ pub fn run() {
             start_eve_login,
             get_characters,
             logout_character,
-            get_skill_queues
+            get_skill_queues,
+            refresh_sde
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
