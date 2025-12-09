@@ -77,7 +77,9 @@ function calculateTimeToTrain(skill: SkillQueueItem): string | null {
     return null;
   }
 
-  const remainingSP = skill.level_end_sp - (skill.training_start_sp || skill.level_start_sp);
+  const currentSP = skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
+  const remainingSP = skill.level_end_sp - currentSP;
+
   if (remainingSP <= 0) {
     return "Complete";
   }
@@ -165,7 +167,8 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
         continue;
       }
 
-      const remainingSP = skill.level_end_sp - (skill.training_start_sp || skill.level_start_sp);
+      const currentSP = skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
+      const remainingSP = skill.level_end_sp - currentSP;
       if (remainingSP <= 0) {
         continue;
       }
