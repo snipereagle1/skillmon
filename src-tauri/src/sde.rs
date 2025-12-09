@@ -118,10 +118,10 @@ struct DogmaEffectRow {
 struct TypeDogmaRow {
     #[serde(rename = "_key")]
     id: i64,
-    #[serde(default)]
-    dogmaAttributes: Vec<DogmaAttributeValue>,
-    #[serde(default)]
-    dogmaEffects: Vec<DogmaEffectValue>,
+    #[serde(default, rename = "dogmaAttributes")]
+    dogma_attributes: Vec<DogmaAttributeValue>,
+    #[serde(default, rename = "dogmaEffects")]
+    dogma_effects: Vec<DogmaEffectValue>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -191,20 +191,23 @@ async fn ensure_latest_inner(app: &AppHandle, pool: &SqlitePool, force: bool) ->
 
     import_from_files(pool, &extracted_paths, &latest).await?;
 
+    // Clean up temporary files after successful import
+    fs::remove_file(&zip_path).await.ok();
+    for path in extracted_paths.values() {
+        fs::remove_file(path).await.ok();
+    }
+
     Ok(())
 }
 
 async fn fetch_latest_build() -> Result<LatestBuild> {
     let response = reqwest::get(LATEST_METADATA_URL).await?;
     if !response.status().is_success() {
-        anyhow::bail!(
-            "failed to fetch SDE metadata: {}",
-            response.status()
-        );
+        anyhow::bail!("failed to fetch SDE metadata: {}", response.status());
     }
     let text = response.text().await?;
-    let build: LatestBuild = serde_json::from_str(&text)
-        .context("failed to parse SDE metadata response")?;
+    let build: LatestBuild =
+        serde_json::from_str(&text).context("failed to parse SDE metadata response")?;
     Ok(build)
 }
 
@@ -220,11 +223,7 @@ async fn download_zip(latest: &LatestBuild, zip_path: &Path) -> Result<()> {
     let response = reqwest::get(&url).await?;
 
     if !response.status().is_success() {
-        anyhow::bail!(
-            "failed to download SDE zip {}: {}",
-            url,
-            response.status()
-        );
+        anyhow::bail!("failed to download SDE zip {}: {}", url, response.status());
     }
 
     let mut stream = response.bytes_stream();
@@ -267,9 +266,8 @@ async fn extract_selected_files(
             }
             let mut out_file = std::fs::File::create(&out_path)
                 .with_context(|| format!("failed to create {}", out_path.display()))?;
-            std::io::copy(&mut entry, &mut out_file).with_context(|| {
-                format!("failed to extract {} to {}", name, out_path.display())
-            })?;
+            std::io::copy(&mut entry, &mut out_file)
+                .with_context(|| format!("failed to extract {} to {}", name, out_path.display()))?;
             paths.insert((*name).to_string(), out_path);
         }
 
@@ -305,18 +303,35 @@ async fn import_from_files(
         .get("characterAttributes.jsonl")
         .context("characterAttributes.jsonl path missing")?;
 
-    let mut conn = pool.acquire().await?;
+    let mut tx = pool.begin().await?;
 
-    clear_tables(&mut conn).await?;
-    import_categories(&mut conn, categories).await?;
-    import_groups(&mut conn, groups).await?;
-    import_types(&mut conn, types).await?;
-    import_dogma_attributes(&mut conn, dogma_attributes).await?;
-    import_dogma_effects(&mut conn, dogma_effects).await?;
-    import_type_dogma(&mut conn, type_dogma).await?;
-    import_character_attributes(&mut conn, character_attributes).await?;
-    upsert_metadata(&mut conn, latest).await?;
+    clear_tables(&mut *tx).await?;
+    import_categories(&mut *tx, categories)
+        .await
+        .context("failed to import categories")?;
+    import_groups(&mut *tx, groups)
+        .await
+        .context("failed to import groups")?;
+    import_types(&mut *tx, types)
+        .await
+        .context("failed to import types")?;
+    import_dogma_attributes(&mut *tx, dogma_attributes)
+        .await
+        .context("failed to import dogma attributes")?;
+    import_dogma_effects(&mut *tx, dogma_effects)
+        .await
+        .context("failed to import dogma effects")?;
+    import_type_dogma(&mut *tx, type_dogma)
+        .await
+        .context("failed to import type dogma")?;
+    import_character_attributes(&mut *tx, character_attributes)
+        .await
+        .context("failed to import character attributes")?;
+    upsert_metadata(&mut *tx, latest)
+        .await
+        .context("failed to update metadata")?;
 
+    tx.commit().await?;
     Ok(())
 }
 
@@ -355,36 +370,63 @@ async fn clear_tables(conn: &mut SqliteConnection) -> Result<()> {
 }
 
 async fn import_categories(conn: &mut SqliteConnection, path: &Path) -> Result<()> {
-    let file = fs::File::open(path).await?;
+    let file = fs::File::open(path)
+        .await
+        .with_context(|| format!("failed to open categories file: {}", path.display()))?;
     let reader = BufReader::new(file);
     let mut lines = reader.lines();
     let mut batch = Vec::with_capacity(512);
+    let mut line_number = 0;
 
     while let Some(line) = lines.next_line().await? {
-        let row: CategoryRow = serde_json::from_str(&line)?;
+        line_number += 1;
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        let row: CategoryRow = serde_json::from_str(&line)
+            .with_context(|| format!("failed to parse category line {}: {}", line_number, line))?;
         let name = extract_text(row.name).unwrap_or_default();
         batch.push((row.id, name, row.published.unwrap_or(false)));
 
         if batch.len() >= 512 {
-            insert_categories(conn, &batch).await?;
+            insert_categories(conn, &batch)
+                .await
+                .with_context(|| format!("failed to insert batch at line {}", line_number))?;
             batch.clear();
         }
     }
 
     if !batch.is_empty() {
-        insert_categories(conn, &batch).await?;
+        insert_categories(conn, &batch)
+            .await
+            .with_context(|| format!("failed to insert final batch ({} rows)", batch.len()))?;
     }
 
     Ok(())
 }
 
-async fn insert_categories(conn: &mut SqliteConnection, rows: &[(i64, String, bool)]) -> Result<()> {
+async fn insert_categories(
+    conn: &mut SqliteConnection,
+    rows: &[(i64, String, bool)],
+) -> Result<()> {
+    if rows.is_empty() {
+        return Ok(());
+    }
+
     let mut builder =
-        QueryBuilder::<Sqlite>::new("INSERT INTO sde_categories (category_id, name, published) VALUES ");
-    builder.push_values(rows, |mut b, (id, name, published)| {
-        b.push_bind(*id).push_bind(name).push_bind(*published);
+        QueryBuilder::<Sqlite>::new("INSERT INTO sde_categories (category_id, name, published) ");
+
+    builder.push_values(rows.iter(), |mut b, row| {
+        b.push_bind(row.0).push_bind(&row.1).push_bind(row.2);
     });
-    builder.build().execute(conn).await?;
+
+    builder
+        .build()
+        .execute(conn)
+        .await
+        .map_err(|e| anyhow::anyhow!("SQL error inserting {} category rows: {}", rows.len(), e))?;
     Ok(())
 }
 
@@ -422,15 +464,18 @@ async fn insert_groups(
     conn: &mut SqliteConnection,
     rows: &[(i64, Option<i64>, String, Option<i64>, bool)],
 ) -> Result<()> {
+    if rows.is_empty() {
+        return Ok(());
+    }
     let mut builder = QueryBuilder::<Sqlite>::new(
-        "INSERT INTO sde_groups (group_id, category_id, name, icon_id, published) VALUES ",
+        "INSERT INTO sde_groups (group_id, category_id, name, icon_id, published) ",
     );
-    builder.push_values(rows, |mut b, (id, category_id, name, icon_id, published)| {
-        b.push_bind(*id)
-            .push_bind(*category_id)
-            .push_bind(name)
-            .push_bind(*icon_id)
-            .push_bind(*published);
+    builder.push_values(rows.iter(), |mut b, row| {
+        b.push_bind(row.0)
+            .push_bind(row.1)
+            .push_bind(&row.2)
+            .push_bind(row.3)
+            .push_bind(row.4);
     });
     builder.build().execute(conn).await?;
     Ok(())
@@ -482,12 +527,28 @@ async fn import_types(conn: &mut SqliteConnection, path: &Path) -> Result<()> {
 #[allow(clippy::too_many_arguments)]
 async fn insert_types(
     conn: &mut SqliteConnection,
-    rows: &[(i64, i64, Option<i64>, String, Option<String>, bool, Option<i64>, Option<i64>, Option<f64>, Option<f64>, Option<f64>, Option<f64>)],
+    rows: &[(
+        i64,
+        i64,
+        Option<i64>,
+        String,
+        Option<String>,
+        bool,
+        Option<i64>,
+        Option<i64>,
+        Option<f64>,
+        Option<f64>,
+        Option<f64>,
+        Option<f64>,
+    )],
 ) -> Result<()> {
+    if rows.is_empty() {
+        return Ok(());
+    }
     let mut builder = QueryBuilder::<Sqlite>::new(
-        "INSERT INTO sde_types (type_id, group_id, category_id, name, description, published, market_group_id, icon_id, radius, volume, portion_size, mass) VALUES ",
+        "INSERT INTO sde_types (type_id, group_id, category_id, name, description, published, market_group_id, icon_id, radius, volume, portion_size, mass) ",
     );
-    builder.push_values(rows, |mut b, row| {
+    builder.push_values(rows.iter(), |mut b, row| {
         b.push_bind(row.0)
             .push_bind(row.1)
             .push_bind(row.2)
@@ -542,10 +603,24 @@ async fn import_dogma_attributes(conn: &mut SqliteConnection, path: &Path) -> Re
 
 async fn insert_dogma_attributes(
     conn: &mut SqliteConnection,
-    rows: &[(i64, Option<i64>, Option<i64>, Option<f64>, Option<i64>, Option<bool>, Option<bool>, Option<bool>, String, Option<String>)],
+    rows: &[(
+        i64,
+        Option<i64>,
+        Option<i64>,
+        Option<f64>,
+        Option<i64>,
+        Option<bool>,
+        Option<bool>,
+        Option<bool>,
+        String,
+        Option<String>,
+    )],
 ) -> Result<()> {
-    let mut builder = QueryBuilder::<Sqlite>::new("INSERT INTO sde_dogma_attributes (attribute_id, attribute_category_id, data_type, default_value, unit_id, high_is_good, stackable, published, name, display_name) VALUES ");
-    builder.push_values(rows, |mut b, row| {
+    if rows.is_empty() {
+        return Ok(());
+    }
+    let mut builder = QueryBuilder::<Sqlite>::new("INSERT INTO sde_dogma_attributes (attribute_id, attribute_category_id, data_type, default_value, unit_id, high_is_good, stackable, published, name, display_name) ");
+    builder.push_values(rows.iter(), |mut b, row| {
         b.push_bind(row.0)
             .push_bind(row.1)
             .push_bind(row.2)
@@ -593,12 +668,22 @@ async fn import_dogma_effects(conn: &mut SqliteConnection, path: &Path) -> Resul
 
 async fn insert_dogma_effects(
     conn: &mut SqliteConnection,
-    rows: &[(i64, String, Option<i64>, Option<bool>, Option<bool>, Option<bool>)],
+    rows: &[(
+        i64,
+        String,
+        Option<i64>,
+        Option<bool>,
+        Option<bool>,
+        Option<bool>,
+    )],
 ) -> Result<()> {
+    if rows.is_empty() {
+        return Ok(());
+    }
     let mut builder = QueryBuilder::<Sqlite>::new(
-        "INSERT INTO sde_dogma_effects (effect_id, name, effect_category_id, is_offensive, is_assistance, published) VALUES ",
+        "INSERT INTO sde_dogma_effects (effect_id, name, effect_category_id, is_offensive, is_assistance, published) ",
     );
-    builder.push_values(rows, |mut b, row| {
+    builder.push_values(rows.iter(), |mut b, row| {
         b.push_bind(row.0)
             .push_bind(&row.1)
             .push_bind(row.2)
@@ -619,26 +704,41 @@ async fn import_type_dogma(conn: &mut SqliteConnection, path: &Path) -> Result<(
     let mut effect_batch = Vec::with_capacity(512);
     let mut skill_batch = Vec::with_capacity(256);
 
+    // Skill requirement attribute pairs: (requiredSkillN, requiredSkillNLevel)
+    // 182/277 = requiredSkill1/Level, 183/278 = requiredSkill2/Level, etc.
     const REQUIREMENTS: &[(i64, i64)] = &[
-        (182, 277),
-        (183, 278),
-        (184, 279),
-        (1285, 1286),
-        (1289, 1287),
-        (1290, 1288),
+        (182, 277),   // requiredSkill1, requiredSkill1Level
+        (183, 278),   // requiredSkill2, requiredSkill2Level
+        (184, 279),   // requiredSkill3, requiredSkill3Level
+        (1285, 1286), // requiredSkill4, requiredSkill4Level
+        (1289, 1287), // requiredSkill5, requiredSkill5Level
+        (1290, 1288), // requiredSkill6, requiredSkill6Level
     ];
 
     while let Some(line) = lines.next_line().await? {
         let row: TypeDogmaRow = serde_json::from_str(&line)?;
 
+        // Check if this type exists in sde_types (only published types are imported)
+        let type_exists: bool = sqlx::query_scalar::<_, bool>(
+            "SELECT EXISTS(SELECT 1 FROM sde_types WHERE type_id = ?)",
+        )
+        .bind(row.id)
+        .fetch_one(&mut *conn)
+        .await?;
+
+        // Skip dogma data for types that don't exist (unpublished types)
+        if !type_exists {
+            continue;
+        }
+
         let mut attr_map = HashMap::new();
 
-        for attr in &row.dogmaAttributes {
+        for attr in &row.dogma_attributes {
             attr_batch.push((row.id, attr.attribute_id, attr.value));
             attr_map.insert(attr.attribute_id, attr.value);
         }
 
-        for effect in &row.dogmaEffects {
+        for effect in &row.dogma_effects {
             effect_batch.push((row.id, effect.effect_id, effect.is_default.unwrap_or(false)));
         }
 
@@ -646,12 +746,7 @@ async fn import_type_dogma(conn: &mut SqliteConnection, path: &Path) -> Result<(
             if let Some(skill_id_val) = attr_map.get(skill_attr) {
                 if *skill_id_val > 0.0 {
                     let level = attr_map.get(level_attr).copied().unwrap_or(0.0);
-                    skill_batch.push((
-                        row.id,
-                        *skill_id_val as i64,
-                        level as i64,
-                        *skill_attr,
-                    ));
+                    skill_batch.push((row.id, *skill_id_val as i64, level as i64, *skill_attr));
                 }
             }
         }
@@ -683,22 +778,34 @@ async fn import_type_dogma(conn: &mut SqliteConnection, path: &Path) -> Result<(
     Ok(())
 }
 
-async fn insert_type_dogma_attributes(conn: &mut SqliteConnection, rows: &[(i64, i64, f64)]) -> Result<()> {
+async fn insert_type_dogma_attributes(
+    conn: &mut SqliteConnection,
+    rows: &[(i64, i64, f64)],
+) -> Result<()> {
+    if rows.is_empty() {
+        return Ok(());
+    }
     let mut builder = QueryBuilder::<Sqlite>::new(
-        "INSERT INTO sde_type_dogma_attributes (type_id, attribute_id, value) VALUES ",
+        "INSERT INTO sde_type_dogma_attributes (type_id, attribute_id, value) ",
     );
-    builder.push_values(rows, |mut b, row| {
+    builder.push_values(rows.iter(), |mut b, row| {
         b.push_bind(row.0).push_bind(row.1).push_bind(row.2);
     });
     builder.build().execute(conn).await?;
     Ok(())
 }
 
-async fn insert_type_dogma_effects(conn: &mut SqliteConnection, rows: &[(i64, i64, bool)]) -> Result<()> {
+async fn insert_type_dogma_effects(
+    conn: &mut SqliteConnection,
+    rows: &[(i64, i64, bool)],
+) -> Result<()> {
+    if rows.is_empty() {
+        return Ok(());
+    }
     let mut builder = QueryBuilder::<Sqlite>::new(
-        "INSERT INTO sde_type_dogma_effects (type_id, effect_id, is_default) VALUES ",
+        "INSERT INTO sde_type_dogma_effects (type_id, effect_id, is_default) ",
     );
-    builder.push_values(rows, |mut b, row| {
+    builder.push_values(rows.iter(), |mut b, row| {
         b.push_bind(row.0).push_bind(row.1).push_bind(row.2);
     });
     builder.build().execute(conn).await?;
@@ -709,10 +816,13 @@ async fn insert_skill_requirements(
     conn: &mut SqliteConnection,
     rows: &[(i64, i64, i64, i64)],
 ) -> Result<()> {
+    if rows.is_empty() {
+        return Ok(());
+    }
     let mut builder = QueryBuilder::<Sqlite>::new(
-        "INSERT INTO sde_skill_requirements (skill_type_id, required_skill_id, required_level, source_attr_id) VALUES ",
+        "INSERT INTO sde_skill_requirements (skill_type_id, required_skill_id, required_level, source_attr_id) ",
     );
-    builder.push_values(rows, |mut b, row| {
+    builder.push_values(rows.iter(), |mut b, row| {
         b.push_bind(row.0)
             .push_bind(row.1)
             .push_bind(row.2)
@@ -756,10 +866,13 @@ async fn insert_character_attributes(
     conn: &mut SqliteConnection,
     rows: &[(i64, String, Option<String>, Option<String>, Option<i64>)],
 ) -> Result<()> {
+    if rows.is_empty() {
+        return Ok(());
+    }
     let mut builder = QueryBuilder::<Sqlite>::new(
-        "INSERT INTO sde_character_attributes (attribute_id, name, description, short_description, icon_id) VALUES ",
+        "INSERT INTO sde_character_attributes (attribute_id, name, description, short_description, icon_id) ",
     );
-    builder.push_values(rows, |mut b, row| {
+    builder.push_values(rows.iter(), |mut b, row| {
         b.push_bind(row.0)
             .push_bind(&row.1)
             .push_bind(&row.2)
@@ -788,11 +901,7 @@ fn extract_text(value: Option<Value>) -> Option<String> {
             .get("en")
             .and_then(|v| v.as_str())
             .map(str::to_string)
-            .or_else(|| {
-                map.values()
-                    .find_map(|v| v.as_str().map(str::to_string))
-            }),
+            .or_else(|| map.values().find_map(|v| v.as_str().map(str::to_string))),
         _ => None,
     }
 }
-

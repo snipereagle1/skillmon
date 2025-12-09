@@ -156,9 +156,8 @@ async fn get_cached_skill_queue(
         req_builder = req_builder.header(IF_NONE_MATCH, header_value);
     }
     {
-        let header_value = HeaderValue::from_str(
-            &serde_plain::to_string(&request.x_compatibility_date)?,
-        )?;
+        let header_value =
+            HeaderValue::from_str(&serde_plain::to_string(&request.x_compatibility_date)?)?;
         req_builder = req_builder.header("x-compatibility-date", header_value);
     }
     if let Some(value) = request.x_tenant.as_ref() {
@@ -385,8 +384,9 @@ pub fn run() {
                 let pool = app.state::<db::Pool>().inner().clone();
                 let app_handle_for_sde = app.handle().clone();
                 tauri::async_runtime::spawn(async move {
-                    if let Err(err) = sde::ensure_latest(&app_handle_for_sde, &pool).await {
-                        eprintln!("SDE import failed: {}", err);
+                    match sde::ensure_latest(&app_handle_for_sde, &pool).await {
+                        Ok(_) => eprintln!("SDE import completed successfully"),
+                        Err(err) => eprintln!("SDE import failed: {:#}", err),
                     }
                 });
 
