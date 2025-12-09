@@ -7,6 +7,7 @@ use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use reqwest::header::{ACCEPT_LANGUAGE, IF_NONE_MATCH};
 use serde::Serialize;
 use serde_plain;
+use sqlx::{QueryBuilder, Row, Sqlite};
 use tauri::{Emitter, Listener, Manager, State};
 
 mod auth;
@@ -85,6 +86,7 @@ async fn refresh_sde(app: tauri::AppHandle, pool: State<'_, db::Pool>) -> Result
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillQueueItem {
     pub skill_id: i64,
+    pub skill_name: Option<String>,
     pub queue_position: i32,
     pub finished_level: i32,
     pub start_date: Option<String>,
@@ -196,6 +198,40 @@ async fn get_cached_skill_queue(
     Ok(None)
 }
 
+async fn get_skill_names(pool: &db::Pool, skill_ids: &[i64]) -> Result<HashMap<i64, String>, String> {
+    if skill_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let mut skill_names = HashMap::new();
+
+    for chunk in skill_ids.chunks(100) {
+        let mut query_builder: QueryBuilder<Sqlite> = QueryBuilder::new(
+            "SELECT type_id, name FROM sde_types WHERE type_id IN ("
+        );
+
+        let mut separated = query_builder.separated(", ");
+        for skill_id in chunk {
+            separated.push_bind(skill_id);
+        }
+        separated.push_unseparated(")");
+
+        let query = query_builder.build();
+        let rows = query
+            .fetch_all(pool)
+            .await
+            .map_err(|e| format!("Failed to query skill names: {}", e))?;
+
+        for row in rows {
+            let type_id: i64 = row.get(0);
+            let name: String = row.get(1);
+            skill_names.insert(type_id, name);
+        }
+    }
+
+    Ok(skill_names)
+}
+
 #[tauri::command]
 async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkillQueue>, String> {
     let characters = db::get_all_characters(&*pool)
@@ -203,6 +239,7 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
         .map_err(|e| format!("Failed to get characters: {}", e))?;
 
     let mut results = Vec::new();
+    let mut all_skill_ids = Vec::new();
 
     for character in characters {
         let access_token =
@@ -226,8 +263,11 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
                     .into_iter()
                     .filter_map(|item| {
                         let obj = item.as_object()?;
+                        let skill_id = obj.get("skill_id")?.as_i64()?;
+                        all_skill_ids.push(skill_id);
                         Some(SkillQueueItem {
-                            skill_id: obj.get("skill_id")?.as_i64()?,
+                            skill_id,
+                            skill_name: None,
                             queue_position: obj.get("queue_position")?.as_i64()? as i32,
                             finished_level: obj.get("finished_level")?.as_i64()? as i32,
                             start_date: obj
@@ -264,6 +304,19 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
                     "Failed to fetch skill queue for character {}: {}",
                     character.character_id, e
                 );
+            }
+        }
+    }
+
+    let unique_skill_ids: Vec<i64> = all_skill_ids.iter().copied().collect::<std::collections::HashSet<_>>().into_iter().collect();
+    let skill_names = get_skill_names(&*pool, &unique_skill_ids)
+        .await
+        .map_err(|e| format!("Failed to get skill names: {}", e))?;
+
+    for result in &mut results {
+        for skill_item in &mut result.skill_queue {
+            if let Some(name) = skill_names.get(&skill_item.skill_id) {
+                skill_item.skill_name = Some(name.clone());
             }
         }
     }

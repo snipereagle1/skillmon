@@ -5,6 +5,7 @@ export interface Character {
 
 export interface SkillQueueItem {
   skill_id: number;
+  skill_name?: string;
   queue_position: number;
   finished_level: number;
   start_date: string | null;
