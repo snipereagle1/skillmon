@@ -16,6 +16,7 @@ pub struct Tokens {
     pub access_token: String,
     pub refresh_token: String,
     pub expires_at: i64,
+    pub scopes: Option<String>,
 }
 
 pub async fn get_character(pool: &Pool, character_id: i64) -> Result<Option<Character>> {
@@ -70,7 +71,7 @@ pub async fn delete_character(pool: &Pool, character_id: i64) -> Result<()> {
 
 pub async fn get_tokens(pool: &Pool, character_id: i64) -> Result<Option<Tokens>> {
     let tokens = sqlx::query_as::<_, Tokens>(
-    "SELECT character_id, access_token, refresh_token, expires_at FROM tokens WHERE character_id = ?",
+    "SELECT character_id, access_token, refresh_token, expires_at, scopes FROM tokens WHERE character_id = ?",
   )
   .bind(character_id)
   .fetch_optional(pool)
@@ -85,17 +86,24 @@ pub async fn set_tokens(
     access_token: &str,
     refresh_token: &str,
     expires_at: i64,
+    scopes: Option<&[String]>,
 ) -> Result<()> {
+    let scopes_json = scopes
+        .map(|s| serde_json::to_string(s))
+        .transpose()
+        .map_err(|e| anyhow::anyhow!("Failed to serialize scopes: {}", e))?;
+
     sqlx::query(
         r#"
-      INSERT INTO tokens (character_id, access_token, refresh_token, expires_at)
-      VALUES (?, ?, ?, ?)
+      INSERT INTO tokens (character_id, access_token, refresh_token, expires_at, scopes)
+      VALUES (?, ?, ?, ?, ?)
     "#,
     )
     .bind(character_id)
     .bind(access_token)
     .bind(refresh_token)
     .bind(expires_at)
+    .bind(scopes_json.as_deref())
     .execute(pool)
     .await?;
 
@@ -108,17 +116,24 @@ pub async fn update_tokens(
     access_token: &str,
     refresh_token: &str,
     expires_at: i64,
+    scopes: Option<&[String]>,
 ) -> Result<()> {
+    let scopes_json = scopes
+        .map(|s| serde_json::to_string(s))
+        .transpose()
+        .map_err(|e| anyhow::anyhow!("Failed to serialize scopes: {}", e))?;
+
     sqlx::query(
         r#"
       UPDATE tokens
-      SET access_token = ?, refresh_token = ?, expires_at = ?
+      SET access_token = ?, refresh_token = ?, expires_at = ?, scopes = ?
       WHERE character_id = ?
     "#,
     )
     .bind(access_token)
     .bind(refresh_token)
     .bind(expires_at)
+    .bind(scopes_json.as_deref())
     .bind(character_id)
     .execute(pool)
     .await?;

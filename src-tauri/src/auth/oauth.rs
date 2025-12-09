@@ -2,6 +2,7 @@ use anyhow::{Context, Result};
 use base64::{engine::general_purpose::URL_SAFE_NO_PAD, Engine};
 use chrono::Utc;
 use serde_json::Value;
+use std::collections::HashSet;
 
 use super::pkce::generate_pkce_pair;
 use super::types::{CharacterInfo, TokenResponse};
@@ -135,12 +136,20 @@ pub async fn ensure_valid_access_token(
 
         let new_expires_at = Utc::now().timestamp() + token_response.expires_in;
 
+        // Extract scopes from the new access token
+        let scopes = extract_scopes_from_jwt(&token_response.access_token)
+            .unwrap_or_else(|e| {
+                eprintln!("Warning: Failed to extract scopes from refreshed token: {}", e);
+                Vec::new()
+            });
+
         db::update_tokens(
             pool,
             character_id,
             &token_response.access_token,
             &token_response.refresh_token,
             new_expires_at,
+            Some(&scopes),
         )
         .await
         .context("Failed to update tokens in database")?;
@@ -151,7 +160,7 @@ pub async fn ensure_valid_access_token(
     }
 }
 
-pub fn extract_character_from_jwt(access_token: &str) -> Result<CharacterInfo> {
+fn decode_jwt_payload(access_token: &str) -> Result<Value> {
     let jwt_parts: Vec<&str> = access_token.split('.').collect();
     if jwt_parts.len() != 3 {
         anyhow::bail!("Invalid JWT format: expected 3 parts, got {}", jwt_parts.len());
@@ -169,6 +178,38 @@ pub fn extract_character_from_jwt(access_token: &str) -> Result<CharacterInfo> {
         .context(format!("Failed to parse JWT payload. Decoded: {}", decoded_str))?;
 
     eprintln!("JWT JSON: {}", serde_json::to_string_pretty(&json).unwrap_or_default());
+
+    Ok(json)
+}
+
+pub fn extract_scopes_from_jwt(access_token: &str) -> Result<Vec<String>> {
+    let json = decode_jwt_payload(access_token)?;
+
+    // EVE JWT uses "scp" for scopes, which can be either an array or a single string
+    let scopes = match json.get("scp") {
+        Some(Value::Array(arr)) => {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(|s| s.to_string()))
+                .collect()
+        }
+        Some(Value::String(s)) => {
+            // If it's a single string, split by spaces
+            s.split_whitespace().map(|s| s.to_string()).collect()
+        }
+        Some(_) => {
+            anyhow::bail!("Invalid 'scp' field format in JWT");
+        }
+        None => {
+            // If scp is missing, return empty vector (older tokens might not have it)
+            Vec::new()
+        }
+    };
+
+    Ok(scopes)
+}
+
+pub fn extract_character_from_jwt(access_token: &str) -> Result<CharacterInfo> {
+    let json = decode_jwt_payload(access_token)?;
 
     // EVE JWT uses "sub" for character ID in format "CHARACTER:EVE:12345678"
     let sub_str = json["sub"]
@@ -205,5 +246,51 @@ pub fn extract_character_from_jwt(access_token: &str) -> Result<CharacterInfo> {
         character_id,
         character_name,
     })
+}
+
+/// Check if a token has the required scopes.
+/// Returns a list of missing scopes, or empty vector if all required scopes are present.
+/// Logs missing scopes for graceful degradation.
+pub async fn check_token_scopes(
+    pool: &Pool,
+    character_id: i64,
+    required_scopes: &[&str],
+) -> Result<Vec<String>> {
+    let tokens = db::get_tokens(pool, character_id)
+        .await
+        .context("Failed to retrieve tokens from database")?;
+
+    let tokens = tokens.ok_or_else(|| {
+        anyhow::anyhow!("No tokens found for character_id: {}", character_id)
+    })?;
+
+    // Parse scopes from JSON string
+    let token_scopes: Vec<String> = if let Some(scopes_json) = &tokens.scopes {
+        serde_json::from_str(scopes_json)
+            .unwrap_or_else(|e| {
+                eprintln!("Warning: Failed to parse scopes JSON for character {}: {}", character_id, e);
+                Vec::new()
+            })
+    } else {
+        // No scopes stored (old token)
+        Vec::new()
+    };
+
+    let token_scopes_set: HashSet<String> = token_scopes.iter().cloned().collect();
+    let required_scopes_set: HashSet<String> = required_scopes.iter().map(|s| s.to_string()).collect();
+
+    let missing_scopes: Vec<String> = required_scopes_set
+        .difference(&token_scopes_set)
+        .cloned()
+        .collect();
+
+    if !missing_scopes.is_empty() {
+        eprintln!(
+            "Warning: Token for character {} is missing required scopes: {:?}",
+            character_id, missing_scopes
+        );
+    }
+
+    Ok(missing_scopes)
 }
 

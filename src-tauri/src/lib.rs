@@ -1708,6 +1708,9 @@ pub async fn handle_oauth_callback(
     let character_info = auth::extract_character_from_jwt(&token_response.access_token)
         .context("Failed to extract character info from JWT")?;
 
+    let scopes = auth::extract_scopes_from_jwt(&token_response.access_token)
+        .context("Failed to extract scopes from JWT")?;
+
     let expires_at = Utc::now().timestamp() + token_response.expires_in;
 
     let existing_character = db::get_character(&*pool, character_info.character_id).await?;
@@ -1739,6 +1742,7 @@ pub async fn handle_oauth_callback(
             &token_response.access_token,
             &token_response.refresh_token,
             expires_at,
+            Some(&scopes),
         )
         .await
         .context("Failed to set tokens")?;
@@ -1749,6 +1753,7 @@ pub async fn handle_oauth_callback(
             &token_response.access_token,
             &token_response.refresh_token,
             expires_at,
+            Some(&scopes),
         )
         .await
         .context("Failed to update tokens")?;
