@@ -19,7 +19,7 @@ pub struct RateLimitInfo {
     pub updated_at: chrono::DateTime<Utc>,
 }
 
-pub type RateLimitStore = Arc<RwLock<HashMap<String, RateLimitInfo>>>;
+pub type RateLimitStore = Arc<RwLock<HashMap<i64, HashMap<String, RateLimitInfo>>>>;
 
 pub fn extract_rate_limit_info(headers: &HeaderMap) -> Option<RateLimitInfo> {
     let group = headers.get("x-ratelimit-group")?.to_str().ok()?.to_string();
@@ -62,6 +62,7 @@ pub async fn fetch_cached<T: serde::de::DeserializeOwned>(
     endpoint_path: &str,
     cache_key: &str,
     rate_limits: &RateLimitStore,
+    character_id: i64,
 ) -> Result<Option<T>> {
     let cached_entry = cache::get_cached_response(pool, cache_key).await?;
 
@@ -92,7 +93,11 @@ pub async fn fetch_cached<T: serde::de::DeserializeOwned>(
     let headers = response.headers().clone();
 
     if let Some(info) = extract_rate_limit_info(&headers) {
-        rate_limits.write().await.insert(info.group.clone(), info);
+        let mut store = rate_limits.write().await;
+        store
+            .entry(character_id)
+            .or_insert_with(HashMap::new)
+            .insert(info.group.clone(), info);
     }
 
     if status.as_u16() == 304 {
