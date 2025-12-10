@@ -1,12 +1,10 @@
 use std::collections::HashMap;
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 
 use anyhow::{Context, Result};
 use chrono::Utc;
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
-use reqwest::header::{ACCEPT_LANGUAGE, IF_NONE_MATCH};
 use serde::Serialize;
-use serde_plain;
 use sqlx::{QueryBuilder, Row, Sqlite};
 use tauri::{Emitter, Listener, Manager, State};
 
@@ -189,182 +187,31 @@ async fn get_cached_skill_queue(
     pool: &db::Pool,
     client: &reqwest::Client,
     character_id: i64,
+    rate_limits: &esi::RateLimitStore,
 ) -> Result<Option<esi::CharactersCharacterIdSkillqueueGet>> {
     let endpoint_path = format!("characters/{}/skillqueue", character_id);
     let cache_key = cache::build_cache_key(&endpoint_path, character_id);
-
-    let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
-
-    if let Some((cached_body, _)) = &cached_entry {
-        let cached_data: esi::CharactersCharacterIdSkillqueueGet =
-            serde_json::from_str(cached_body)
-                .context("Failed to deserialize cached skill queue")?;
-        return Ok(Some(cached_data));
-    }
-
-    let mut request = esi::GetCharactersCharacterIdSkillqueueRequest {
-        character_id,
-        x_compatibility_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
-        ..Default::default()
-    };
-
-    if let Some((_, Some(etag))) = cached_entry {
-        request.if_none_match = Some(etag);
-    }
-
-    let url = esi::BASE_URL
-        .parse::<reqwest::Url>()
-        .context("Invalid base URL")?
-        .join(&request.render_path()?)
-        .context("Failed to construct request URL")?;
-
-    let mut req_builder = client.get(url);
-    if let Some(value) = request.accept_language.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header(ACCEPT_LANGUAGE, header_value);
-    }
-    if let Some(value) = request.if_none_match.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header(IF_NONE_MATCH, header_value);
-    }
-    {
-        let header_value =
-            HeaderValue::from_str(&serde_plain::to_string(&request.x_compatibility_date)?)?;
-        req_builder = req_builder.header("x-compatibility-date", header_value);
-    }
-    if let Some(value) = request.x_tenant.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header("x-tenant", header_value);
-    }
-
-    let response = req_builder.send().await?;
-    let status = response.status();
-    let headers = response.headers().clone();
-
-    if status.as_u16() == 304 {
-        if let Some((cached_body, _)) = cache::get_cached_response(pool, &cache_key).await? {
-            let cached_data: esi::CharactersCharacterIdSkillqueueGet =
-                serde_json::from_str(&cached_body)
-                    .context("Failed to deserialize cached skill queue")?;
-            return Ok(Some(cached_data));
-        }
-    }
-
-    if status.is_success() {
-        let body_bytes = response.bytes().await?;
-        let body_str = String::from_utf8_lossy(&body_bytes);
-
-        let etag = cache::extract_etag(&headers);
-        let expires_at = cache::extract_expires(&headers);
-
-        cache::set_cached_response(pool, &cache_key, etag.as_deref(), expires_at, &body_str)
-            .await?;
-
-        let data: esi::CharactersCharacterIdSkillqueueGet =
-            serde_json::from_str(&body_str).context("Failed to deserialize skill queue")?;
-        return Ok(Some(data));
-    }
-
-    Ok(None)
+    esi::fetch_cached(pool, client, &endpoint_path, &cache_key, rate_limits).await
 }
 
 async fn get_cached_character_attributes(
     pool: &db::Pool,
     client: &reqwest::Client,
     character_id: i64,
+    rate_limits: &esi::RateLimitStore,
 ) -> Result<Option<esi::CharactersCharacterIdAttributesGet>> {
     let endpoint_path = format!("characters/{}/attributes", character_id);
     let cache_key = cache::build_cache_key(&endpoint_path, character_id);
 
-    let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
-
-    if let Some((cached_body, _)) = &cached_entry {
-        let cached_data: esi::CharactersCharacterIdAttributesGet =
-            serde_json::from_str(cached_body)
-                .context("Failed to deserialize cached character attributes")?;
-
-        db::set_character_attributes(
-            pool,
-            character_id,
-            cached_data.charisma,
-            cached_data.intelligence,
-            cached_data.memory,
-            cached_data.perception,
-            cached_data.willpower,
-            cached_data.bonus_remaps,
-            cached_data
-                .accrued_remap_cooldown_date
-                .as_ref()
-                .map(|d| d.to_rfc3339()),
-            cached_data.last_remap_date.as_ref().map(|d| d.to_rfc3339()),
-        )
-        .await
-        .ok();
-
-        return Ok(Some(cached_data));
-    }
-
-    let mut request = esi::GetCharactersCharacterIdAttributesRequest {
-        character_id,
-        x_compatibility_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
-        ..Default::default()
-    };
-
-    if let Some((_, Some(etag))) = cached_entry {
-        request.if_none_match = Some(etag);
-    }
-
-    let url = esi::BASE_URL
-        .parse::<reqwest::Url>()
-        .context("Invalid base URL")?
-        .join(&request.render_path()?)
-        .context("Failed to construct request URL")?;
-
-    let mut req_builder = client.get(url);
-    if let Some(value) = request.accept_language.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header(ACCEPT_LANGUAGE, header_value);
-    }
-    if let Some(value) = request.if_none_match.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header(IF_NONE_MATCH, header_value);
-    }
+    if let Some(data) = esi::fetch_cached::<esi::CharactersCharacterIdAttributesGet>(
+        pool,
+        client,
+        &endpoint_path,
+        &cache_key,
+        rate_limits,
+    )
+    .await?
     {
-        let header_value =
-            HeaderValue::from_str(&serde_plain::to_string(&request.x_compatibility_date)?)?;
-        req_builder = req_builder.header("x-compatibility-date", header_value);
-    }
-    if let Some(value) = request.x_tenant.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header("x-tenant", header_value);
-    }
-
-    let response = req_builder.send().await?;
-    let status = response.status();
-    let headers = response.headers().clone();
-
-    if status.as_u16() == 304 {
-        if let Some((cached_body, _)) = cache::get_cached_response(pool, &cache_key).await? {
-            let cached_data: esi::CharactersCharacterIdAttributesGet =
-                serde_json::from_str(&cached_body)
-                    .context("Failed to deserialize cached character attributes")?;
-            return Ok(Some(cached_data));
-        }
-    }
-
-    if status.is_success() {
-        let body_bytes = response.bytes().await?;
-        let body_str = String::from_utf8_lossy(&body_bytes);
-
-        let etag = cache::extract_etag(&headers);
-        let expires_at = cache::extract_expires(&headers);
-
-        cache::set_cached_response(pool, &cache_key, etag.as_deref(), expires_at, &body_str)
-            .await?;
-
-        let data: esi::CharactersCharacterIdAttributesGet = serde_json::from_str(&body_str)
-            .context("Failed to deserialize character attributes")?;
-
         db::set_character_attributes(
             pool,
             character_id,
@@ -379,137 +226,33 @@ async fn get_cached_character_attributes(
                 .map(|d| d.to_rfc3339()),
             data.last_remap_date.as_ref().map(|d| d.to_rfc3339()),
         )
-        .await?;
+        .await
+        .ok();
 
-        return Ok(Some(data));
+        Ok(Some(data))
+    } else {
+        Ok(None)
     }
-
-    Ok(None)
 }
 
 async fn get_cached_character_skills(
     pool: &db::Pool,
     client: &reqwest::Client,
     character_id: i64,
+    rate_limits: &esi::RateLimitStore,
 ) -> Result<Option<esi::CharactersCharacterIdSkillsGet>> {
     let endpoint_path = format!("characters/{}/skills", character_id);
     let cache_key = cache::build_cache_key(&endpoint_path, character_id);
 
-    let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
-
-    if let Some((cached_body, _)) = &cached_entry {
-        let cached_data: esi::CharactersCharacterIdSkillsGet = serde_json::from_str(cached_body)
-            .context("Failed to deserialize cached character skills")?;
-
-        let skills_data: Vec<(i64, i64, i64, i64)> = cached_data
-            .skills
-            .iter()
-            .filter_map(|skill| {
-                let obj = skill.as_object()?;
-                Some((
-                    obj.get("skill_id")?.as_i64()?,
-                    obj.get("active_skill_level")?.as_i64()?,
-                    obj.get("skillpoints_in_skill")?.as_i64()?,
-                    obj.get("trained_skill_level")?.as_i64()?,
-                ))
-            })
-            .collect();
-        db::set_character_skills(pool, character_id, &skills_data)
-            .await
-            .ok();
-
-        let unallocated_sp = cached_data.unallocated_sp.unwrap_or(0);
-        db::set_character_unallocated_sp(pool, character_id, unallocated_sp)
-            .await
-            .ok();
-
-        return Ok(Some(cached_data));
-    }
-
-    let mut request = esi::GetCharactersCharacterIdSkillsRequest {
-        character_id,
-        x_compatibility_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
-        ..Default::default()
-    };
-
-    if let Some((_, Some(etag))) = cached_entry {
-        request.if_none_match = Some(etag);
-    }
-
-    let url = esi::BASE_URL
-        .parse::<reqwest::Url>()
-        .context("Invalid base URL")?
-        .join(&request.render_path()?)
-        .context("Failed to construct request URL")?;
-
-    let mut req_builder = client.get(url);
-    if let Some(value) = request.accept_language.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header(ACCEPT_LANGUAGE, header_value);
-    }
-    if let Some(value) = request.if_none_match.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header(IF_NONE_MATCH, header_value);
-    }
+    if let Some(data) = esi::fetch_cached::<esi::CharactersCharacterIdSkillsGet>(
+        pool,
+        client,
+        &endpoint_path,
+        &cache_key,
+        rate_limits,
+    )
+    .await?
     {
-        let header_value =
-            HeaderValue::from_str(&serde_plain::to_string(&request.x_compatibility_date)?)?;
-        req_builder = req_builder.header("x-compatibility-date", header_value);
-    }
-    if let Some(value) = request.x_tenant.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header("x-tenant", header_value);
-    }
-
-    let response = req_builder.send().await?;
-    let status = response.status();
-    let headers = response.headers().clone();
-
-    if status.as_u16() == 304 {
-        if let Some((cached_body, _)) = cache::get_cached_response(pool, &cache_key).await? {
-            let cached_data: esi::CharactersCharacterIdSkillsGet =
-                serde_json::from_str(&cached_body)
-                    .context("Failed to deserialize cached character skills")?;
-
-            let skills_data: Vec<(i64, i64, i64, i64)> = cached_data
-                .skills
-                .iter()
-                .filter_map(|skill| {
-                    let obj = skill.as_object()?;
-                    Some((
-                        obj.get("skill_id")?.as_i64()?,
-                        obj.get("active_skill_level")?.as_i64()?,
-                        obj.get("skillpoints_in_skill")?.as_i64()?,
-                        obj.get("trained_skill_level")?.as_i64()?,
-                    ))
-                })
-                .collect();
-            db::set_character_skills(pool, character_id, &skills_data)
-                .await
-                .ok();
-
-            let unallocated_sp = cached_data.unallocated_sp.unwrap_or(0);
-            db::set_character_unallocated_sp(pool, character_id, unallocated_sp)
-                .await
-                .ok();
-
-            return Ok(Some(cached_data));
-        }
-    }
-
-    if status.is_success() {
-        let body_bytes = response.bytes().await?;
-        let body_str = String::from_utf8_lossy(&body_bytes);
-
-        let etag = cache::extract_etag(&headers);
-        let expires_at = cache::extract_expires(&headers);
-
-        cache::set_cached_response(pool, &cache_key, etag.as_deref(), expires_at, &body_str)
-            .await?;
-
-        let data: esi::CharactersCharacterIdSkillsGet =
-            serde_json::from_str(&body_str).context("Failed to deserialize character skills")?;
-
         let skills_data: Vec<(i64, i64, i64, i64)> = data
             .skills
             .iter()
@@ -532,10 +275,10 @@ async fn get_cached_character_skills(
             .await
             .ok();
 
-        return Ok(Some(data));
+        Ok(Some(data))
+    } else {
+        Ok(None)
     }
-
-    Ok(None)
 }
 
 async fn get_skill_names(
@@ -614,328 +357,44 @@ async fn get_cached_character_clones(
     pool: &db::Pool,
     client: &reqwest::Client,
     character_id: i64,
+    rate_limits: &esi::RateLimitStore,
 ) -> Result<Option<esi::CharactersCharacterIdClonesGet>> {
     let endpoint_path = format!("characters/{}/clones", character_id);
     let cache_key = cache::build_cache_key(&endpoint_path, character_id);
-
-    let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
-
-    if let Some((cached_body, _)) = &cached_entry {
-        let cached_data: esi::CharactersCharacterIdClonesGet =
-            serde_json::from_str(cached_body).context("Failed to deserialize cached clones")?;
-        return Ok(Some(cached_data));
-    }
-
-    let mut request = esi::GetCharactersCharacterIdClonesRequest {
-        character_id,
-        x_compatibility_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
-        ..Default::default()
-    };
-
-    if let Some((_, Some(etag))) = cached_entry {
-        request.if_none_match = Some(etag);
-    }
-
-    let url = esi::BASE_URL
-        .parse::<reqwest::Url>()
-        .context("Invalid base URL")?
-        .join(&request.render_path()?)
-        .context("Failed to construct request URL")?;
-
-    let mut req_builder = client.get(url);
-    if let Some(value) = request.accept_language.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header(ACCEPT_LANGUAGE, header_value);
-    }
-    if let Some(value) = request.if_none_match.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header(IF_NONE_MATCH, header_value);
-    }
-    {
-        let header_value =
-            HeaderValue::from_str(&serde_plain::to_string(&request.x_compatibility_date)?)?;
-        req_builder = req_builder.header("x-compatibility-date", header_value);
-    }
-    if let Some(value) = request.x_tenant.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header("x-tenant", header_value);
-    }
-
-    let response = req_builder.send().await?;
-    let status = response.status();
-    let headers = response.headers().clone();
-
-    if status.as_u16() == 304 {
-        if let Some((cached_body, _)) = cache::get_cached_response(pool, &cache_key).await? {
-            let cached_data: esi::CharactersCharacterIdClonesGet =
-                serde_json::from_str(&cached_body)
-                    .context("Failed to deserialize cached clones")?;
-            return Ok(Some(cached_data));
-        }
-    }
-
-    if status.is_success() {
-        let body_bytes = response.bytes().await?;
-        let body_str = String::from_utf8_lossy(&body_bytes);
-
-        let etag = cache::extract_etag(&headers);
-        let expires_at = cache::extract_expires(&headers);
-
-        cache::set_cached_response(pool, &cache_key, etag.as_deref(), expires_at, &body_str)
-            .await?;
-
-        let data: esi::CharactersCharacterIdClonesGet =
-            serde_json::from_str(&body_str).context("Failed to deserialize clones")?;
-        return Ok(Some(data));
-    }
-
-    Ok(None)
+    esi::fetch_cached(pool, client, &endpoint_path, &cache_key, rate_limits).await
 }
 
 async fn get_cached_character_implants(
     pool: &db::Pool,
     client: &reqwest::Client,
     character_id: i64,
+    rate_limits: &esi::RateLimitStore,
 ) -> Result<Option<esi::CharactersCharacterIdImplantsGet>> {
     let endpoint_path = format!("characters/{}/implants", character_id);
     let cache_key = cache::build_cache_key(&endpoint_path, character_id);
-
-    let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
-
-    if let Some((cached_body, _)) = &cached_entry {
-        let cached_data: esi::CharactersCharacterIdImplantsGet =
-            serde_json::from_str(cached_body).context("Failed to deserialize cached implants")?;
-        return Ok(Some(cached_data));
-    }
-
-    let mut request = esi::GetCharactersCharacterIdImplantsRequest {
-        character_id,
-        x_compatibility_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
-        ..Default::default()
-    };
-
-    if let Some((_, Some(etag))) = cached_entry {
-        request.if_none_match = Some(etag);
-    }
-
-    let url = esi::BASE_URL
-        .parse::<reqwest::Url>()
-        .context("Invalid base URL")?
-        .join(&request.render_path()?)
-        .context("Failed to construct request URL")?;
-
-    let mut req_builder = client.get(url);
-    if let Some(value) = request.accept_language.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header(ACCEPT_LANGUAGE, header_value);
-    }
-    if let Some(value) = request.if_none_match.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header(IF_NONE_MATCH, header_value);
-    }
-    {
-        let header_value =
-            HeaderValue::from_str(&serde_plain::to_string(&request.x_compatibility_date)?)?;
-        req_builder = req_builder.header("x-compatibility-date", header_value);
-    }
-    if let Some(value) = request.x_tenant.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header("x-tenant", header_value);
-    }
-
-    let response = req_builder.send().await?;
-    let status = response.status();
-    let headers = response.headers().clone();
-
-    if status.as_u16() == 304 {
-        if let Some((cached_body, _)) = cache::get_cached_response(pool, &cache_key).await? {
-            let cached_data: esi::CharactersCharacterIdImplantsGet =
-                serde_json::from_str(&cached_body)
-                    .context("Failed to deserialize cached implants")?;
-            return Ok(Some(cached_data));
-        }
-    }
-
-    if status.is_success() {
-        let body_bytes = response.bytes().await?;
-        let body_str = String::from_utf8_lossy(&body_bytes);
-
-        let etag = cache::extract_etag(&headers);
-        let expires_at = cache::extract_expires(&headers);
-
-        cache::set_cached_response(pool, &cache_key, etag.as_deref(), expires_at, &body_str)
-            .await?;
-
-        let data: esi::CharactersCharacterIdImplantsGet =
-            serde_json::from_str::<esi::CharactersCharacterIdImplantsGet>(&body_str)
-                .context("Failed to deserialize implants")?;
-        return Ok(Some(data));
-    }
-
-    Ok(None)
+    esi::fetch_cached(pool, client, &endpoint_path, &cache_key, rate_limits).await
 }
 
 async fn get_cached_station_info(
     pool: &db::Pool,
     client: &reqwest::Client,
     station_id: i64,
+    rate_limits: &esi::RateLimitStore,
 ) -> Result<Option<esi::UniverseStationsStationIdGet>> {
     let endpoint_path = format!("universe/stations/{}", station_id);
     let cache_key = format!("{}:0", endpoint_path);
-
-    let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
-
-    if let Some((cached_body, _)) = &cached_entry {
-        let cached_data: esi::UniverseStationsStationIdGet = serde_json::from_str(cached_body)
-            .context("Failed to deserialize cached station info")?;
-        return Ok(Some(cached_data));
-    }
-
-    let mut request = esi::GetUniverseStationsStationIdRequest {
-        station_id,
-        x_compatibility_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
-        ..Default::default()
-    };
-
-    if let Some((_, Some(etag))) = cached_entry {
-        request.if_none_match = Some(etag);
-    }
-
-    let url = esi::BASE_URL
-        .parse::<reqwest::Url>()
-        .context("Invalid base URL")?
-        .join(&request.render_path()?)
-        .context("Failed to construct request URL")?;
-
-    let mut req_builder = client.get(url);
-    if let Some(value) = request.accept_language.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header(ACCEPT_LANGUAGE, header_value);
-    }
-    if let Some(value) = request.if_none_match.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header(IF_NONE_MATCH, header_value);
-    }
-    {
-        let header_value =
-            HeaderValue::from_str(&serde_plain::to_string(&request.x_compatibility_date)?)?;
-        req_builder = req_builder.header("x-compatibility-date", header_value);
-    }
-    if let Some(value) = request.x_tenant.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header("x-tenant", header_value);
-    }
-
-    let response = req_builder.send().await?;
-    let status = response.status();
-    let headers = response.headers().clone();
-
-    if status.as_u16() == 304 {
-        if let Some((cached_body, _)) = cache::get_cached_response(pool, &cache_key).await? {
-            let cached_data: esi::UniverseStationsStationIdGet = serde_json::from_str(&cached_body)
-                .context("Failed to deserialize cached station info")?;
-            return Ok(Some(cached_data));
-        }
-    }
-
-    if status.is_success() {
-        let body_bytes = response.bytes().await?;
-        let body_str = String::from_utf8_lossy(&body_bytes);
-
-        let etag = cache::extract_etag(&headers);
-        let expires_at = cache::extract_expires(&headers);
-
-        cache::set_cached_response(pool, &cache_key, etag.as_deref(), expires_at, &body_str)
-            .await?;
-
-        let data: esi::UniverseStationsStationIdGet =
-            serde_json::from_str(&body_str).context("Failed to deserialize station info")?;
-        return Ok(Some(data));
-    }
-
-    Ok(None)
+    esi::fetch_cached(pool, client, &endpoint_path, &cache_key, rate_limits).await
 }
 
 async fn get_cached_structure_info(
     pool: &db::Pool,
     client: &reqwest::Client,
     structure_id: i64,
+    rate_limits: &esi::RateLimitStore,
 ) -> Result<Option<esi::UniverseStructuresStructureIdGet>> {
     let endpoint_path = format!("universe/structures/{}", structure_id);
     let cache_key = format!("{}:0", endpoint_path);
-
-    let cached_entry = cache::get_cached_response(pool, &cache_key).await?;
-
-    if let Some((cached_body, _)) = &cached_entry {
-        let cached_data: esi::UniverseStructuresStructureIdGet = serde_json::from_str(cached_body)
-            .context("Failed to deserialize cached structure info")?;
-        return Ok(Some(cached_data));
-    }
-
-    let mut request = esi::GetUniverseStructuresStructureIdRequest {
-        structure_id,
-        x_compatibility_date: chrono::NaiveDate::from_ymd_opt(2020, 1, 1).unwrap(),
-        ..Default::default()
-    };
-
-    if let Some((_, Some(etag))) = cached_entry {
-        request.if_none_match = Some(etag);
-    }
-
-    let url = esi::BASE_URL
-        .parse::<reqwest::Url>()
-        .context("Invalid base URL")?
-        .join(&request.render_path()?)
-        .context("Failed to construct request URL")?;
-
-    let mut req_builder = client.get(url);
-    if let Some(value) = request.accept_language.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header(ACCEPT_LANGUAGE, header_value);
-    }
-    if let Some(value) = request.if_none_match.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header(IF_NONE_MATCH, header_value);
-    }
-    {
-        let header_value =
-            HeaderValue::from_str(&serde_plain::to_string(&request.x_compatibility_date)?)?;
-        req_builder = req_builder.header("x-compatibility-date", header_value);
-    }
-    if let Some(value) = request.x_tenant.as_ref() {
-        let header_value = HeaderValue::from_str(value.as_str())?;
-        req_builder = req_builder.header("x-tenant", header_value);
-    }
-
-    let response = req_builder.send().await?;
-    let status = response.status();
-    let headers = response.headers().clone();
-
-    if status.as_u16() == 304 {
-        if let Some((cached_body, _)) = cache::get_cached_response(pool, &cache_key).await? {
-            let cached_data: esi::UniverseStructuresStructureIdGet =
-                serde_json::from_str(&cached_body)
-                    .context("Failed to deserialize cached structure info")?;
-            return Ok(Some(cached_data));
-        }
-    }
-
-    if status.is_success() {
-        let body_bytes = response.bytes().await?;
-        let body_str = String::from_utf8_lossy(&body_bytes);
-
-        let etag = cache::extract_etag(&headers);
-        let expires_at = cache::extract_expires(&headers);
-
-        cache::set_cached_response(pool, &cache_key, etag.as_deref(), expires_at, &body_str)
-            .await?;
-
-        let data: esi::UniverseStructuresStructureIdGet =
-            serde_json::from_str(&body_str).context("Failed to deserialize structure info")?;
-        return Ok(Some(data));
-    }
-
-    Ok(None)
+    esi::fetch_cached(pool, client, &endpoint_path, &cache_key, rate_limits).await
 }
 
 #[derive(Debug, Clone)]
@@ -1015,7 +474,10 @@ fn calculate_sp_for_level(rank: i64, level: i32) -> i64 {
 }
 
 #[tauri::command]
-async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkillQueue>, String> {
+async fn get_skill_queues(
+    pool: State<'_, db::Pool>,
+    rate_limits: State<'_, esi::RateLimitStore>,
+) -> Result<Vec<CharacterSkillQueue>, String> {
     let characters = db::get_all_characters(&*pool)
         .await
         .map_err(|e| format!("Failed to get characters: {}", e))?;
@@ -1040,52 +502,58 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
         let client = create_authenticated_client(&access_token)
             .map_err(|e| format!("Failed to create client: {}", e))?;
 
-        let character_attributes =
-            match get_cached_character_attributes(&*pool, &client, character.character_id).await {
-                Ok(Some(attrs)) => Some(CharacterAttributesResponse {
-                    charisma: attrs.charisma,
-                    intelligence: attrs.intelligence,
-                    memory: attrs.memory,
-                    perception: attrs.perception,
-                    willpower: attrs.willpower,
-                }),
-                Ok(None) => {
-                    if let Ok(Some(cached_attrs)) =
-                        db::get_character_attributes(&*pool, character.character_id).await
-                    {
-                        Some(CharacterAttributesResponse {
-                            charisma: cached_attrs.charisma,
-                            intelligence: cached_attrs.intelligence,
-                            memory: cached_attrs.memory,
-                            perception: cached_attrs.perception,
-                            willpower: cached_attrs.willpower,
-                        })
-                    } else {
-                        None
-                    }
+        let character_attributes = match get_cached_character_attributes(
+            &*pool,
+            &client,
+            character.character_id,
+            &*rate_limits,
+        )
+        .await
+        {
+            Ok(Some(attrs)) => Some(CharacterAttributesResponse {
+                charisma: attrs.charisma,
+                intelligence: attrs.intelligence,
+                memory: attrs.memory,
+                perception: attrs.perception,
+                willpower: attrs.willpower,
+            }),
+            Ok(None) => {
+                if let Ok(Some(cached_attrs)) =
+                    db::get_character_attributes(&*pool, character.character_id).await
+                {
+                    Some(CharacterAttributesResponse {
+                        charisma: cached_attrs.charisma,
+                        intelligence: cached_attrs.intelligence,
+                        memory: cached_attrs.memory,
+                        perception: cached_attrs.perception,
+                        willpower: cached_attrs.willpower,
+                    })
+                } else {
+                    None
                 }
-                Err(e) => {
-                    eprintln!(
-                        "Failed to fetch attributes for character {}: {}",
-                        character.character_id, e
-                    );
-                    if let Ok(Some(cached_attrs)) =
-                        db::get_character_attributes(&*pool, character.character_id).await
-                    {
-                        Some(CharacterAttributesResponse {
-                            charisma: cached_attrs.charisma,
-                            intelligence: cached_attrs.intelligence,
-                            memory: cached_attrs.memory,
-                            perception: cached_attrs.perception,
-                            willpower: cached_attrs.willpower,
-                        })
-                    } else {
-                        None
-                    }
+            }
+            Err(e) => {
+                eprintln!(
+                    "Failed to fetch attributes for character {}: {}",
+                    character.character_id, e
+                );
+                if let Ok(Some(cached_attrs)) =
+                    db::get_character_attributes(&*pool, character.character_id).await
+                {
+                    Some(CharacterAttributesResponse {
+                        charisma: cached_attrs.charisma,
+                        intelligence: cached_attrs.intelligence,
+                        memory: cached_attrs.memory,
+                        perception: cached_attrs.perception,
+                        willpower: cached_attrs.willpower,
+                    })
+                } else {
+                    None
                 }
-            };
+            }
+        };
 
-        get_cached_character_skills(&*pool, &client, character.character_id)
+        get_cached_character_skills(&*pool, &client, character.character_id, &*rate_limits)
             .await
             .ok();
         let mut skill_sp_map: HashMap<i64, i64> = HashMap::new();
@@ -1109,7 +577,7 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
                 unallocated_sp: 0,
             });
 
-        match get_cached_skill_queue(&*pool, &client, character_id).await {
+        match get_cached_skill_queue(&*pool, &client, character_id, &*rate_limits).await {
             Ok(Some(queue_data)) => {
                 let skill_queue: Vec<SkillQueueItem> = queue_data
                     .into_iter()
@@ -1371,6 +839,7 @@ struct CloneResponse {
 #[tauri::command]
 async fn get_clones(
     pool: State<'_, db::Pool>,
+    rate_limits: State<'_, esi::RateLimitStore>,
     character_id: i64,
 ) -> Result<Vec<CloneResponse>, String> {
     let access_token = auth::ensure_valid_access_token(&*pool, character_id)
@@ -1380,15 +849,16 @@ async fn get_clones(
     let client = create_authenticated_client(&access_token)
         .map_err(|e| format!("Failed to create client: {}", e))?;
 
-    let clones_data = get_cached_character_clones(&*pool, &client, character_id)
+    let clones_data = get_cached_character_clones(&*pool, &client, character_id, &*rate_limits)
         .await
         .map_err(|e| format!("Failed to fetch clones: {}", e))?
         .ok_or_else(|| "No clones data returned".to_string())?;
 
-    let current_implants = get_cached_character_implants(&*pool, &client, character_id)
-        .await
-        .map_err(|e| format!("Failed to fetch implants: {}", e))?
-        .unwrap_or_default();
+    let current_implants =
+        get_cached_character_implants(&*pool, &client, character_id, &*rate_limits)
+            .await
+            .map_err(|e| format!("Failed to fetch implants: {}", e))?
+            .unwrap_or_default();
 
     let mut clones_to_store = Vec::new();
     let mut matched_clone_id_for_current: Option<i64> = None;
@@ -1416,6 +886,7 @@ async fn get_clones(
                 location_type_str,
                 location_id,
                 character_id,
+                &*rate_limits,
             )
             .await
             .unwrap_or_else(|_| "Unknown Location".to_string());
@@ -1468,6 +939,7 @@ async fn get_clones(
                         location_type_str,
                         location_id,
                         character_id,
+                        &*rate_limits,
                     )
                     .await
                     .unwrap_or_else(|_| "Unknown Location".to_string());
@@ -1529,6 +1001,7 @@ async fn get_clones(
                         location_type_str,
                         location_id,
                         character_id,
+                        &*rate_limits,
                     )
                     .await
                     .unwrap_or_else(|_| "Unknown Location".to_string());
@@ -1558,6 +1031,7 @@ async fn get_clones(
                         location_type_str,
                         location_id,
                         character_id,
+                        &*rate_limits,
                     )
                     .await
                     .unwrap_or_else(|_| "Unknown Location".to_string());
@@ -1638,6 +1112,7 @@ async fn resolve_clone_location(
     location_type: &str,
     location_id: i64,
     _character_id: i64,
+    rate_limits: &esi::RateLimitStore,
 ) -> Result<String> {
     match location_type {
         "station" => {
@@ -1647,7 +1122,9 @@ async fn resolve_clone_location(
             }
 
             // Not in database, fetch from ESI
-            if let Some(station) = get_cached_station_info(pool, client, location_id).await? {
+            if let Some(station) =
+                get_cached_station_info(pool, client, location_id, rate_limits).await?
+            {
                 let name = if !station.name.is_empty() {
                     station.name
                 } else {
@@ -1673,7 +1150,7 @@ async fn resolve_clone_location(
             }
 
             // Not in database, fetch from ESI
-            match get_cached_structure_info(pool, client, location_id).await {
+            match get_cached_structure_info(pool, client, location_id, rate_limits).await {
                 Ok(Some(structure)) => {
                     let name = if !structure.name.is_empty() {
                         structure.name
@@ -1733,8 +1210,17 @@ async fn get_type_names(
 }
 
 #[tauri::command]
+async fn get_rate_limits(
+    rate_limits: State<'_, esi::RateLimitStore>,
+) -> Result<HashMap<String, esi::RateLimitInfo>, String> {
+    let store = rate_limits.read().await;
+    Ok(store.clone())
+}
+
+#[tauri::command]
 async fn get_character_attributes_breakdown(
     pool: State<'_, db::Pool>,
+    rate_limits: State<'_, esi::RateLimitStore>,
     character_id: i64,
 ) -> Result<CharacterAttributesBreakdown, String> {
     const BASE_ATTRIBUTE: i64 = 17;
@@ -1754,43 +1240,46 @@ async fn get_character_attributes_breakdown(
     let client = create_authenticated_client(&access_token)
         .map_err(|e| format!("Failed to create client: {}", e))?;
 
-    let attributes = match get_cached_character_attributes(&*pool, &client, character_id).await {
-        Ok(Some(attrs)) => db::CharacterAttributes {
-            character_id,
-            charisma: attrs.charisma,
-            intelligence: attrs.intelligence,
-            memory: attrs.memory,
-            perception: attrs.perception,
-            willpower: attrs.willpower,
-            bonus_remaps: attrs.bonus_remaps,
-            accrued_remap_cooldown_date: attrs
-                .accrued_remap_cooldown_date
-                .as_ref()
-                .map(|d| d.to_rfc3339()),
-            last_remap_date: attrs.last_remap_date.as_ref().map(|d| d.to_rfc3339()),
-        },
-        Ok(None) => db::get_character_attributes(&*pool, character_id)
-            .await
-            .map_err(|e| format!("Failed to get character attributes: {}", e))?
-            .ok_or_else(|| {
-                "Character attributes not found. Please refresh your character data.".to_string()
-            })?,
-        Err(e) => {
-            eprintln!("Failed to fetch attributes from ESI: {}", e);
-            db::get_character_attributes(&*pool, character_id)
+    let attributes =
+        match get_cached_character_attributes(&*pool, &client, character_id, &*rate_limits).await {
+            Ok(Some(attrs)) => db::CharacterAttributes {
+                character_id,
+                charisma: attrs.charisma,
+                intelligence: attrs.intelligence,
+                memory: attrs.memory,
+                perception: attrs.perception,
+                willpower: attrs.willpower,
+                bonus_remaps: attrs.bonus_remaps,
+                accrued_remap_cooldown_date: attrs
+                    .accrued_remap_cooldown_date
+                    .as_ref()
+                    .map(|d| d.to_rfc3339()),
+                last_remap_date: attrs.last_remap_date.as_ref().map(|d| d.to_rfc3339()),
+            },
+            Ok(None) => db::get_character_attributes(&*pool, character_id)
                 .await
                 .map_err(|e| format!("Failed to get character attributes: {}", e))?
                 .ok_or_else(|| {
                     "Character attributes not found. Please refresh your character data."
                         .to_string()
-                })?
-        }
-    };
+                })?,
+            Err(e) => {
+                eprintln!("Failed to fetch attributes from ESI: {}", e);
+                db::get_character_attributes(&*pool, character_id)
+                    .await
+                    .map_err(|e| format!("Failed to get character attributes: {}", e))?
+                    .ok_or_else(|| {
+                        "Character attributes not found. Please refresh your character data."
+                            .to_string()
+                    })?
+            }
+        };
 
-    let current_implants = get_cached_character_implants(&*pool, &client, character_id)
-        .await
-        .map_err(|e| format!("Failed to fetch implants: {}", e))?
-        .unwrap_or_default();
+    let current_implants =
+        get_cached_character_implants(&*pool, &client, character_id, &*rate_limits)
+            .await
+            .map_err(|e| format!("Failed to fetch implants: {}", e))?
+            .unwrap_or_default();
 
     let implant_bonuses = if current_implants.is_empty() {
         HashMap::new()
@@ -1879,6 +1368,7 @@ async fn get_character_attributes_breakdown(
 #[tauri::command]
 async fn get_character_skills_with_groups(
     pool: State<'_, db::Pool>,
+    rate_limits: State<'_, esi::RateLimitStore>,
     character_id: i64,
 ) -> Result<CharacterSkillsResponse, String> {
     const SKILL_CATEGORY_ID: i64 = 16;
@@ -1904,7 +1394,7 @@ async fn get_character_skills_with_groups(
         if let Ok(access_token) = auth::ensure_valid_access_token(&*pool, character_id).await {
             if let Ok(client) = create_authenticated_client(&access_token) {
                 if let Ok(Some(queue_data)) =
-                    get_cached_skill_queue(&*pool, &client, character_id).await
+                    get_cached_skill_queue(&*pool, &client, character_id, &*rate_limits).await
                 {
                     for item in queue_data {
                         if let Some(obj) = item.as_object() {
@@ -2117,6 +1607,10 @@ pub fn run() {
                 let pool = db::init_db(&app.handle()).await?;
                 app.manage(pool);
                 app.manage(AuthStateMap::default());
+                app.manage(Arc::new(tokio::sync::RwLock::new(HashMap::<
+                    String,
+                    esi::RateLimitInfo,
+                >::new())));
 
                 // Kick off background SDE import/refresh
                 let pool = app.state::<db::Pool>().inner().clone();
@@ -2204,7 +1698,8 @@ pub fn run() {
             get_clones,
             update_clone_name,
             get_type_names,
-            get_character_attributes_breakdown
+            get_character_attributes_breakdown,
+            get_rate_limits
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
