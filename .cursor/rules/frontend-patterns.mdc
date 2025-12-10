@@ -15,13 +15,14 @@ All data fetching uses `@tanstack/react-query` (React Query). Never use `fetch` 
 
 ```typescript
 import { useQuery } from "@tanstack/react-query";
-import { invoke } from "@tauri-apps/api/core";
+import { getMyData } from "@/generated/commands";
+import type { MyDataType } from "@/generated/types";
 
 export function useMyData() {
   return useQuery({
     queryKey: ["myData"],
     queryFn: async () => {
-      return await invoke<MyDataType>("my_command");
+      return await getMyData();
     },
   });
 }
@@ -30,30 +31,27 @@ export function useMyData() {
 ### Query Keys
 
 Use descriptive, hierarchical query keys:
+
 - `["characters"]` - All characters
-- `["skillQueues"]` - All skill queues
+- `["skillQueue", characterId]` - Individual character skill queue
 - `["character", characterId]` - Single character (if needed)
 
 ## Tauri Commands
 
-Invoke Tauri commands using `invoke()` from `@tauri-apps/api/core`:
+Use auto-generated command functions from `@/generated/commands` instead of calling `invoke()` directly:
 
 ```typescript
-import { invoke } from "@tauri-apps/api/core";
+import { getCharacters, logoutCharacter } from "@/generated/commands";
 
-const result = await invoke<ReturnType>("command_name", { arg1: value1 });
+const characters = await getCharacters();
+await logoutCharacter({ characterId: 123 });
 ```
 
-Commands are defined in `src-tauri/src/lib.rs` with the `#[tauri::command]` attribute.
+Commands are defined in `src-tauri/src/lib.rs` with the `#[tauri::command]` attribute. TypeScript bindings are auto-generated during build via `tauri-typegen` (see `src-tauri/build.rs`).
 
 ## Custom Hooks
 
-Custom hooks wrapping Tauri commands are located in `src/hooks/tauri/`:
-
-- `useCharacters.ts` - Fetch all characters
-- `useSkillQueues.ts` - Fetch all skill queues
-- `useStartEveLogin.ts` - Start EVE SSO login
-- `useLogoutCharacter.ts` - Logout a character
+Custom hooks wrapping Tauri commands are located in `src/hooks/tauri/`. See that directory for available hooks.
 
 ### Hook Structure
 
@@ -61,14 +59,14 @@ All data-fetching hooks follow this pattern:
 
 ```typescript
 import { useQuery } from "@tanstack/react-query";
-import { invoke } from "@tauri-apps/api/core";
-import type { DataType } from "@/types/tauri";
+import { getMyData } from "@/generated/commands";
+import type { DataType } from "@/generated/types";
 
 export function useMyData() {
   return useQuery<DataType[]>({
     queryKey: ["myData"],
     queryFn: async () => {
-      return await invoke<DataType[]>("get_my_data");
+      return await getMyData();
     },
   });
 }
@@ -78,14 +76,15 @@ For mutations (commands that modify state), use `useMutation`:
 
 ```typescript
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { invoke } from "@tauri-apps/api/core";
+import { myMutation } from "@/generated/commands";
+import type { InputType } from "@/generated/types";
 
 export function useMyMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (data: InputType) => {
-      return await invoke("my_mutation", data);
+      return await myMutation(data);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["myData"] });
@@ -96,15 +95,15 @@ export function useMyMutation() {
 
 ## Type Definitions
 
-TypeScript types matching Rust structs are in `src/types/tauri.ts`. These should match the `Serialize` structs in Rust.
+TypeScript types are auto-generated from Rust structs in `src/generated/types.ts`. These are generated during build via `tauri-typegen` and should not be edited manually.
 
-Example:
+Import types from the generated module:
+
 ```typescript
-export interface Character {
-  character_id: number;
-  character_name: string;
-}
+import type { Character, CharacterSkillQueue } from "@/generated/types";
 ```
+
+**Note**: The old `src/types/tauri.ts` file is deprecated. Use `@/generated/types` instead.
 
 ## Components
 
@@ -127,6 +126,7 @@ Configured in `components.json` and `tsconfig.json`:
 - `@/components` → `src/components`
 - `@/lib` → `src/lib`
 - `@/hooks` → `src/hooks`
+- `@/generated` → `src/generated`
 - `@/components/ui` → `src/components/ui`
 
 Use these aliases instead of relative paths:
@@ -151,8 +151,9 @@ import { Button } from "../../components/ui/button";
 
 - Always use React Query for data fetching
 - Use custom hooks to encapsulate Tauri command invocations
+- Use generated command functions from `@/generated/commands` instead of `invoke()` directly
 - Invalidate queries after mutations to refresh data
-- Use TypeScript types from `@/types/tauri` for type safety
+- Use TypeScript types from `@/generated/types` for type safety
 - Use path aliases for imports
 - Use shadcn CLI to add UI components
 - Follow React 19 patterns (functional components, hooks)

@@ -1,7 +1,5 @@
 ---
-globs:
-  - "src-tauri/src/esi/**"
-  - "src-tauri/src/lib.rs"
+description: Include when adding new ESI functionality to the rust backend
 alwaysApply: false
 ---
 
@@ -15,9 +13,10 @@ The ESI (EVE Swagger Interface) client is auto-generated from the EVE Online Ope
 
 - **Module**: `src-tauri/src/esi/`
 - **Files**:
-  - `mod.rs` - Module exports (`BASE_URL` and client types)
+  - `mod.rs` - Module exports (`BASE_URL`, client types, cached utilities)
   - `client.rs` - Generated client code (do not edit manually)
   - `types.rs` - Generated type definitions (do not edit manually)
+  - `cached.rs` - Caching and rate limit tracking utilities
   - `openapi.json` - Cached OpenAPI schema
 
 ## Regenerating the Client
@@ -88,9 +87,58 @@ fn create_authenticated_client(access_token: &str) -> Result<reqwest::Client> {
 
 The access token comes from the `tokens` table in the database. See `src-tauri/src/lib.rs` for the implementation.
 
-## Caching
+## Caching and Rate Limit Tracking
 
-ESI responses should always use the caching system to respect rate limits and ETag headers.
+ESI responses should always use the unified caching and rate limit tracking system via `esi::fetch_cached()`. This function handles both caching and rate limit tracking automatically.
+
+### Rate Limit Tracking
+
+Rate limits are tracked per character using `esi::RateLimitStore`, which is managed as Tauri state:
+
+- **Type**: `esi::RateLimitStore` = `Arc<RwLock<HashMap<i64, HashMap<String, RateLimitInfo>>>>`
+- **Structure**: Character ID → Rate limit group → Rate limit info
+- **Info Fields**: `group`, `limit`, `remaining`, `window_minutes`, `updated_at`
+
+Rate limit information is extracted from ESI response headers:
+
+- `x-ratelimit-group` - Rate limit group name
+- `x-ratelimit-limit` - Limit format: `{limit}/{window}m` (e.g., `100/60m`)
+- `x-ratelimit-remaining` - Remaining requests in current window
+
+### Primary Request Function
+
+Use `esi::fetch_cached()` for all ESI API requests:
+
+```rust
+use esi::{fetch_cached, RateLimitStore};
+
+async fn get_skill_queue(
+    pool: &db::Pool,
+    client: &reqwest::Client,
+    character_id: i64,
+    rate_limits: &RateLimitStore,
+) -> Result<Option<SkillQueueResponse>> {
+    let endpoint_path = format!("characters/{}/skillqueue", character_id);
+    let cache_key = cache::build_cache_key(&endpoint_path, character_id);
+
+    fetch_cached::<SkillQueueResponse>(
+        pool,
+        client,
+        &endpoint_path,
+        &cache_key,
+        rate_limits,
+        character_id,
+    ).await
+}
+```
+
+This function:
+
+1. Checks cache for existing response
+2. Uses ETag for conditional requests if cached
+3. Tracks rate limits from response headers
+4. Stores response in cache with expiration
+5. Returns cached data on 304 Not Modified
 
 ### Cache Helpers
 
@@ -101,16 +149,21 @@ Located in `src-tauri/src/cache/mod.rs`:
 - `cache::set_cached_response(pool, cache_key, etag, expires_at, response_body)` - Store response
 - `cache::extract_etag(headers)` - Extract ETag from response headers
 - `cache::extract_expires(headers)` - Extract expiration time from headers
+- `cache::clear_character_cache(pool, character_id)` - Clear all cache entries for a character
 
-### Caching Pattern
+### Rate Limit Access
 
-1. Build cache key: `format!("characters/{}/skillqueue", character_id)`
-2. Check cache: `get_cached_response(pool, cache_key)`
-3. If cached and not expired, return cached data
-4. If cached but expired, use ETag in `If-None-Match` header
-5. After API call, store response with `set_cached_response()`
+To retrieve current rate limit information, use the `get_rate_limits` Tauri command from the frontend, or access the `RateLimitStore` state in Rust commands:
 
-See `get_cached_skill_queue()` in `src-tauri/src/lib.rs` for a complete example.
+```rust
+#[tauri::command]
+async fn get_rate_limits(
+    rate_limits: State<'_, esi::RateLimitStore>,
+) -> Result<Vec<CharacterRateLimits>, String> {
+    let store = rate_limits.read().await;
+    // Access rate limit data
+}
+```
 
 ## Cache Table
 
@@ -123,9 +176,12 @@ The `esi_cache` table stores:
 
 ## Best Practices
 
-- Always use caching for ESI requests to minimize API calls
-- Include ETag in requests when available (`If-None-Match` header)
-- Handle 304 Not Modified responses (when ETag matches)
-- Respect cache expiration times from response headers
-- Use `x_compatibility_date` in requests for API versioning
-- Handle rate limiting (ESI returns 429 Too Many Requests)
+- Always use `esi::fetch_cached()` for ESI requests to get caching and rate limit tracking automatically
+- Pass `rate_limits: &esi::RateLimitStore` to all ESI fetching functions
+- Access rate limit information via `get_rate_limits` Tauri command when needed
+- Include ETag in requests when available (`If-None-Match` header) - handled automatically by `fetch_cached()`
+- Handle 304 Not Modified responses (when ETag matches) - handled automatically by `fetch_cached()`
+- Respect cache expiration times from response headers - handled automatically
+- Use `x_compatibility_date` in requests for API versioning - included automatically by `fetch_cached()`
+- Rate limits are tracked per character automatically
+- Clear character cache when forcing refresh (e.g., `cache::clear_character_cache()`)

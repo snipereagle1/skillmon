@@ -32,11 +32,14 @@ All commands follow this pattern:
 #[tauri::command]
 async fn command_name(
     pool: State<'_, db::Pool>,
+    rate_limits: State<'_, esi::RateLimitStore>,
     // other parameters
 ) -> Result<ReturnType, String> {
     // Implementation
 }
 ```
+
+Commands that make ESI API requests should include `rate_limits: State<'_, esi::RateLimitStore>` to track rate limits.
 
 ## State Access
 
@@ -63,6 +66,21 @@ async fn my_auth_command(
     auth_states: State<'_, AuthStateMap>
 ) -> Result<(), String> {
     // Access auth_states
+}
+```
+
+### Rate Limit Store
+
+For commands that make ESI API requests:
+
+```rust
+#[tauri::command]
+async fn my_esi_command(
+    pool: State<'_, db::Pool>,
+    rate_limits: State<'_, esi::RateLimitStore>,
+    character_id: i64,
+) -> Result<MyType, String> {
+    // Use rate_limits with esi::fetch_cached()
 }
 ```
 
@@ -104,9 +122,11 @@ async fn my_command(pool: State<'_, db::Pool>) -> Result<MyType, String> {
 
 1. Define the command function with `#[tauri::command]` attribute
 2. Add it to the `invoke_handler![]` macro in `run()`
-3. Create a corresponding TypeScript type in `src/types/tauri.ts`
+3. TypeScript types and command bindings are auto-generated during build (see `src-tauri/build.rs`)
 4. Create a custom hook in `src/hooks/tauri/` if it's a data-fetching command
 5. Use the hook in components
+
+**Note**: TypeScript bindings are generated automatically via `tauri-typegen` during the build process. No manual type definitions needed.
 
 ## Best Practices
 
@@ -114,6 +134,8 @@ async fn my_command(pool: State<'_, db::Pool>) -> Result<MyType, String> {
 - Use descriptive names that match their purpose
 - Always return `Result<T, String>` for error handling
 - Access database via `State<'_, db::Pool>`
+- Include `rate_limits: State<'_, esi::RateLimitStore>` for commands that make ESI API requests
 - Use `async` for all commands (database and HTTP operations are async)
 - Convert `anyhow::Result` to `Result<T, String>` with `.map_err()`
 - Emit events when state changes that frontend should know about
+- TypeScript types are auto-generated - no manual type definitions needed
