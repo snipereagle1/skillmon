@@ -294,6 +294,25 @@ pub async fn get_skill_groups_for_category(
 }
 
 #[derive(Debug, Clone, Serialize, FromRow)]
+pub struct Station {
+    pub station_id: i64,
+    pub name: String,
+    pub system_id: i64,
+    pub owner: Option<i64>,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, FromRow)]
+pub struct Structure {
+    pub structure_id: i64,
+    pub name: String,
+    pub solar_system_id: i64,
+    pub type_id: Option<i64>,
+    pub owner_id: i64,
+    pub updated_at: i64,
+}
+
+#[derive(Debug, Clone, Serialize, FromRow)]
 pub struct Clone {
     pub id: i64,
     pub character_id: i64,
@@ -313,20 +332,128 @@ pub struct CloneImplant {
     pub slot: Option<i64>,
 }
 
+pub async fn get_station(pool: &Pool, station_id: i64) -> Result<Option<Station>> {
+    let station = sqlx::query_as::<_, Station>(
+        "SELECT station_id, name, system_id, owner, updated_at FROM stations WHERE station_id = ?",
+    )
+    .bind(station_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(station)
+}
+
+pub async fn get_structure(pool: &Pool, structure_id: i64) -> Result<Option<Structure>> {
+    let structure = sqlx::query_as::<_, Structure>(
+        "SELECT structure_id, name, solar_system_id, type_id, owner_id, updated_at FROM structures WHERE structure_id = ?",
+    )
+    .bind(structure_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(structure)
+}
+
+pub async fn upsert_station(
+    pool: &Pool,
+    station_id: i64,
+    name: &str,
+    system_id: i64,
+    owner: Option<i64>,
+) -> Result<()> {
+    let now = chrono::Utc::now().timestamp();
+    sqlx::query(
+        "INSERT INTO stations (station_id, name, system_id, owner, updated_at) VALUES (?, ?, ?, ?, ?)
+         ON CONFLICT(station_id) DO UPDATE SET name = ?, system_id = ?, owner = ?, updated_at = ?",
+    )
+    .bind(station_id)
+    .bind(name)
+    .bind(system_id)
+    .bind(owner)
+    .bind(now)
+    .bind(name)
+    .bind(system_id)
+    .bind(owner)
+    .bind(now)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn upsert_structure(
+    pool: &Pool,
+    structure_id: i64,
+    name: &str,
+    solar_system_id: i64,
+    type_id: Option<i64>,
+    owner_id: i64,
+) -> Result<()> {
+    let now = chrono::Utc::now().timestamp();
+    sqlx::query(
+        "INSERT INTO structures (structure_id, name, solar_system_id, type_id, owner_id, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(structure_id) DO UPDATE SET name = ?, solar_system_id = ?, type_id = ?, owner_id = ?, updated_at = ?",
+    )
+    .bind(structure_id)
+    .bind(name)
+    .bind(solar_system_id)
+    .bind(type_id)
+    .bind(owner_id)
+    .bind(now)
+    .bind(name)
+    .bind(solar_system_id)
+    .bind(type_id)
+    .bind(owner_id)
+    .bind(now)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
 pub async fn get_character_clones(pool: &Pool, character_id: i64) -> Result<Vec<Clone>> {
-    let clones = sqlx::query_as::<_, Clone>(
-        "SELECT id, character_id, clone_id, name, location_type, location_id, location_name, is_current, updated_at FROM clones WHERE character_id = ? ORDER BY is_current DESC, updated_at DESC",
+    let rows = sqlx::query(
+        "SELECT
+            c.id,
+            c.character_id,
+            c.clone_id,
+            c.name,
+            c.location_type,
+            c.location_id,
+            COALESCE(s.name, st.name, 'Unknown Location') as location_name,
+            c.is_current,
+            c.updated_at
+        FROM clones c
+        LEFT JOIN stations s ON c.location_type = 'station' AND c.location_id = s.station_id
+        LEFT JOIN structures st ON c.location_type = 'structure' AND c.location_id = st.structure_id
+        WHERE c.character_id = ?
+        ORDER BY c.is_current DESC, c.updated_at DESC",
     )
     .bind(character_id)
     .fetch_all(pool)
     .await?;
+
+    let clones = rows
+        .into_iter()
+        .map(|row| Clone {
+            id: row.get(0),
+            character_id: row.get(1),
+            clone_id: row.get(2),
+            name: row.get(3),
+            location_type: row.get(4),
+            location_id: row.get(5),
+            location_name: row.get(6),
+            is_current: row.get::<i64, _>(7) != 0,
+            updated_at: row.get(8),
+        })
+        .collect();
 
     Ok(clones)
 }
 
 pub async fn get_clone_implants(pool: &Pool, clone_db_id: i64) -> Result<Vec<CloneImplant>> {
     let implants = sqlx::query_as::<_, CloneImplant>(
-        "SELECT clone_id, implant_type_id, slot FROM clone_implants WHERE clone_id = ? ORDER BY slot, implant_type_id",
+        "SELECT clone_id, implant_type_id, slot FROM clone_implants WHERE clone_id = ? ORDER BY COALESCE(slot, 999), implant_type_id",
     )
     .bind(clone_db_id)
     .fetch_all(pool)
@@ -338,15 +465,7 @@ pub async fn get_clone_implants(pool: &Pool, clone_db_id: i64) -> Result<Vec<Clo
 pub async fn set_character_clones(
     pool: &Pool,
     character_id: i64,
-    clones: &[(
-        Option<i64>,
-        Option<String>,
-        String,
-        i64,
-        Option<String>,
-        bool,
-        Vec<i64>,
-    )],
+    clones: &[(Option<i64>, Option<String>, String, i64, bool, Vec<i64>)],
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
 
@@ -355,9 +474,7 @@ pub async fn set_character_clones(
         .execute(&mut *tx)
         .await?;
 
-    for (clone_id, name, location_type, location_id, location_name, is_current, implant_type_ids) in
-        clones
-    {
+    for (clone_id, name, location_type, location_id, is_current, implant_type_ids) in clones {
         let now = chrono::Utc::now().timestamp();
 
         let clone_db_id: i64 = if let Some(esi_clone_id) = clone_id {
@@ -371,12 +488,11 @@ pub async fn set_character_clones(
 
             if let Some(id) = existing {
                 sqlx::query(
-                    "UPDATE clones SET name = ?, location_type = ?, location_id = ?, location_name = ?, is_current = ?, updated_at = ? WHERE id = ?",
+                    "UPDATE clones SET name = ?, location_type = ?, location_id = ?, is_current = ?, updated_at = ? WHERE id = ?",
                 )
                 .bind(name)
                 .bind(location_type)
                 .bind(location_id)
-                .bind(location_name)
                 .bind(*is_current as i64)
                 .bind(now)
                 .bind(id)
@@ -385,14 +501,13 @@ pub async fn set_character_clones(
                 id
             } else {
                 sqlx::query(
-                    "INSERT INTO clones (character_id, clone_id, name, location_type, location_id, location_name, is_current, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                    "INSERT INTO clones (character_id, clone_id, name, location_type, location_id, is_current, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 )
                 .bind(character_id)
                 .bind(esi_clone_id)
                 .bind(name)
                 .bind(location_type)
                 .bind(location_id)
-                .bind(location_name)
                 .bind(*is_current as i64)
                 .bind(now)
                 .execute(&mut *tx)
@@ -402,22 +517,74 @@ pub async fn set_character_clones(
                     .await?
             }
         } else {
-            sqlx::query(
-                "INSERT INTO clones (character_id, clone_id, name, location_type, location_id, location_name, is_current, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            )
-            .bind(character_id)
-            .bind::<Option<i64>>(None)
-            .bind(name)
-            .bind(location_type)
-            .bind(location_id)
-            .bind(location_name)
-            .bind(*is_current as i64)
-            .bind(now)
-            .execute(&mut *tx)
-            .await?;
-            sqlx::query_scalar::<_, i64>("SELECT last_insert_rowid()")
-                .fetch_one(&mut *tx)
-                .await?
+            // For clones with NULL clone_id, check if one already exists with the same implants
+            // to avoid creating duplicates. We match by checking if the implant sets are identical.
+            let existing_null_clone: Option<i64> = if !implant_type_ids.is_empty() {
+                // Find clones with NULL clone_id that have the same number of implants
+                let candidates = sqlx::query_scalar::<_, i64>(
+                    "SELECT c.id FROM clones c
+                     WHERE c.character_id = ? AND c.clone_id IS NULL
+                     AND (SELECT COUNT(*) FROM clone_implants ci WHERE ci.clone_id = c.id) = ?",
+                )
+                .bind(character_id)
+                .bind(implant_type_ids.len() as i64)
+                .fetch_all(&mut *tx)
+                .await?;
+
+                // Check each candidate to see if it has the exact same implants
+                let mut sorted_implants = implant_type_ids.clone();
+                sorted_implants.sort();
+
+                let mut found_match = None;
+                for candidate_id in candidates {
+                    let candidate_implants: Vec<i64> = sqlx::query_scalar::<_, i64>(
+                        "SELECT implant_type_id FROM clone_implants WHERE clone_id = ? ORDER BY implant_type_id"
+                    )
+                    .bind(candidate_id)
+                    .fetch_all(&mut *tx)
+                    .await?;
+
+                    if candidate_implants == sorted_implants {
+                        found_match = Some(candidate_id);
+                        break;
+                    }
+                }
+                found_match
+            } else {
+                None
+            };
+
+            if let Some(existing_id) = existing_null_clone {
+                // Update existing clone instead of creating a new one
+                sqlx::query(
+                    "UPDATE clones SET name = ?, location_type = ?, location_id = ?, is_current = ?, updated_at = ? WHERE id = ?",
+                )
+                .bind(name)
+                .bind(location_type)
+                .bind(location_id)
+                .bind(*is_current as i64)
+                .bind(now)
+                .bind(existing_id)
+                .execute(&mut *tx)
+                .await?;
+                existing_id
+            } else {
+                sqlx::query(
+                    "INSERT INTO clones (character_id, clone_id, name, location_type, location_id, is_current, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                )
+                .bind(character_id)
+                .bind::<Option<i64>>(None)
+                .bind(name)
+                .bind(location_type)
+                .bind(location_id)
+                .bind(*is_current as i64)
+                .bind(now)
+                .execute(&mut *tx)
+                .await?;
+                sqlx::query_scalar::<_, i64>("SELECT last_insert_rowid()")
+                    .fetch_one(&mut *tx)
+                    .await?
+            }
         };
 
         sqlx::query("DELETE FROM clone_implants WHERE clone_id = ?")
@@ -425,13 +592,27 @@ pub async fn set_character_clones(
             .execute(&mut *tx)
             .await?;
 
-        for (slot_idx, implant_type_id) in implant_type_ids.iter().enumerate() {
+        // Get slot values from SDE for each implant type
+        // Attribute ID 331 is "implantSlot" in EVE Online
+        const IMPLANT_SLOT_ATTRIBUTE_ID: i64 = 331;
+
+        for implant_type_id in implant_type_ids {
+            let slot: Option<i64> = sqlx::query_scalar::<_, Option<f64>>(
+                "SELECT value FROM sde_type_dogma_attributes WHERE type_id = ? AND attribute_id = ?"
+            )
+            .bind(implant_type_id)
+            .bind(IMPLANT_SLOT_ATTRIBUTE_ID)
+            .fetch_optional(&mut *tx)
+            .await?
+            .flatten()
+            .map(|v| v as i64);
+
             sqlx::query(
                 "INSERT INTO clone_implants (clone_id, implant_type_id, slot) VALUES (?, ?, ?)",
             )
             .bind(clone_db_id)
             .bind(implant_type_id)
-            .bind(slot_idx as i64)
+            .bind(slot)
             .execute(&mut *tx)
             .await?;
         }
@@ -463,12 +644,13 @@ pub async fn find_clone_by_implants(
 
     let implant_count = implant_type_ids.len() as i64;
 
+    // Build the IN clause for implant type IDs
     let mut query_builder: sqlx::QueryBuilder<sqlx::Sqlite> = sqlx::QueryBuilder::new(
         "SELECT c.id FROM clones c
-         WHERE c.character_id = ?
-         AND (SELECT COUNT(*) FROM clone_implants ci WHERE ci.clone_id = c.id) = ",
+         WHERE c.character_id = ",
     );
     query_builder.push_bind(character_id);
+    query_builder.push(" AND (SELECT COUNT(*) FROM clone_implants ci WHERE ci.clone_id = c.id) = ");
     query_builder.push_bind(implant_count);
     query_builder.push(" AND (SELECT COUNT(*) FROM clone_implants ci WHERE ci.clone_id = c.id AND ci.implant_type_id IN (");
 
