@@ -1,6 +1,7 @@
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import type { Character, SkillQueueItem } from "@/types/tauri";
+import { isAfter, isBefore, isEqual } from "date-fns";
 
 interface CharacterCardProps {
   character: Character;
@@ -16,9 +17,31 @@ function getTrainingStatus(skillQueue: SkillQueueItem[] | undefined): TrainingSt
     return "empty";
   }
 
-  const firstItem = skillQueue[0];
-  if (firstItem.queue_position === 0 && firstItem.finish_date !== null) {
-    return "training";
+  const now = new Date();
+
+  for (const item of skillQueue) {
+    // Check if queue_position is 0 (currently training)
+    if (item.queue_position === 0) {
+      return "training";
+    }
+
+    // Check if current time is between start_date and finish_date
+    // Backend logic: now >= start_utc && now < finish_utc (inclusive start, exclusive end)
+    if (item.start_date !== null && item.finish_date !== null) {
+      try {
+        const startDate = new Date(item.start_date);
+        const finishDate = new Date(item.finish_date);
+
+        const isAfterOrEqualStart = isAfter(now, startDate) || isEqual(now, startDate);
+        const isBeforeFinish = isBefore(now, finishDate);
+
+        if (isAfterOrEqualStart && isBeforeFinish) {
+          return "training";
+        }
+      } catch (e) {
+        // Invalid date format, skip this check
+      }
+    }
   }
 
   return "paused";
