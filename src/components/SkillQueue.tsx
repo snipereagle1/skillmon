@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useSkillQueues } from "@/hooks/tauri/useSkillQueues";
 import type { SkillQueueItem, CharacterSkillQueue } from "@/types/tauri";
 import { intervalToDuration } from "date-fns";
+import { cn } from "@/lib/utils";
 import {
   Tooltip,
   TooltipContent,
@@ -90,6 +91,50 @@ function calculateTimeToTrain(skill: SkillQueueItem): string | null {
   return formatDurationFromHours(hoursToTrain);
 }
 
+function calculateCompletionPercentage(skill: SkillQueueItem): number {
+  if (skill.level_start_sp === null || skill.level_end_sp === null) {
+    return 0;
+  }
+
+  const currentSP = skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
+  const totalSP = skill.level_end_sp - skill.level_start_sp;
+  const completedSP = currentSP - skill.level_start_sp;
+
+  if (totalSP <= 0) {
+    return 100;
+  }
+
+  if (completedSP <= 0) {
+    return 0;
+  }
+
+  if (completedSP >= totalSP) {
+    return 100;
+  }
+
+  return Math.min(Math.max((completedSP / totalSP) * 100, 0), 100);
+}
+
+function calculateTrainingHours(skill: SkillQueueItem): number {
+  if (!skill.sp_per_minute || skill.sp_per_minute <= 0) {
+    return 0;
+  }
+
+  if (skill.level_start_sp === null || skill.level_end_sp === null) {
+    return 0;
+  }
+
+  const currentSP = skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
+  const remainingSP = skill.level_end_sp - currentSP;
+
+  if (remainingSP <= 0) {
+    return 0;
+  }
+
+  const spPerHour = skill.sp_per_minute * 60;
+  return remainingSP / spPerHour;
+}
+
 function LevelIndicator({ level }: { level: number }) {
   const squares = Array.from({ length: level }, (_, i) => (
     <div
@@ -105,16 +150,28 @@ function LevelIndicator({ level }: { level: number }) {
   );
 }
 
-function SkillQueueEntry({ skill }: { skill: SkillQueueItem }) {
+function SkillQueueEntry({ skill, totalQueueHours, offsetPercentage }: { skill: SkillQueueItem; totalQueueHours: number; offsetPercentage: number }) {
   const isTraining = skill.queue_position === 0;
   const levelRoman = ["I", "II", "III", "IV", "V"][skill.finished_level - 1] || skill.finished_level.toString();
   const spPerHour = skill.sp_per_minute ? skill.sp_per_minute * 60 : null;
   const timeToTrain = calculateTimeToTrain(skill);
   const completionTime = formatTimeRemaining(skill.finish_date);
 
+  const completionPercentage = isTraining ? calculateCompletionPercentage(skill) : 0;
+  const skillHours = calculateTrainingHours(skill);
+  const timePercentage = totalQueueHours > 0 ? (skillHours / totalQueueHours) * 100 : 0;
+  const MIN_WIDTH_PERCENTAGE = 1;
+  const displayWidth = Math.max(timePercentage, MIN_WIDTH_PERCENTAGE);
+
   return (
-    <div className={`px-4 py-3 border-b last:border-b-0 border-border/50 ${isTraining ? 'bg-primary/5' : ''}`}>
-      <div className="flex items-center justify-between gap-4">
+    <div className={cn("relative px-4 py-3 border-b last:border-b-0 border-border/50", isTraining && "bg-primary/5")}>
+      {isTraining && completionPercentage > 0 && (
+        <div
+          className="absolute inset-0 bg-green-500/20 pointer-events-none transition-all"
+          style={{ width: `${completionPercentage}%` }}
+        />
+      )}
+      <div className="flex items-center justify-between gap-4 relative z-10">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <LevelIndicator level={skill.finished_level} />
           <div className="flex flex-col flex-1 min-w-0">
@@ -131,7 +188,7 @@ function SkillQueueEntry({ skill }: { skill: SkillQueueItem }) {
         {timeToTrain !== null ? (
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
-              <span className={`text-sm whitespace-nowrap cursor-help ${isTraining ? 'text-green-400 font-medium' : 'text-muted-foreground'}`}>
+              <span className={cn("text-sm whitespace-nowrap cursor-help", isTraining ? "text-green-400 font-medium" : "text-muted-foreground")}>
                 {timeToTrain}
               </span>
             </TooltipTrigger>
@@ -140,9 +197,23 @@ function SkillQueueEntry({ skill }: { skill: SkillQueueItem }) {
             </TooltipContent>
           </Tooltip>
         ) : (
-          <span className={`text-sm whitespace-nowrap ${isTraining ? 'text-green-400 font-medium' : 'text-muted-foreground'}`}>
+          <span className={cn("text-sm whitespace-nowrap", isTraining ? "text-green-400 font-medium" : "text-muted-foreground")}>
             {completionTime}
           </span>
+        )}
+      </div>
+      <div className="absolute bottom-0 left-0 right-0 h-0.5 pointer-events-none">
+        {offsetPercentage > 0 && (
+          <div
+            className="absolute h-full bg-blue-400/20 dark:bg-blue-500/20"
+            style={{ left: '0%', width: `${offsetPercentage}%` }}
+          />
+        )}
+        {timePercentage > 0 && (
+          <div
+            className="absolute h-full bg-blue-400 dark:bg-blue-500"
+            style={{ left: `${offsetPercentage}%`, width: `${displayWidth}%` }}
+          />
         )}
       </div>
     </div>
@@ -159,23 +230,7 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
     let totalHours = 0;
 
     for (const skill of queue.skill_queue) {
-      if (!skill.sp_per_minute || skill.sp_per_minute <= 0) {
-        continue;
-      }
-
-      if (skill.level_start_sp === null || skill.level_end_sp === null) {
-        continue;
-      }
-
-      const currentSP = skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
-      const remainingSP = skill.level_end_sp - currentSP;
-      if (remainingSP <= 0) {
-        continue;
-      }
-
-      const spPerHour = skill.sp_per_minute * 60;
-      const hoursToTrain = remainingSP / spPerHour;
-      totalHours += hoursToTrain;
+      totalHours += calculateTrainingHours(skill);
     }
 
     if (totalHours === 0) {
@@ -183,6 +238,18 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
     }
 
     return formatDurationFromHours(totalHours);
+  };
+
+  const calculateTotalTimeHours = (): number => {
+    if (queue.skill_queue.length === 0) return 0;
+
+    let totalHours = 0;
+
+    for (const skill of queue.skill_queue) {
+      totalHours += calculateTrainingHours(skill);
+    }
+
+    return totalHours;
   };
 
   const calculateTotalSP = (): number => {
@@ -214,11 +281,23 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
             <div className="flex items-center justify-center h-full p-8">
               <p className="text-muted-foreground">No skills in queue</p>
             </div>
-          ) : (
-            queue.skill_queue.map((skill, idx) => (
-              <SkillQueueEntry key={`${skill.skill_id}-${idx}`} skill={skill} />
-            ))
-          )}
+          ) : (() => {
+            const totalHours = calculateTotalTimeHours();
+            let cumulativeHours = 0;
+            return queue.skill_queue.map((skill, idx) => {
+              const offsetPercentage = totalHours > 0 ? (cumulativeHours / totalHours) * 100 : 0;
+              const skillHours = calculateTrainingHours(skill);
+              cumulativeHours += skillHours;
+              return (
+                <SkillQueueEntry
+                  key={`${skill.skill_id}-${idx}`}
+                  skill={skill}
+                  totalQueueHours={totalHours}
+                  offsetPercentage={offsetPercentage}
+                />
+              );
+            });
+          })()}
         </div>
 
       <div className="border-t border-border bg-muted/30 px-4 py-3 space-y-3">
