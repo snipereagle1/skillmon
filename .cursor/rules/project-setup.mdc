@@ -22,6 +22,17 @@ The ESI client is auto-generated from the EVE Online OpenAPI schema. Run `./scri
 
 **Note**: The generated files are not checked into version control. They are generated at build time.
 
+## TypeScript Bindings Generation
+
+TypeScript bindings for Tauri commands and types are auto-generated during the build process using `tauri-typegen`. The generation happens in `src-tauri/build.rs` and outputs to `src/generated/`.
+
+**Generated Files**:
+- `src/generated/commands.ts` - TypeScript command functions
+- `src/generated/types.ts` - TypeScript type definitions
+- `src/generated/index.ts` - Module exports
+
+**Note**: These files are generated automatically and should not be edited manually. They are regenerated on every build. If you need to regenerate them manually, run `cargo build` in the `src-tauri` directory.
+
 ## Database
 
 - **Location**: SQLite database is automatically created in the Tauri app data directory

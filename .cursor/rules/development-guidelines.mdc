@@ -35,10 +35,11 @@ Components are added to `src/components/ui/` automatically. The configuration is
 
 ## ESI Requests
 
-- **Always use caching** helpers from `cache` module
-- **Include ETag** in requests when available
-- **Handle 304 Not Modified** responses
-- **Respect rate limits**
+- **Always use `esi::fetch_cached()`** for ESI API requests (handles caching and rate limit tracking)
+- **Pass `rate_limits: &esi::RateLimitStore`** to all ESI fetching functions
+- **Include ETag** in requests when available (handled automatically by `fetch_cached()`)
+- **Handle 304 Not Modified** responses (handled automatically by `fetch_cached()`)
+- **Respect rate limits** (tracked automatically per character)
 
 See the `esi-client` rule for detailed caching patterns and examples.
 
@@ -46,8 +47,10 @@ See the `esi-client` rule for detailed caching patterns and examples.
 
 - **Always use React Query** (`@tanstack/react-query`) for data fetching
 - **Never use `fetch` or `axios`** directly for Tauri commands
+- **Use generated command functions** from `@/generated/commands` instead of calling `invoke()` directly
 - **Use custom hooks** in `src/hooks/tauri/` to wrap Tauri commands
 - **Invalidate queries** after mutations to refresh data
+- **TypeScript types are auto-generated** - use `@/generated/types` instead of manually defining types
 
 See the `frontend-patterns` rule for detailed patterns and examples.
 
@@ -55,9 +58,11 @@ See the `frontend-patterns` rule for detailed patterns and examples.
 
 - **Return `Result<T, String>`** for error handling
 - **Use `State<'_, db::Pool>`** to access database
+- **Include `rate_limits: State<'_, esi::RateLimitStore>`** for commands that make ESI API requests
 - **Use `async`** for all commands
 - **Convert errors** with `.map_err(|e| format!("Error: {}", e))`
 - **Emit events** when state changes that frontend should know about
+- **TypeScript bindings are auto-generated** - types and command functions are created during build
 
 See the `tauri-commands` rule for detailed patterns and examples.
 
@@ -98,9 +103,11 @@ See the `tauri-commands` rule for detailed patterns and examples.
 2. Use shadcn CLI for components
 3. Use sqlx for type-safe database queries
 4. Use React Query for all data fetching
-5. Use caching for ESI requests
-6. Return `Result<T, String>` from Tauri commands
-7. Follow existing patterns when adding new features
-8. Keep components and functions focused and small
-9. Use TypeScript types for type safety
-10. Handle errors gracefully with clear messages
+5. Use generated command functions from `@/generated/commands` instead of `invoke()` directly
+6. Use `esi::fetch_cached()` for all ESI requests (handles caching and rate limits)
+7. Return `Result<T, String>` from Tauri commands
+8. Include `rate_limits` state for commands making ESI requests
+9. Follow existing patterns when adding new features
+10. Keep components and functions focused and small
+11. Use auto-generated TypeScript types from `@/generated/types`
+12. Handle errors gracefully with clear messages
