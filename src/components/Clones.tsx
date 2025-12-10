@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
 import { invoke } from "@tauri-apps/api/core";
 import { useClones } from "@/hooks/tauri/useClones";
 import type { Clone } from "@/types/tauri";
@@ -16,7 +15,7 @@ export function Clones({ characterId }: ClonesProps) {
   const allImplantIds = useMemo(() => {
     const ids = new Set<number>();
     clones.forEach((clone) => {
-      clone.implants.forEach((id) => ids.add(id));
+      clone.implants.forEach((implant) => ids.add(implant.implant_type_id));
     });
     return Array.from(ids);
   }, [clones]);
@@ -124,14 +123,16 @@ function CloneRow({ clone, implantNames }: CloneRowProps) {
         </div>
         <div className="flex-1 min-w-0">
           <div className="font-medium text-foreground">{displayName}</div>
-          <div className="text-sm text-muted-foreground mt-1">{clone.location_name}</div>
+          <div className="text-sm text-muted-foreground mt-1">
+            {clone.location_name || "Unknown Location"}
+          </div>
           {clone.implants.length > 0 ? (
             <div className="flex flex-wrap gap-1.5 mt-2">
-              {clone.implants.map((implantId) => (
+              {clone.implants.map((implant) => (
                 <ImplantIcon
-                  key={implantId}
-                  implantId={implantId}
-                  name={implantNames.get(implantId) || `Implant ${implantId}`}
+                  key={implant.implant_type_id}
+                  implantId={implant.implant_type_id}
+                  name={implantNames.get(implant.implant_type_id) || `Implant ${implant.implant_type_id}`}
                 />
               ))}
             </div>
@@ -150,35 +151,35 @@ interface ImplantIconProps {
 }
 
 function ImplantIcon({ implantId, name }: ImplantIconProps) {
-  const colors = [
-    "bg-green-500/20 border-green-500/50",
-    "bg-purple-500/20 border-purple-500/50",
-    "bg-orange-500/20 border-orange-500/50",
-    "bg-blue-500/20 border-blue-500/50",
-    "bg-cyan-500/20 border-cyan-500/50",
-  ];
-  const colorIndex = implantId % colors.length;
-  const colorClass = colors[colorIndex];
+  const [imageError, setImageError] = useState(false);
+  const imageUrl = `https://images.evetech.net/types/${implantId}/icon?size=64`;
 
   return (
     <Tooltip>
       <TooltipTrigger asChild>
-        <div
-          className={`w-8 h-8 rounded border ${colorClass} flex items-center justify-center cursor-help`}
-        >
-          <svg
-            className="w-5 h-5 text-foreground/70"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+        <div className="w-8 h-8 rounded border border-border/50 bg-background/50 flex items-center justify-center cursor-help overflow-hidden">
+          {imageError ? (
+            <svg
+              className="w-5 h-5 text-muted-foreground"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+              />
+            </svg>
+          ) : (
+            <img
+              src={imageUrl}
+              alt={name}
+              className="w-full h-full object-contain"
+              onError={() => setImageError(true)}
             />
-          </svg>
+          )}
         </div>
       </TooltipTrigger>
       <TooltipContent>

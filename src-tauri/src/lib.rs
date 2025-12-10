@@ -733,7 +733,8 @@ async fn get_cached_character_implants(
             .await?;
 
         let data: esi::CharactersCharacterIdImplantsGet =
-            serde_json::from_str(&body_str).context("Failed to deserialize implants")?;
+            serde_json::from_str::<esi::CharactersCharacterIdImplantsGet>(&body_str)
+                .context("Failed to deserialize implants")?;
         return Ok(Some(data));
     }
 
@@ -1301,6 +1302,12 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
 }
 
 #[derive(Debug, Clone, Serialize)]
+struct CloneImplantResponse {
+    implant_type_id: i64,
+    slot: Option<i64>,
+}
+
+#[derive(Debug, Clone, Serialize)]
 struct CloneResponse {
     id: i64,
     character_id: i64,
@@ -1310,7 +1317,7 @@ struct CloneResponse {
     location_id: i64,
     location_name: String,
     is_current: bool,
-    implants: Vec<i64>,
+    implants: Vec<CloneImplantResponse>,
 }
 
 #[tauri::command]
@@ -1336,8 +1343,10 @@ async fn get_clones(
         .unwrap_or_default();
 
     let mut clones_to_store = Vec::new();
-    let mut current_clone_matched = false;
+    let mut matched_clone_id_for_current: Option<i64> = None;
+    let mut matched_clone_location_update: Option<(String, i64)> = None;
 
+    // Process jump clones (these are never the current clone)
     for jump_clone in &clones_data.jump_clones {
         if let Some(obj) = jump_clone.as_object() {
             let clone_id = obj.get("jump_clone_id").and_then(|v| v.as_i64());
@@ -1352,7 +1361,8 @@ async fn get_clones(
                 .map(|arr| arr.iter().filter_map(|v| v.as_i64()).collect::<Vec<_>>())
                 .unwrap_or_default();
 
-            let location_name = resolve_clone_location(
+            // Resolve location (this will check database first, then fetch from ESI if needed)
+            let _location_name = resolve_clone_location(
                 &*pool,
                 &client,
                 location_type_str,
@@ -1367,114 +1377,152 @@ async fn get_clones(
                 None,
                 location_type_str.to_string(),
                 location_id,
-                Some(location_name.clone()),
                 false,
-                implants.clone(),
+                implants,
             ));
         }
     }
 
+    // Determine which clone should be marked as current
     let mut current_implants_sorted = current_implants.clone();
     current_implants_sorted.sort();
 
-    if let Some(home_location) = &clones_data.home_location {
-        if let (Some(location_id), Some(location_type)) = (
-            home_location.location_id,
-            home_location.location_type.as_ref(),
-        ) {
-            let location_type_str = match location_type {
-                esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Station => "station",
-                esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Structure => {
-                    "structure"
-                }
-            };
-
-            let location_name = resolve_clone_location(
-                &*pool,
-                &client,
-                location_type_str,
-                location_id,
-                character_id,
-            )
-            .await
-            .unwrap_or_else(|_| "Unknown Location".to_string());
-
-            if !current_implants_sorted.is_empty() {
-                let matched_clone_id =
-                    db::find_clone_by_implants(&*pool, character_id, &current_implants_sorted)
-                        .await
-                        .map_err(|e| format!("Failed to find clone by implants: {}", e))?;
-
-                if let Some(matched_id) = matched_clone_id {
-                    sqlx::query("UPDATE clones SET location_type = ?, location_id = ?, location_name = ?, is_current = 1 WHERE id = ?")
-                        .bind(location_type_str)
-                        .bind(location_id)
-                        .bind(&location_name)
-                        .bind(matched_id)
-                        .execute(&*pool)
-                        .await
-                        .map_err(|e| format!("Failed to update matched clone: {}", e))?;
-                    current_clone_matched = true;
-                } else {
-                    clones_to_store.push((
-                        None,
-                        None,
-                        location_type_str.to_string(),
-                        location_id,
-                        Some(location_name),
-                        true,
-                        current_implants_sorted.clone(),
-                    ));
-                }
-            }
-        }
-    }
-
-    if !current_clone_matched && !current_implants_sorted.is_empty() {
+    if !current_implants_sorted.is_empty() {
+        // Try to find an existing clone that matches the current implants
         let matched_clone_id =
             db::find_clone_by_implants(&*pool, character_id, &current_implants_sorted)
                 .await
                 .map_err(|e| format!("Failed to find clone by implants: {}", e))?;
 
         if let Some(matched_id) = matched_clone_id {
-            sqlx::query("UPDATE clones SET is_current = 1 WHERE id = ?")
-                .bind(matched_id)
-                .execute(&*pool)
-                .await
-                .map_err(|e| format!("Failed to update matched clone: {}", e))?;
+            // Found a matching clone - we'll mark it as current after storing clones
+            matched_clone_id_for_current = Some(matched_id);
+
+            // If we have home location, prepare to update the clone's location info
+            if let Some(home_location) = &clones_data.home_location {
+                if let (Some(location_id), Some(location_type)) = (
+                    home_location.location_id,
+                    home_location.location_type.as_ref(),
+                ) {
+                    let location_type_str = match location_type {
+                        esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Station => {
+                            "station"
+                        }
+                        esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Structure => {
+                            "structure"
+                        }
+                    };
+
+                    // Resolve location (this will check database first, then fetch from ESI if needed)
+                    let _location_name = resolve_clone_location(
+                        &*pool,
+                        &client,
+                        location_type_str,
+                        location_id,
+                        character_id,
+                    )
+                    .await
+                    .unwrap_or_else(|_| "Unknown Location".to_string());
+
+                    matched_clone_location_update =
+                        Some((location_type_str.to_string(), location_id));
+                }
+            }
         } else if let Some(home_location) = &clones_data.home_location {
-            if let (Some(location_id), Some(location_type)) = (
-                home_location.location_id,
-                home_location.location_type.as_ref(),
-            ) {
-                let location_type_str = match location_type {
-                    esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Station => {
-                        "station"
-                    }
-                    esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Structure => {
-                        "structure"
-                    }
-                };
+            // No matching clone found by implants. Before creating a new one, try to find
+            // an existing clone with NULL clone_id that has the same implants using the same function.
+            // This handles the case where duplicates were created previously.
+            let existing_null_clone =
+                db::find_clone_by_implants(&*pool, character_id, &current_implants_sorted)
+                    .await
+                    .ok()
+                    .flatten()
+                    .and_then(|id| {
+                        // Verify this clone actually has NULL clone_id
+                        // We'll check this in a separate query
+                        Some(id)
+                    });
 
-                let location_name = resolve_clone_location(
-                    &*pool,
-                    &client,
-                    location_type_str,
-                    location_id,
-                    character_id,
+            // Check if the found clone has NULL clone_id
+            let null_clone_id = if let Some(id) = existing_null_clone {
+                sqlx::query_scalar::<_, Option<i64>>(
+                    "SELECT clone_id FROM clones WHERE id = ? AND clone_id IS NULL",
                 )
+                .bind(id)
+                .fetch_optional(&*pool)
                 .await
-                .unwrap_or_else(|_| "Unknown Location".to_string());
+                .ok()
+                .flatten()
+                .map(|_| id)
+            } else {
+                None
+            };
 
-                clones_to_store.push((
-                    None,
-                    None,
-                    location_type_str.to_string(),
-                    location_id,
-                    Some(location_name),
-                    true,
-                    current_implants_sorted,
-                ));
+            if let Some(existing_id) = null_clone_id {
+                // Found an existing clone with NULL clone_id and matching implants, mark it as current
+                matched_clone_id_for_current = Some(existing_id);
+                if let (Some(location_id), Some(location_type)) = (
+                    home_location.location_id,
+                    home_location.location_type.as_ref(),
+                ) {
+                    let location_type_str = match location_type {
+                        esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Station => {
+                            "station"
+                        }
+                        esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Structure => {
+                            "structure"
+                        }
+                    };
+
+                    // Resolve location (this will check database first, then fetch from ESI if needed)
+                    let _location_name = resolve_clone_location(
+                        &*pool,
+                        &client,
+                        location_type_str,
+                        location_id,
+                        character_id,
+                    )
+                    .await
+                    .unwrap_or_else(|_| "Unknown Location".to_string());
+
+                    matched_clone_location_update =
+                        Some((location_type_str.to_string(), location_id));
+                }
+            } else {
+                // No existing clone found, create a new one
+                if let (Some(location_id), Some(location_type)) = (
+                    home_location.location_id,
+                    home_location.location_type.as_ref(),
+                ) {
+                    let location_type_str = match location_type {
+                        esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Station => {
+                            "station"
+                        }
+                        esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Structure => {
+                            "structure"
+                        }
+                    };
+
+                    // Resolve location (this will check database first, then fetch from ESI if needed)
+                    let _location_name = resolve_clone_location(
+                        &*pool,
+                        &client,
+                        location_type_str,
+                        location_id,
+                        character_id,
+                    )
+                    .await
+                    .unwrap_or_else(|_| "Unknown Location".to_string());
+
+                    clones_to_store.push((
+                        None,
+                        None,
+                        location_type_str.to_string(),
+                        location_id,
+                        true,
+                        current_implants_sorted,
+                    ));
+                }
             }
         }
     }
@@ -1483,17 +1531,41 @@ async fn get_clones(
         .await
         .map_err(|e| format!("Failed to store clones: {}", e))?;
 
+    // Now mark the matched clone as current (after set_character_clones has cleared all flags)
+    if let Some(matched_id) = matched_clone_id_for_current {
+        if let Some((location_type, location_id)) = matched_clone_location_update {
+            sqlx::query(
+                "UPDATE clones SET location_type = ?, location_id = ?, is_current = 1 WHERE id = ?",
+            )
+            .bind(location_type)
+            .bind(location_id)
+            .bind(matched_id)
+            .execute(&*pool)
+            .await
+            .map_err(|e| format!("Failed to update matched clone: {}", e))?;
+        } else {
+            sqlx::query("UPDATE clones SET is_current = 1 WHERE id = ?")
+                .bind(matched_id)
+                .execute(&*pool)
+                .await
+                .map_err(|e| format!("Failed to update matched clone: {}", e))?;
+        }
+    }
+
     let stored_clones = db::get_character_clones(&*pool, character_id)
         .await
         .map_err(|e| format!("Failed to get stored clones: {}", e))?;
 
     let mut result = Vec::new();
     for clone in stored_clones {
-        let implants = db::get_clone_implants(&*pool, clone.id)
+        let implants: Vec<CloneImplantResponse> = db::get_clone_implants(&*pool, clone.id)
             .await
             .map_err(|e| format!("Failed to get clone implants: {}", e))?
             .into_iter()
-            .map(|i| i.implant_type_id)
+            .map(|i| CloneImplantResponse {
+                implant_type_id: i.implant_type_id,
+                slot: i.slot,
+            })
             .collect();
 
         result.push(CloneResponse {
@@ -1521,20 +1593,73 @@ async fn resolve_clone_location(
 ) -> Result<String> {
     match location_type {
         "station" => {
+            // Check database first
+            if let Some(station) = db::get_station(pool, location_id).await? {
+                return Ok(station.name);
+            }
+
+            // Not in database, fetch from ESI
             if let Some(station) = get_cached_station_info(pool, client, location_id).await? {
-                Ok(format!("{} - {}", station.system_id, station.name))
+                let name = if !station.name.is_empty() {
+                    station.name
+                } else {
+                    format!("Unknown Location {}", location_id)
+                };
+
+                // Upsert to database
+                db::upsert_station(pool, location_id, &name, station.system_id, station.owner)
+                    .await?;
+
+                Ok(name)
             } else {
-                Ok(format!("Station {}", location_id))
+                let name = format!("Unknown Location {}", location_id);
+                // Store unknown location in database to avoid repeated failed calls
+                db::upsert_station(pool, location_id, &name, 0, None).await?;
+                Ok(name)
             }
         }
-        "structure" => match get_cached_structure_info(pool, client, location_id).await {
-            Ok(Some(structure)) => Ok(format!(
-                "{} - {}",
-                structure.solar_system_id, structure.name
-            )),
-            Ok(None) => Ok("Inaccessible Structure".to_string()),
-            Err(_) => Ok("Inaccessible Structure".to_string()),
-        },
+        "structure" => {
+            // Check database first
+            if let Some(structure) = db::get_structure(pool, location_id).await? {
+                return Ok(structure.name);
+            }
+
+            // Not in database, fetch from ESI
+            match get_cached_structure_info(pool, client, location_id).await {
+                Ok(Some(structure)) => {
+                    let name = if !structure.name.is_empty() {
+                        structure.name
+                    } else {
+                        format!("Unknown Location {}", location_id)
+                    };
+
+                    // Upsert to database
+                    db::upsert_structure(
+                        pool,
+                        location_id,
+                        &name,
+                        structure.solar_system_id,
+                        structure.type_id,
+                        structure.owner_id,
+                    )
+                    .await?;
+
+                    Ok(name)
+                }
+                Ok(None) => {
+                    // Inaccessible structure - store placeholder
+                    let name = "Inaccessible Structure".to_string();
+                    db::upsert_structure(pool, location_id, &name, 0, None, 0).await?;
+                    Ok(name)
+                }
+                Err(_) => {
+                    // Error fetching - store placeholder
+                    let name = "Inaccessible Structure".to_string();
+                    db::upsert_structure(pool, location_id, &name, 0, None, 0).await?;
+                    Ok(name)
+                }
+            }
+        }
         _ => Ok(format!("Unknown Location {}", location_id)),
     }
 }

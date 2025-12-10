@@ -62,6 +62,16 @@ export interface CharacterSkillsResponse {
   groups: SkillGroup[];
 }
 
+export interface CloneImplant {
+  implant_type_id: number;
+  slot: number | null;
+}
+
+export interface CloneImplant {
+  implant_type_id: number;
+  slot: number | null;
+}
+
 export interface Clone {
   id: number;
   character_id: number;
@@ -71,12 +81,5 @@ export interface Clone {
   location_id: number;
   location_name: string;
   is_current: boolean;
-  implants: number[];
+  implants: CloneImplant[];
 }
-
-export interface CloneImplant {
-  clone_id: number;
-  implant_type_id: number;
-  slot: number | null;
-}
-
