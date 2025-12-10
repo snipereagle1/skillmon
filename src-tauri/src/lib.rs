@@ -191,7 +191,15 @@ async fn get_cached_skill_queue(
 ) -> Result<Option<esi::CharactersCharacterIdSkillqueueGet>> {
     let endpoint_path = format!("characters/{}/skillqueue", character_id);
     let cache_key = cache::build_cache_key(&endpoint_path, character_id);
-    esi::fetch_cached(pool, client, &endpoint_path, &cache_key, rate_limits).await
+    esi::fetch_cached(
+        pool,
+        client,
+        &endpoint_path,
+        &cache_key,
+        rate_limits,
+        character_id,
+    )
+    .await
 }
 
 async fn get_cached_character_attributes(
@@ -209,6 +217,7 @@ async fn get_cached_character_attributes(
         &endpoint_path,
         &cache_key,
         rate_limits,
+        character_id,
     )
     .await?
     {
@@ -250,6 +259,7 @@ async fn get_cached_character_skills(
         &endpoint_path,
         &cache_key,
         rate_limits,
+        character_id,
     )
     .await?
     {
@@ -361,7 +371,15 @@ async fn get_cached_character_clones(
 ) -> Result<Option<esi::CharactersCharacterIdClonesGet>> {
     let endpoint_path = format!("characters/{}/clones", character_id);
     let cache_key = cache::build_cache_key(&endpoint_path, character_id);
-    esi::fetch_cached(pool, client, &endpoint_path, &cache_key, rate_limits).await
+    esi::fetch_cached(
+        pool,
+        client,
+        &endpoint_path,
+        &cache_key,
+        rate_limits,
+        character_id,
+    )
+    .await
 }
 
 async fn get_cached_character_implants(
@@ -372,7 +390,15 @@ async fn get_cached_character_implants(
 ) -> Result<Option<esi::CharactersCharacterIdImplantsGet>> {
     let endpoint_path = format!("characters/{}/implants", character_id);
     let cache_key = cache::build_cache_key(&endpoint_path, character_id);
-    esi::fetch_cached(pool, client, &endpoint_path, &cache_key, rate_limits).await
+    esi::fetch_cached(
+        pool,
+        client,
+        &endpoint_path,
+        &cache_key,
+        rate_limits,
+        character_id,
+    )
+    .await
 }
 
 async fn get_cached_station_info(
@@ -383,7 +409,7 @@ async fn get_cached_station_info(
 ) -> Result<Option<esi::UniverseStationsStationIdGet>> {
     let endpoint_path = format!("universe/stations/{}", station_id);
     let cache_key = format!("{}:0", endpoint_path);
-    esi::fetch_cached(pool, client, &endpoint_path, &cache_key, rate_limits).await
+    esi::fetch_cached(pool, client, &endpoint_path, &cache_key, rate_limits, 0).await
 }
 
 async fn get_cached_structure_info(
@@ -394,7 +420,7 @@ async fn get_cached_structure_info(
 ) -> Result<Option<esi::UniverseStructuresStructureIdGet>> {
     let endpoint_path = format!("universe/structures/{}", structure_id);
     let cache_key = format!("{}:0", endpoint_path);
-    esi::fetch_cached(pool, client, &endpoint_path, &cache_key, rate_limits).await
+    esi::fetch_cached(pool, client, &endpoint_path, &cache_key, rate_limits, 0).await
 }
 
 #[derive(Debug, Clone)]
@@ -1212,7 +1238,7 @@ async fn get_type_names(
 #[tauri::command]
 async fn get_rate_limits(
     rate_limits: State<'_, esi::RateLimitStore>,
-) -> Result<HashMap<String, esi::RateLimitInfo>, String> {
+) -> Result<HashMap<i64, HashMap<String, esi::RateLimitInfo>>, String> {
     let store = rate_limits.read().await;
     Ok(store.clone())
 }
@@ -1608,8 +1634,8 @@ pub fn run() {
                 app.manage(pool);
                 app.manage(AuthStateMap::default());
                 app.manage(Arc::new(tokio::sync::RwLock::new(HashMap::<
-                    String,
-                    esi::RateLimitInfo,
+                    i64,
+                    HashMap<String, esi::RateLimitInfo>,
                 >::new())));
 
                 // Kick off background SDE import/refresh

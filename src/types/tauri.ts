@@ -100,3 +100,14 @@ export interface CharacterAttributesBreakdown {
   perception: AttributeBreakdown;
   willpower: AttributeBreakdown;
 }
+
+export interface RateLimitInfo {
+  group: string;
+  limit: number;
+  remaining: number;
+  window_minutes: number;
+  updated_at: string;
+}
+
+// Keyed by character_id (0 for public endpoints), then by group
+export type RateLimits = Record<number, Record<string, RateLimitInfo>>;
