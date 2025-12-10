@@ -74,20 +74,26 @@ pub fn extract_expires(headers: &HeaderMap) -> i64 {
                 .get("cache-control")
                 .and_then(|v| v.to_str().ok())
                 .and_then(|cache_control| {
-                    cache_control
-                        .split(',')
-                        .find_map(|part| {
-                            let part = part.trim();
-                            if part.starts_with("max-age=") {
-                                part.strip_prefix("max-age=")
-                                    .and_then(|s| s.parse::<i64>().ok())
-                                    .map(|max_age| Utc::now().timestamp() + max_age)
-                            } else {
-                                None
-                            }
-                        })
+                    cache_control.split(',').find_map(|part| {
+                        let part = part.trim();
+                        if part.starts_with("max-age=") {
+                            part.strip_prefix("max-age=")
+                                .and_then(|s| s.parse::<i64>().ok())
+                                .map(|max_age| Utc::now().timestamp() + max_age)
+                        } else {
+                            None
+                        }
+                    })
                 })
         })
         .unwrap_or_else(|| Utc::now().timestamp() + 300)
 }
 
+pub async fn clear_character_cache(pool: &Pool, character_id: i64) -> Result<()> {
+    sqlx::query("DELETE FROM esi_cache WHERE cache_key LIKE ?")
+        .bind(format!("%:{}", character_id))
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}

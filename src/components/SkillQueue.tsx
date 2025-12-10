@@ -1,9 +1,9 @@
-import { useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
-import { useSkillQueues } from "@/hooks/tauri/useSkillQueues";
+import { useSkillQueue } from "@/hooks/tauri/useSkillQueue";
+import { useForceRefreshSkillQueue } from "@/hooks/tauri/useForceRefreshSkillQueue";
 import type { SkillQueueItem, CharacterSkillQueue } from "@/types/tauri";
 import { intervalToDuration } from "date-fns";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
 import {
   Tooltip,
   TooltipContent,
@@ -329,70 +329,41 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
 }
 
 interface SkillQueueProps {
-  characterId?: number | null;
+  characterId: number | null;
 }
 
-export function SkillQueue({ characterId }: SkillQueueProps = {}) {
-  const { data: queues = [], isLoading, error } = useSkillQueues();
-  const queryClient = useQueryClient();
-
-  useEffect(() => {
-    let unlistenFn: (() => void) | null = null;
-    const setupListener = async () => {
-      try {
-        const { listen } = await import("@tauri-apps/api/event");
-        const unlisten = await listen("auth-success", async () => {
-          await new Promise(resolve => setTimeout(resolve, 500));
-          queryClient.invalidateQueries({ queryKey: ["skillQueues"] });
-        });
-        unlistenFn = unlisten;
-      } catch (error) {
-        console.error("Failed to setup listener:", error);
-      }
-    };
-
-    setupListener();
-
-    return () => {
-      if (unlistenFn) unlistenFn();
-    };
-  }, [queryClient]);
+export function SkillQueue({ characterId }: SkillQueueProps) {
+  const { data: queue, isLoading, error } = useSkillQueue(characterId, {
+    refetchInterval: 60_000,
+  });
+  const forceRefresh = useForceRefreshSkillQueue();
 
   if (isLoading) {
-    return <p className="text-muted-foreground">Loading skill queues...</p>;
+    return <p className="text-muted-foreground">Loading skill queue...</p>;
   }
 
   if (error) {
-    return <p className="text-destructive">Error: {error instanceof Error ? error.message : "Failed to load skill queues"}</p>;
+    return <p className="text-destructive">Error: {error instanceof Error ? error.message : "Failed to load skill queue"}</p>;
   }
 
-  if (characterId !== undefined && characterId !== null) {
-    const queue = queues.find(q => q.character_id === characterId);
-    if (!queue) {
-      return <p className="text-muted-foreground">No skill queue found for this character.</p>;
-    }
-    return <CharacterQueue queue={queue} />;
-  }
-
-  if (queues.length === 0) {
-    return <p className="text-muted-foreground">No characters with skill queues found.</p>;
+  if (!queue) {
+    return <p className="text-muted-foreground">No skill queue found for this character.</p>;
   }
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-xl font-bold">Skill Queues</h2>
-        <button
-          onClick={() => queryClient.invalidateQueries({ queryKey: ["skillQueues"] })}
-          className="px-3 py-1 bg-gray-600 text-white rounded hover:bg-gray-700 text-sm"
+    <div className="flex flex-col h-full">
+      <div className="flex items-center justify-end mb-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => characterId && forceRefresh.mutate(characterId)}
+          disabled={forceRefresh.isPending || !characterId}
         >
-          Refresh
-        </button>
+          {forceRefresh.isPending ? "Refreshing..." : "Refresh"}
+        </Button>
       </div>
-      <div className="space-y-4">
-        {queues.map((queue) => (
-          <CharacterQueue key={queue.character_id} queue={queue} />
-        ))}
+      <div className="flex-1 min-h-0">
+        <CharacterQueue queue={queue} />
       </div>
     </div>
   );

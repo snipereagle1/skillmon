@@ -1,4 +1,3 @@
-import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCharacters } from "@/hooks/tauri/useCharacters";
 import { useLogoutCharacter } from "@/hooks/tauri/useLogoutCharacter";
@@ -7,43 +6,6 @@ export function CharacterList() {
   const { data: characters = [], isLoading, error } = useCharacters();
   const logoutMutation = useLogoutCharacter();
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    let unlistenFn: (() => void) | null = null;
-
-    const setupAuthListener = async () => {
-      try {
-        const { listen } = await import("@tauri-apps/api/event");
-        console.log("CharacterList: Setting up auth-success listener...");
-        const unlisten = await listen("auth-success", async (event) => {
-          console.log("CharacterList: ===== AUTH SUCCESS EVENT RECEIVED =====");
-          console.log("CharacterList: Full event object:", JSON.stringify(event, null, 2));
-          console.log("CharacterList: Character ID:", event.payload);
-          console.log("CharacterList: Refreshing character list...");
-          await new Promise(resolve => setTimeout(resolve, 500));
-          console.log("CharacterList: Delay complete, invalidating queries...");
-          queryClient.invalidateQueries({ queryKey: ["characters"] });
-          console.log("CharacterList: ===== Character list refreshed =====");
-        });
-        console.log("CharacterList: Auth listener set up successfully, waiting for events...");
-        unlistenFn = unlisten;
-      } catch (error) {
-        console.error("CharacterList: Failed to setup auth listener:", error);
-        console.error("CharacterList: Error details:", error);
-        if (error instanceof Error && error.message.includes("Tauri")) {
-          console.log("CharacterList: Not in Tauri environment (expected in browser dev)");
-        }
-      }
-    };
-
-    setupAuthListener();
-
-    return () => {
-      if (unlistenFn) {
-        unlistenFn();
-      }
-    };
-  }, [queryClient]);
 
   const handleLogout = async (characterId: number) => {
     try {
