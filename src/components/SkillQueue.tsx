@@ -1,7 +1,7 @@
 import { useSkillQueue } from "@/hooks/tauri/useSkillQueue";
 import { useForceRefreshSkillQueue } from "@/hooks/tauri/useForceRefreshSkillQueue";
 import type { SkillQueueItem, CharacterSkillQueue } from "@/types/tauri";
-import { intervalToDuration } from "date-fns";
+import { intervalToDuration, isAfter, isBefore, isEqual } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -150,8 +150,36 @@ function LevelIndicator({ level }: { level: number }) {
   );
 }
 
+function isCurrentlyTraining(skill: SkillQueueItem): boolean {
+  // Check if queue_position is 0 (currently training)
+  if (skill.queue_position === 0) {
+    return true;
+  }
+
+  // Check if current time is between start_date and finish_date
+  // Backend logic: now >= start_utc && now < finish_utc (inclusive start, exclusive end)
+  if (skill.start_date !== null && skill.finish_date !== null) {
+    try {
+      const now = new Date();
+      const startDate = new Date(skill.start_date);
+      const finishDate = new Date(skill.finish_date);
+
+      const isAfterOrEqualStart = isAfter(now, startDate) || isEqual(now, startDate);
+      const isBeforeFinish = isBefore(now, finishDate);
+
+      if (isAfterOrEqualStart && isBeforeFinish) {
+        return true;
+      }
+    } catch (e) {
+      // Invalid date format, skip this check
+    }
+  }
+
+  return false;
+}
+
 function SkillQueueEntry({ skill, totalQueueHours, offsetPercentage }: { skill: SkillQueueItem; totalQueueHours: number; offsetPercentage: number }) {
-  const isTraining = skill.queue_position === 0;
+  const isTraining = isCurrentlyTraining(skill);
   const levelRoman = ["I", "II", "III", "IV", "V"][skill.finished_level - 1] || skill.finished_level.toString();
   const spPerHour = skill.sp_per_minute ? skill.sp_per_minute * 60 : null;
   const timeToTrain = calculateTimeToTrain(skill);
