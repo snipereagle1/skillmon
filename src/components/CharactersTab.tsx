@@ -1,8 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCharacters } from "@/hooks/tauri/useCharacters";
 import { useSkillQueues } from "@/hooks/tauri/useSkillQueues";
-import type { CharacterSkillQueue } from "@/types/tauri";
+import { useCharacterSkills } from "@/hooks/tauri/useCharacterSkills";
 import { CharacterCard } from "./CharacterCard";
 import { SkillQueue } from "./SkillQueue";
 import { Skills } from "./Skills";
@@ -15,6 +15,7 @@ export function CharactersTab() {
   const { data: skillQueues = [], isLoading: isLoadingQueues } = useSkillQueues();
   const [selectedCharacterId, setSelectedCharacterId] = useState<number | null>(null);
   const queryClient = useQueryClient();
+  const { data: characterSkills } = useCharacterSkills(selectedCharacterId);
 
   const isLoading = isLoadingCharacters || isLoadingQueues;
   const error = charactersError;
@@ -34,6 +35,7 @@ export function CharactersTab() {
           await new Promise((resolve) => setTimeout(resolve, 500));
           queryClient.invalidateQueries({ queryKey: ["characters"] });
           queryClient.invalidateQueries({ queryKey: ["skillQueues"] });
+          queryClient.invalidateQueries({ queryKey: ["characterSkills"] });
           queryClient.invalidateQueries({ queryKey: ["clones"] });
           queryClient.invalidateQueries({ queryKey: ["attributes"] });
         });
@@ -58,6 +60,18 @@ export function CharactersTab() {
   const selectedSkillQueue = skillQueues.find(
     (q) => q.character_id === selectedCharacterId
   );
+
+  const totalSkillpoints = useMemo(() => {
+    if (!characterSkills || !selectedSkillQueue) {
+      return null;
+    }
+    const skillsSP = characterSkills.skills.reduce(
+      (sum, skill) => sum + skill.skillpoints_in_skill,
+      0
+    );
+    const unallocatedSP = selectedSkillQueue.unallocated_sp ?? 0;
+    return skillsSP + unallocatedSP;
+  }, [characterSkills, selectedSkillQueue]);
 
   if (isLoading) {
     return (
@@ -102,13 +116,18 @@ export function CharactersTab() {
       <div className="flex-1 border rounded-lg overflow-hidden flex flex-col">
         {selectedCharacter ? (
           <Tabs defaultValue="skill-queue" className="flex flex-col flex-1 overflow-hidden">
-            <div className="border-b px-4 pt-2">
+            <div className="border-b px-4 py-2 flex items-center justify-between">
               <TabsList>
                 <TabsTrigger value="skill-queue">Skill Queue</TabsTrigger>
                 <TabsTrigger value="skills">Skills</TabsTrigger>
                 <TabsTrigger value="clones">Clones</TabsTrigger>
                 <TabsTrigger value="attributes">Attributes</TabsTrigger>
               </TabsList>
+              {totalSkillpoints !== null && (
+                <span className="text-sm text-muted-foreground">
+                  {totalSkillpoints.toLocaleString('en-US')} total skillpoints
+                </span>
+              )}
             </div>
             <TabsContent value="skill-queue" className="flex-1 overflow-auto p-4 m-0">
               <SkillQueue characterId={selectedCharacterId} />
