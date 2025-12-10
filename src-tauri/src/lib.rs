@@ -499,10 +499,7 @@ fn calculate_sp_for_level(rank: i64, level: i32) -> i64 {
     sp as i64
 }
 
-async fn refresh_all_skill_queues(
-    pool: &db::Pool,
-    rate_limits: &esi::RateLimitStore,
-) {
+async fn refresh_all_skill_queues(pool: &db::Pool, rate_limits: &esi::RateLimitStore) {
     let characters = match db::get_all_characters(pool).await {
         Ok(chars) => chars,
         Err(e) => {
@@ -542,52 +539,50 @@ async fn build_character_skill_queue(
     let client = create_authenticated_client(&access_token)
         .map_err(|e| format!("Failed to create client: {}", e))?;
 
-    let character_attributes = match get_cached_character_attributes(
-        pool,
-        &client,
-        character_id,
-        rate_limits,
-    )
-    .await
-    {
-        Ok(Some(attrs)) => Some(CharacterAttributesResponse {
-            charisma: attrs.charisma,
-            intelligence: attrs.intelligence,
-            memory: attrs.memory,
-            perception: attrs.perception,
-            willpower: attrs.willpower,
-        }),
-        Ok(None) => {
-            if let Ok(Some(cached_attrs)) = db::get_character_attributes(pool, character_id).await {
-                Some(CharacterAttributesResponse {
-                    charisma: cached_attrs.charisma,
-                    intelligence: cached_attrs.intelligence,
-                    memory: cached_attrs.memory,
-                    perception: cached_attrs.perception,
-                    willpower: cached_attrs.willpower,
-                })
-            } else {
-                None
+    let character_attributes =
+        match get_cached_character_attributes(pool, &client, character_id, rate_limits).await {
+            Ok(Some(attrs)) => Some(CharacterAttributesResponse {
+                charisma: attrs.charisma,
+                intelligence: attrs.intelligence,
+                memory: attrs.memory,
+                perception: attrs.perception,
+                willpower: attrs.willpower,
+            }),
+            Ok(None) => {
+                if let Ok(Some(cached_attrs)) =
+                    db::get_character_attributes(pool, character_id).await
+                {
+                    Some(CharacterAttributesResponse {
+                        charisma: cached_attrs.charisma,
+                        intelligence: cached_attrs.intelligence,
+                        memory: cached_attrs.memory,
+                        perception: cached_attrs.perception,
+                        willpower: cached_attrs.willpower,
+                    })
+                } else {
+                    None
+                }
             }
-        }
-        Err(e) => {
-            eprintln!(
-                "Failed to fetch attributes for character {}: {}",
-                character_id, e
-            );
-            if let Ok(Some(cached_attrs)) = db::get_character_attributes(pool, character_id).await {
-                Some(CharacterAttributesResponse {
-                    charisma: cached_attrs.charisma,
-                    intelligence: cached_attrs.intelligence,
-                    memory: cached_attrs.memory,
-                    perception: cached_attrs.perception,
-                    willpower: cached_attrs.willpower,
-                })
-            } else {
-                None
+            Err(e) => {
+                eprintln!(
+                    "Failed to fetch attributes for character {}: {}",
+                    character_id, e
+                );
+                if let Ok(Some(cached_attrs)) =
+                    db::get_character_attributes(pool, character_id).await
+                {
+                    Some(CharacterAttributesResponse {
+                        charisma: cached_attrs.charisma,
+                        intelligence: cached_attrs.intelligence,
+                        memory: cached_attrs.memory,
+                        perception: cached_attrs.perception,
+                        willpower: cached_attrs.willpower,
+                    })
+                } else {
+                    None
+                }
             }
-        }
-    };
+        };
 
     get_cached_character_skills(pool, &client, character_id, rate_limits)
         .await
@@ -610,7 +605,51 @@ async fn build_character_skill_queue(
         });
 
     let queue_data = match get_cached_skill_queue(pool, &client, character_id, rate_limits).await {
-        Ok(Some(data)) => data,
+        Ok(Some(data)) => {
+            // Check if the currently training skill (queue_position 0) has finished
+            // If so, the cache is stale and we need to refresh
+            let should_refresh = data.iter().any(|item| {
+                if let Some(obj) = item.as_object() {
+                    if let (Some(queue_pos), Some(finish_str)) = (
+                        obj.get("queue_position").and_then(|v| v.as_i64()),
+                        obj.get("finish_date").and_then(|v| v.as_str()),
+                    ) {
+                        if queue_pos == 0 {
+                            if let Ok(finish) = chrono::DateTime::parse_from_rfc3339(finish_str) {
+                                let finish_utc = finish.with_timezone(&chrono::Utc);
+                                let now = chrono::Utc::now();
+                                return now >= finish_utc;
+                            }
+                        }
+                    }
+                }
+                false
+            });
+
+            if should_refresh {
+                // Clear cache and fetch fresh data
+                cache::clear_character_cache(pool, character_id).await.ok();
+                match get_cached_skill_queue(pool, &client, character_id, rate_limits).await {
+                    Ok(Some(fresh_data)) => fresh_data,
+                    Ok(None) => {
+                        eprintln!(
+                            "Failed to fetch skill queue for character {}: No data returned after refresh",
+                            character_id
+                        );
+                        return Ok(None);
+                    }
+                    Err(e) => {
+                        eprintln!(
+                            "Failed to fetch skill queue for character {} after refresh: {}",
+                            character_id, e
+                        );
+                        return Ok(None);
+                    }
+                }
+            } else {
+                data
+            }
+        }
         Ok(None) => {
             eprintln!(
                 "Failed to fetch skill queue for character {}: No data returned",
@@ -648,9 +687,7 @@ async fn build_character_skill_queue(
                     .get("finish_date")
                     .and_then(|v| v.as_str())
                     .map(String::from),
-                training_start_sp: obj
-                    .get("training_start_sp")
-                    .and_then(|v| v.as_i64()),
+                training_start_sp: obj.get("training_start_sp").and_then(|v| v.as_i64()),
                 level_start_sp: obj.get("level_start_sp").and_then(|v| v.as_i64()),
                 level_end_sp: obj.get("level_end_sp").and_then(|v| v.as_i64()),
                 current_sp: None,
@@ -722,8 +759,7 @@ async fn build_character_skill_queue(
                         let elapsed_duration = (now - start_utc).num_seconds() as f64;
 
                         if total_duration > 0.0 && elapsed_duration > 0.0 {
-                            let total_sp_needed = skill_item.level_end_sp.unwrap_or(0)
-                                - skill_item.level_start_sp.unwrap_or(0);
+                            let total_sp_needed = skill_item.level_end_sp.unwrap_or(0) - base_sp;
                             let progress_ratio = elapsed_duration / total_duration;
                             let sp_gained = (total_sp_needed as f64 * progress_ratio) as i64;
                             let calculated_sp = base_sp + sp_gained;
@@ -1201,7 +1237,12 @@ async fn get_skill_queue_for_character(
     )
     .await
     .map_err(|e| format!("Failed to build skill queue: {}", e))?
-    .ok_or_else(|| format!("No skill queue data available for character {}", character_id))
+    .ok_or_else(|| {
+        format!(
+            "No skill queue data available for character {}",
+            character_id
+        )
+    })
 }
 
 #[tauri::command]
@@ -1227,7 +1268,12 @@ async fn force_refresh_skill_queue(
     )
     .await
     .map_err(|e| format!("Failed to build skill queue: {}", e))?
-    .ok_or_else(|| format!("No skill queue data available for character {}", character_id))
+    .ok_or_else(|| {
+        format!(
+            "No skill queue data available for character {}",
+            character_id
+        )
+    })
 }
 
 #[derive(Debug, Clone, Serialize)]
