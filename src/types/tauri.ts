@@ -83,3 +83,19 @@ export interface Clone {
   is_current: boolean;
   implants: CloneImplant[];
 }
+
+export interface AttributeBreakdown {
+  base: number;
+  implants: number;
+  remap: number;
+  accelerator: number;
+  total: number;
+}
+
+export interface CharacterAttributesBreakdown {
+  charisma: AttributeBreakdown;
+  intelligence: AttributeBreakdown;
+  memory: AttributeBreakdown;
+  perception: AttributeBreakdown;
+  willpower: AttributeBreakdown;
+}

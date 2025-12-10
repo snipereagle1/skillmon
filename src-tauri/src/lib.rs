@@ -117,6 +117,24 @@ pub struct CharacterAttributesResponse {
 }
 
 #[derive(Debug, Clone, Serialize)]
+pub struct AttributeBreakdown {
+    pub base: i64,
+    pub implants: i64,
+    pub remap: i64,
+    pub accelerator: i64,
+    pub total: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CharacterAttributesBreakdown {
+    pub charisma: AttributeBreakdown,
+    pub intelligence: AttributeBreakdown,
+    pub memory: AttributeBreakdown,
+    pub perception: AttributeBreakdown,
+    pub willpower: AttributeBreakdown,
+}
+
+#[derive(Debug, Clone, Serialize)]
 pub struct CharacterSkillQueue {
     pub character_id: i64,
     pub character_name: String,
@@ -1685,6 +1703,150 @@ async fn get_type_names(
 }
 
 #[tauri::command]
+async fn get_character_attributes_breakdown(
+    pool: State<'_, db::Pool>,
+    character_id: i64,
+) -> Result<CharacterAttributesBreakdown, String> {
+    const BASE_ATTRIBUTE: i64 = 17;
+    const REMAP_TOTAL: i64 = 14;
+    const ATTRIBUTE_IDS: [(i64, &str); 5] = [
+        (164, "charisma"),
+        (165, "intelligence"),
+        (166, "memory"),
+        (167, "perception"),
+        (168, "willpower"),
+    ];
+
+    let access_token = auth::ensure_valid_access_token(&*pool, character_id)
+        .await
+        .map_err(|e| format!("Failed to get valid token: {}", e))?;
+
+    let client = create_authenticated_client(&access_token)
+        .map_err(|e| format!("Failed to create client: {}", e))?;
+
+    let attributes = match get_cached_character_attributes(&*pool, &client, character_id).await {
+        Ok(Some(attrs)) => db::CharacterAttributes {
+            character_id,
+            charisma: attrs.charisma,
+            intelligence: attrs.intelligence,
+            memory: attrs.memory,
+            perception: attrs.perception,
+            willpower: attrs.willpower,
+            bonus_remaps: attrs.bonus_remaps,
+            accrued_remap_cooldown_date: attrs
+                .accrued_remap_cooldown_date
+                .as_ref()
+                .map(|d| d.to_rfc3339()),
+            last_remap_date: attrs.last_remap_date.as_ref().map(|d| d.to_rfc3339()),
+        },
+        Ok(None) => db::get_character_attributes(&*pool, character_id)
+            .await
+            .map_err(|e| format!("Failed to get character attributes: {}", e))?
+            .ok_or_else(|| {
+                "Character attributes not found. Please refresh your character data.".to_string()
+            })?,
+        Err(e) => {
+            eprintln!("Failed to fetch attributes from ESI: {}", e);
+            db::get_character_attributes(&*pool, character_id)
+                .await
+                .map_err(|e| format!("Failed to get character attributes: {}", e))?
+                .ok_or_else(|| {
+                    "Character attributes not found. Please refresh your character data."
+                        .to_string()
+                })?
+        }
+    };
+
+    let current_implants = get_cached_character_implants(&*pool, &client, character_id)
+        .await
+        .map_err(|e| format!("Failed to fetch implants: {}", e))?
+        .unwrap_or_default();
+
+    let implant_bonuses = if current_implants.is_empty() {
+        HashMap::new()
+    } else {
+        db::get_implant_attribute_bonuses(&*pool, &current_implants)
+            .await
+            .map_err(|e| format!("Failed to get implant bonuses: {}", e))?
+    };
+
+    let attribute_totals = [
+        attributes.charisma,
+        attributes.intelligence,
+        attributes.memory,
+        attributes.perception,
+        attributes.willpower,
+    ];
+
+    let mut implant_totals = [0i64; 5];
+    let mut remainders = [0i64; 5];
+
+    // Map implant bonus attribute IDs (175-179) to character attribute IDs (164-168)
+    // 175 = charismaBonus, 176 = intelligenceBonus, 177 = memoryBonus, 178 = perceptionBonus, 179 = willpowerBonus
+    const IMPLANT_BONUS_ATTR_IDS: [i64; 5] = [175, 176, 177, 178, 179];
+
+    for (idx, (_, _)) in ATTRIBUTE_IDS.iter().enumerate() {
+        let implant_bonus_attr_id = IMPLANT_BONUS_ATTR_IDS[idx];
+        let mut implant_bonus = 0i64;
+        for implant_id in &current_implants {
+            if let Some(implant_attrs) = implant_bonuses.get(implant_id) {
+                if let Some(&bonus) = implant_attrs.get(&implant_bonus_attr_id) {
+                    implant_bonus += bonus;
+                }
+            }
+        }
+        implant_totals[idx] = implant_bonus;
+        remainders[idx] = attribute_totals[idx] - BASE_ATTRIBUTE - implant_bonus;
+    }
+
+    let remainder_sum: i64 = remainders.iter().sum();
+    let accelerator = (remainder_sum - REMAP_TOTAL) / 5;
+
+    let mut remaps = [0i64; 5];
+    for (idx, remainder) in remainders.iter().enumerate() {
+        remaps[idx] = remainder - accelerator;
+    }
+
+    Ok(CharacterAttributesBreakdown {
+        charisma: AttributeBreakdown {
+            base: BASE_ATTRIBUTE,
+            implants: implant_totals[0],
+            remap: remaps[0],
+            accelerator,
+            total: attribute_totals[0],
+        },
+        intelligence: AttributeBreakdown {
+            base: BASE_ATTRIBUTE,
+            implants: implant_totals[1],
+            remap: remaps[1],
+            accelerator,
+            total: attribute_totals[1],
+        },
+        memory: AttributeBreakdown {
+            base: BASE_ATTRIBUTE,
+            implants: implant_totals[2],
+            remap: remaps[2],
+            accelerator,
+            total: attribute_totals[2],
+        },
+        perception: AttributeBreakdown {
+            base: BASE_ATTRIBUTE,
+            implants: implant_totals[3],
+            remap: remaps[3],
+            accelerator,
+            total: attribute_totals[3],
+        },
+        willpower: AttributeBreakdown {
+            base: BASE_ATTRIBUTE,
+            implants: implant_totals[4],
+            remap: remaps[4],
+            accelerator,
+            total: attribute_totals[4],
+        },
+    })
+}
+
+#[tauri::command]
 async fn get_character_skills_with_groups(
     pool: State<'_, db::Pool>,
     character_id: i64,
@@ -2011,7 +2173,8 @@ pub fn run() {
             refresh_sde,
             get_clones,
             update_clone_name,
-            get_type_names
+            get_type_names,
+            get_character_attributes_breakdown
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
