@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { invoke } from "@tauri-apps/api/core";
-import type { Clone } from "@/types/tauri";
+import { getClones } from "@/generated/commands";
+import type { Clone } from "@/generated/types";
 
 export function useClones(characterId: number | null) {
   return useQuery<Clone[]>({
@@ -9,7 +9,7 @@ export function useClones(characterId: number | null) {
       if (characterId === null) {
         return [];
       }
-      return await invoke<Clone[]>("get_clones", { characterId });
+      return await getClones({ characterId });
     },
     enabled: characterId !== null,
   });

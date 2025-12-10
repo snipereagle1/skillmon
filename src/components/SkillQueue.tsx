@@ -1,6 +1,6 @@
 import { useSkillQueue } from "@/hooks/tauri/useSkillQueue";
 import { useForceRefreshSkillQueue } from "@/hooks/tauri/useForceRefreshSkillQueue";
-import type { SkillQueueItem, CharacterSkillQueue } from "@/types/tauri";
+import type { SkillQueueItem, CharacterSkillQueue } from "@/generated/types";
 import { intervalToDuration, isAfter, isBefore, isEqual } from "date-fns";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";

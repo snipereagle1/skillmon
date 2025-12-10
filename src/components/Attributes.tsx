@@ -1,5 +1,5 @@
 import { useAttributes } from "@/hooks/tauri/useAttributes";
-import type { AttributeBreakdown } from "@/types/tauri";
+import type { AttributeBreakdown } from "@/generated/types";
 import {
   Table,
   TableBody,

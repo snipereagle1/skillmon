@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { getTypeNames } from "@/generated/commands";
 import { useClones } from "@/hooks/tauri/useClones";
-import type { Clone } from "@/types/tauri";
+import type { Clone } from "@/generated/types";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ClonesProps {
@@ -26,7 +26,7 @@ export function Clones({ characterId }: ClonesProps) {
       return;
     }
 
-    invoke<Record<number, string>>("get_type_names", { typeIds: allImplantIds })
+    getTypeNames({ typeIds: allImplantIds })
       .then((names) => {
         const map = new Map<number, string>();
         Object.entries(names).forEach(([id, name]) => {

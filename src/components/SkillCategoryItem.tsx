@@ -5,7 +5,7 @@ import {
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item";
-import type { SkillGroup } from "@/types/tauri";
+import type { SkillGroup } from "@/generated/types";
 import { cn } from "@/lib/utils";
 
 interface SkillCategoryItemProps {
