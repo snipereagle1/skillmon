@@ -1,8 +1,8 @@
 import { useEffect, useState, useMemo } from "react";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueries } from "@tanstack/react-query";
 import { useCharacters } from "@/hooks/tauri/useCharacters";
-import { useSkillQueues } from "@/hooks/tauri/useSkillQueues";
 import { useCharacterSkills } from "@/hooks/tauri/useCharacterSkills";
+import type { CharacterSkillQueue } from "@/types/tauri";
 import { CharacterCard } from "./CharacterCard";
 import { SkillQueue } from "./SkillQueue";
 import { Skills } from "./Skills";
@@ -12,10 +12,30 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export function CharactersTab() {
   const { data: characters = [], isLoading: isLoadingCharacters, error: charactersError } = useCharacters();
-  const { data: skillQueues = [], isLoading: isLoadingQueues } = useSkillQueues();
   const [selectedCharacterId, setSelectedCharacterId] = useState<number | null>(null);
-  const queryClient = useQueryClient();
   const { data: characterSkills } = useCharacterSkills(selectedCharacterId);
+
+  const skillQueueQueriesConfig = useMemo(
+    () =>
+      characters.map((character) => ({
+        queryKey: ["skillQueue", character.character_id] as const,
+        queryFn: async (): Promise<CharacterSkillQueue> => {
+          const { invoke } = await import("@tauri-apps/api/core");
+          return await invoke<CharacterSkillQueue>("get_skill_queue_for_character", {
+            characterId: character.character_id,
+          });
+        },
+        refetchInterval: character.character_id === selectedCharacterId ? 60_000 : 600_000,
+      })),
+    [characters, selectedCharacterId]
+  );
+
+  const skillQueueQueries = useQueries({
+    queries: skillQueueQueriesConfig,
+  });
+
+  const skillQueues: CharacterSkillQueue[] = skillQueueQueries.map((query) => query.data).filter((q): q is CharacterSkillQueue => q !== undefined);
+  const isLoadingQueues = skillQueueQueries.some((query) => query.isLoading);
 
   const isLoading = isLoadingCharacters || isLoadingQueues;
   const error = charactersError;
@@ -25,34 +45,6 @@ export function CharactersTab() {
       setSelectedCharacterId(characters[0].character_id);
     }
   }, [characters, selectedCharacterId]);
-
-  useEffect(() => {
-    let unlistenFn: (() => void) | null = null;
-    const setupAuthListener = async () => {
-      try {
-        const { listen } = await import("@tauri-apps/api/event");
-        const unlisten = await listen("auth-success", async () => {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          queryClient.invalidateQueries({ queryKey: ["characters"] });
-          queryClient.invalidateQueries({ queryKey: ["skillQueues"] });
-          queryClient.invalidateQueries({ queryKey: ["characterSkills"] });
-          queryClient.invalidateQueries({ queryKey: ["clones"] });
-          queryClient.invalidateQueries({ queryKey: ["attributes"] });
-        });
-        unlistenFn = unlisten;
-      } catch (error) {
-        console.error("Failed to setup auth listener:", error);
-      }
-    };
-
-    setupAuthListener();
-
-    return () => {
-      if (unlistenFn) {
-        unlistenFn();
-      }
-    };
-  }, [queryClient]);
 
   const selectedCharacter = characters.find(
     (c) => c.character_id === selectedCharacterId
@@ -97,9 +89,9 @@ export function CharactersTab() {
             <p className="text-muted-foreground p-4">No characters added yet.</p>
           ) : (
             characters.map((character) => {
-              const queue = skillQueues.find(
-                (q) => q.character_id === character.character_id
-              );
+              const queue = skillQueueQueries
+                .find((q) => q.data?.character_id === character.character_id)
+                ?.data;
               return (
                 <CharacterCard
                   key={character.character_id}

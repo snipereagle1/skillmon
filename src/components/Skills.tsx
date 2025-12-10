@@ -1,9 +1,7 @@
 import { useState, useEffect } from "react";
-import { useQueryClient } from "@tanstack/react-query";
 import { useCharacterSkills } from "@/hooks/tauri/useCharacterSkills";
 import { SkillCategoryItem } from "./SkillCategoryItem";
 import { SkillItem } from "./SkillItem";
-import type { SkillGroup } from "@/types/tauri";
 
 interface SkillsProps {
   characterId: number | null;
@@ -11,30 +9,7 @@ interface SkillsProps {
 
 export function Skills({ characterId }: SkillsProps) {
   const { data, isLoading, error } = useCharacterSkills(characterId);
-  const queryClient = useQueryClient();
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
-
-  useEffect(() => {
-    let unlistenFn: (() => void) | null = null;
-    const setupListener = async () => {
-      try {
-        const { listen } = await import("@tauri-apps/api/event");
-        const unlisten = await listen("auth-success", async () => {
-          await new Promise((resolve) => setTimeout(resolve, 500));
-          queryClient.invalidateQueries({ queryKey: ["characterSkills"] });
-        });
-        unlistenFn = unlisten;
-      } catch (error) {
-        console.error("Failed to setup listener:", error);
-      }
-    };
-
-    setupListener();
-
-    return () => {
-      if (unlistenFn) unlistenFn();
-    };
-  }, [queryClient]);
 
   // Set default selected group
   useEffect(() => {
