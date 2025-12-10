@@ -138,10 +138,7 @@ pub async fn ensure_valid_access_token(
 
         // Extract scopes from the new access token
         let scopes = extract_scopes_from_jwt(&token_response.access_token)
-            .unwrap_or_else(|e| {
-                eprintln!("Warning: Failed to extract scopes from refreshed token: {}", e);
-                Vec::new()
-            });
+            .unwrap_or_else(|_| Vec::new());
 
         db::update_tokens(
             pool,
@@ -172,12 +169,9 @@ fn decode_jwt_payload(access_token: &str) -> Result<Value> {
         .context(format!("Failed to decode JWT payload: {}", payload))?;
 
     let decoded_str = String::from_utf8_lossy(&decoded);
-    eprintln!("JWT payload (decoded): {}", decoded_str);
 
     let json: Value = serde_json::from_str(&decoded_str)
         .context(format!("Failed to parse JWT payload. Decoded: {}", decoded_str))?;
-
-    eprintln!("JWT JSON: {}", serde_json::to_string_pretty(&json).unwrap_or_default());
 
     Ok(json)
 }
@@ -267,10 +261,7 @@ pub async fn check_token_scopes(
     // Parse scopes from JSON string
     let token_scopes: Vec<String> = if let Some(scopes_json) = &tokens.scopes {
         serde_json::from_str(scopes_json)
-            .unwrap_or_else(|e| {
-                eprintln!("Warning: Failed to parse scopes JSON for character {}: {}", character_id, e);
-                Vec::new()
-            })
+            .unwrap_or_else(|_| Vec::new())
     } else {
         // No scopes stored (old token)
         Vec::new()
@@ -283,13 +274,6 @@ pub async fn check_token_scopes(
         .difference(&token_scopes_set)
         .cloned()
         .collect();
-
-    if !missing_scopes.is_empty() {
-        eprintln!(
-            "Warning: Token for character {} is missing required scopes: {:?}",
-            character_id, missing_scopes
-        );
-    }
 
     Ok(missing_scopes)
 }
