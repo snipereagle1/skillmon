@@ -7,6 +7,7 @@ import { CharacterCard } from "./CharacterCard";
 import { SkillQueue } from "./SkillQueue";
 import { Skills } from "./Skills";
 import { Clones } from "./Clones";
+import { Attributes } from "./Attributes";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export function CharactersTab() {
@@ -34,6 +35,7 @@ export function CharactersTab() {
           queryClient.invalidateQueries({ queryKey: ["characters"] });
           queryClient.invalidateQueries({ queryKey: ["skillQueues"] });
           queryClient.invalidateQueries({ queryKey: ["clones"] });
+          queryClient.invalidateQueries({ queryKey: ["attributes"] });
         });
         unlistenFn = unlisten;
       } catch (error) {
@@ -105,6 +107,7 @@ export function CharactersTab() {
                 <TabsTrigger value="skill-queue">Skill Queue</TabsTrigger>
                 <TabsTrigger value="skills">Skills</TabsTrigger>
                 <TabsTrigger value="clones">Clones</TabsTrigger>
+                <TabsTrigger value="attributes">Attributes</TabsTrigger>
               </TabsList>
             </div>
             <TabsContent value="skill-queue" className="flex-1 overflow-auto p-4 m-0">
@@ -115,6 +118,9 @@ export function CharactersTab() {
             </TabsContent>
             <TabsContent value="clones" className="flex-1 overflow-hidden m-0">
               <Clones characterId={selectedCharacterId} />
+            </TabsContent>
+            <TabsContent value="attributes" className="flex-1 overflow-hidden m-0">
+              <Attributes characterId={selectedCharacterId} />
             </TabsContent>
           </Tabs>
         ) : (

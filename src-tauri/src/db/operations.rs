@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
 use serde::Serialize;
 use sqlx::{FromRow, Row};
@@ -666,4 +668,44 @@ pub async fn find_clone_by_implants(
     let result = query.fetch_optional(pool).await?;
 
     Ok(result.map(|row| row.get(0)))
+}
+
+pub async fn get_implant_attribute_bonuses(
+    pool: &Pool,
+    implant_type_ids: &[i64],
+) -> Result<HashMap<i64, HashMap<i64, i64>>> {
+    if implant_type_ids.is_empty() {
+        return Ok(HashMap::new());
+    }
+
+    let mut result: HashMap<i64, HashMap<i64, i64>> = HashMap::new();
+
+    for chunk in implant_type_ids.chunks(100) {
+        let mut query_builder: sqlx::QueryBuilder<sqlx::Sqlite> = sqlx::QueryBuilder::new(
+            "SELECT type_id, attribute_id, value FROM sde_type_dogma_attributes WHERE type_id IN (",
+        );
+
+        let mut separated = query_builder.separated(", ");
+        for implant_id in chunk {
+            separated.push_bind(implant_id);
+        }
+        separated.push_unseparated(") AND attribute_id IN (175, 176, 177, 178, 179)");
+
+        let query = query_builder.build();
+        let rows = query.fetch_all(pool).await?;
+
+        for row in rows {
+            let type_id: i64 = row.get(0);
+            let attribute_id: i64 = row.get(1);
+            let value: f64 = row.get(2);
+            let value_int = value as i64;
+
+            result
+                .entry(type_id)
+                .or_insert_with(HashMap::new)
+                .insert(attribute_id, value_int);
+        }
+    }
+
+    Ok(result)
 }
