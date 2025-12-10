@@ -361,9 +361,7 @@ interface SkillQueueProps {
 }
 
 export function SkillQueue({ characterId }: SkillQueueProps) {
-  const { data: queue, isLoading, error } = useSkillQueue(characterId, {
-    refetchInterval: 60_000,
-  });
+  const { data: queue, isLoading, error } = useSkillQueue(characterId);
   const forceRefresh = useForceRefreshSkillQueue();
 
   if (isLoading) {
