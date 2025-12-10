@@ -26,6 +26,12 @@
       "desktop": {
         "schemes": ["eveauth-skillmon"]
       }
+    },
+    "tauri-typegen": {
+      "project_path": "./src-tauri",
+      "output_path": "./src/generated",
+      "validation_library": "none",
+      "verbose": true
     }
   },
   "bundle": {

@@ -16,6 +16,44 @@ mod sde;
 
 type AuthStateMap = Mutex<HashMap<String, auth::AuthState>>;
 
+#[derive(Debug, Clone, Serialize)]
+pub struct Character {
+    pub character_id: i64,
+    pub character_name: String,
+    pub unallocated_sp: i64,
+}
+
+impl From<db::Character> for Character {
+    fn from(c: db::Character) -> Self {
+        Character {
+            character_id: c.character_id,
+            character_name: c.character_name,
+            unallocated_sp: c.unallocated_sp,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RateLimitInfo {
+    pub group: String,
+    pub limit: i32,
+    pub remaining: i32,
+    pub window_minutes: i32,
+    pub updated_at: String,
+}
+
+impl From<&esi::RateLimitInfo> for RateLimitInfo {
+    fn from(r: &esi::RateLimitInfo) -> Self {
+        RateLimitInfo {
+            group: r.group.clone(),
+            limit: r.limit,
+            remaining: r.remaining,
+            window_minutes: r.window_minutes,
+            updated_at: r.updated_at.to_rfc3339(),
+        }
+    }
+}
+
 #[tauri::command]
 async fn start_eve_login(
     app: tauri::AppHandle,
@@ -61,9 +99,10 @@ async fn start_eve_login(
 }
 
 #[tauri::command]
-async fn get_characters(pool: State<'_, db::Pool>) -> Result<Vec<db::Character>, String> {
+async fn get_characters(pool: State<'_, db::Pool>) -> Result<Vec<Character>, String> {
     db::get_all_characters(&*pool)
         .await
+        .map(|chars| chars.into_iter().map(Character::from).collect())
         .map_err(|e| format!("Failed to get characters: {}", e))
 }
 
@@ -1660,20 +1699,42 @@ async fn update_clone_name(
     Ok(())
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct TypeNameEntry {
+    pub type_id: i64,
+    pub name: String,
+}
+
 #[tauri::command]
 async fn get_type_names(
     pool: State<'_, db::Pool>,
     type_ids: Vec<i64>,
-) -> Result<HashMap<i64, String>, String> {
-    get_type_names_helper(&*pool, &type_ids).await
+) -> Result<Vec<TypeNameEntry>, String> {
+    let map = get_type_names_helper(&*pool, &type_ids).await?;
+    Ok(map
+        .into_iter()
+        .map(|(type_id, name)| TypeNameEntry { type_id, name })
+        .collect())
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct CharacterRateLimits {
+    pub character_id: i64,
+    pub limits: Vec<RateLimitInfo>,
 }
 
 #[tauri::command]
 async fn get_rate_limits(
     rate_limits: State<'_, esi::RateLimitStore>,
-) -> Result<HashMap<i64, HashMap<String, esi::RateLimitInfo>>, String> {
+) -> Result<Vec<CharacterRateLimits>, String> {
     let store = rate_limits.read().await;
-    Ok(store.clone())
+    Ok(store
+        .iter()
+        .map(|(character_id, limits_map)| CharacterRateLimits {
+            character_id: *character_id,
+            limits: limits_map.values().map(RateLimitInfo::from).collect(),
+        })
+        .collect())
 }
 
 #[tauri::command]
