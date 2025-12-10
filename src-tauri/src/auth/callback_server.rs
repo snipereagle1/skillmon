@@ -31,11 +31,9 @@ impl CallbackServer {
                         let state = query.get("state").cloned();
 
                         if let (Some(code), Some(state)) = (code, state) {
-                            println!("Callback received: code={}, state={}", code, state);
                             let app_handle_inner = (*app_handle).clone();
                             let callback_url = format!("http://localhost:{}/callback", port);
                             tauri::async_runtime::spawn(async move {
-                                println!("Processing OAuth callback...");
                                 match crate::handle_oauth_callback(
                                     app_handle_inner.clone(),
                                     code,
@@ -44,11 +42,8 @@ impl CallbackServer {
                                 )
                                 .await
                                 {
-                                    Ok(_) => {
-                                        println!("OAuth callback processed successfully");
-                                    }
+                                    Ok(_) => {}
                                     Err(e) => {
-                                        eprintln!("OAuth callback error: {}", e);
                                         let _ = app_handle_inner.emit("auth-error", e.to_string());
                                     }
                                 }

@@ -2095,11 +2095,6 @@ pub async fn handle_oauth_callback(
         .context("Failed to update tokens")?;
     }
 
-    println!(
-        "Authentication successful for character: {} (ID: {})",
-        character_info.character_name, character_info.character_id
-    );
-
     cache::clear_character_cache(&*pool, character_info.character_id)
         .await
         .context("Failed to clear character cache")?;
@@ -2108,14 +2103,9 @@ pub async fn handle_oauth_callback(
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
     // Emit to all windows
-    println!(
-        "Emitting auth-success event with character_id: {}",
-        character_info.character_id
-    );
     match app.emit("auth-success", character_info.character_id) {
-        Ok(_) => println!("Auth success event emitted successfully"),
+        Ok(_) => {}
         Err(e) => {
-            eprintln!("Failed to emit auth success event: {}", e);
             return Err(anyhow::anyhow!("Failed to emit auth success event: {}", e));
         }
     }
@@ -2128,6 +2118,12 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             tauri::async_runtime::block_on(async {
+                if std::env::var("EVE_CLIENT_ID").is_err() {
+                    eprintln!("Error: EVE_CLIENT_ID environment variable is not set. The application cannot function without it.");
+                    eprintln!("Please set EVE_CLIENT_ID to your EVE Online SSO client ID.");
+                    std::process::exit(1);
+                }
+
                 let pool = db::init_db(&app.handle()).await?;
                 app.manage(pool);
                 app.manage(AuthStateMap::default());
