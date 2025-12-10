@@ -140,6 +140,7 @@ pub struct CharacterSkillQueue {
     pub character_name: String,
     pub skill_queue: Vec<SkillQueueItem>,
     pub attributes: Option<CharacterAttributesResponse>,
+    pub unallocated_sp: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -417,6 +418,11 @@ async fn get_cached_character_skills(
             .await
             .ok();
 
+        let unallocated_sp = cached_data.unallocated_sp.unwrap_or(0);
+        db::set_character_unallocated_sp(pool, character_id, unallocated_sp)
+            .await
+            .ok();
+
         return Ok(Some(cached_data));
     }
 
@@ -482,6 +488,11 @@ async fn get_cached_character_skills(
                 .await
                 .ok();
 
+            let unallocated_sp = cached_data.unallocated_sp.unwrap_or(0);
+            db::set_character_unallocated_sp(pool, character_id, unallocated_sp)
+                .await
+                .ok();
+
             return Ok(Some(cached_data));
         }
     }
@@ -513,6 +524,11 @@ async fn get_cached_character_skills(
             })
             .collect();
         db::set_character_skills(pool, character_id, &skills_data)
+            .await
+            .ok();
+
+        let unallocated_sp = data.unallocated_sp.unwrap_or(0);
+        db::set_character_unallocated_sp(pool, character_id, unallocated_sp)
             .await
             .ok();
 
@@ -1080,7 +1096,20 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
         }
         character_skill_sp.insert(character.character_id, skill_sp_map);
 
-        match get_cached_skill_queue(&*pool, &client, character.character_id).await {
+        // Re-read character to get updated unallocated_sp value
+        let character_id = character.character_id;
+        let character_name = character.character_name.clone();
+        let updated_character = db::get_character(&*pool, character_id)
+            .await
+            .ok()
+            .flatten()
+            .unwrap_or(db::Character {
+                character_id,
+                character_name: character_name.clone(),
+                unallocated_sp: 0,
+            });
+
+        match get_cached_skill_queue(&*pool, &client, character_id).await {
             Ok(Some(queue_data)) => {
                 let skill_queue: Vec<SkillQueueItem> = queue_data
                     .into_iter()
@@ -1117,10 +1146,11 @@ async fn get_skill_queues(pool: State<'_, db::Pool>) -> Result<Vec<CharacterSkil
                     .collect();
 
                 results.push(CharacterSkillQueue {
-                    character_id: character.character_id,
-                    character_name: character.character_name,
+                    character_id: updated_character.character_id,
+                    character_name: updated_character.character_name,
                     skill_queue,
                     attributes: character_attributes,
+                    unallocated_sp: updated_character.unallocated_sp,
                 });
             }
             Ok(None) => {

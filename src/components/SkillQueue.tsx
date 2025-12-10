@@ -196,7 +196,7 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
 
   const totalTime = calculateTotalTime();
   const totalSP = calculateTotalSP();
-  const unallocatedSP = 0;
+  const unallocatedSP = queue.unallocated_sp;
 
   const progressPercentage = Math.min((queueSize / MAX_QUEUE_SIZE) * 100, 100);
 
@@ -223,7 +223,7 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
 
       <div className="border-t border-border bg-muted/30 px-4 py-3 space-y-3">
         <div className="text-sm text-green-400">
-          {unallocatedSP.toLocaleString()} unallocated skill points
+          {unallocatedSP.toLocaleString('en-US')} unallocated skill points
         </div>
 
         <div className="space-y-2">
@@ -240,7 +240,7 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
           </div>
 
           <div className="text-sm text-muted-foreground">
-            {totalSP.toLocaleString()} skill points in queue
+            {totalSP.toLocaleString('en-US')} skill points in queue
           </div>
         </div>
       </div>
