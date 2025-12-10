@@ -8,9 +8,9 @@ export function useLogoutCharacter() {
     mutationFn: async (characterId: number) => {
       return await logoutCharacter({ characterId });
     },
-    onSuccess: () => {
+    onSuccess: (_, characterId) => {
       queryClient.invalidateQueries({ queryKey: ["characters"] });
-      queryClient.invalidateQueries({ queryKey: ["skillQueues"] });
+      queryClient.invalidateQueries({ queryKey: ["skillQueue", characterId] });
     },
   });
 }

@@ -29,8 +29,8 @@ export function Clones({ characterId }: ClonesProps) {
     getTypeNames({ typeIds: allImplantIds })
       .then((names) => {
         const map = new Map<number, string>();
-        Object.entries(names).forEach(([id, name]) => {
-          map.set(Number(id), name);
+        names.forEach((entry) => {
+          map.set(entry.type_id, entry.name);
         });
         setImplantNames(map);
       })
