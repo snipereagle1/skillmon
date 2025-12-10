@@ -2,7 +2,8 @@ import { useEffect, useState, useMemo } from "react";
 import { useQueries } from "@tanstack/react-query";
 import { useCharacters } from "@/hooks/tauri/useCharacters";
 import { useCharacterSkills } from "@/hooks/tauri/useCharacterSkills";
-import type { CharacterSkillQueue } from "@/types/tauri";
+import { getSkillQueueForCharacter } from "@/generated/commands";
+import type { CharacterSkillQueue } from "@/generated/types";
 import { CharacterCard } from "./CharacterCard";
 import { SkillQueue } from "./SkillQueue";
 import { Skills } from "./Skills";
@@ -20,8 +21,7 @@ export function CharactersTab() {
       characters.map((character) => ({
         queryKey: ["skillQueue", character.character_id] as const,
         queryFn: async (): Promise<CharacterSkillQueue> => {
-          const { invoke } = await import("@tauri-apps/api/core");
-          return await invoke<CharacterSkillQueue>("get_skill_queue_for_character", {
+          return await getSkillQueueForCharacter({
             characterId: character.character_id,
           });
         },

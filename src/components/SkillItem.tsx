@@ -3,7 +3,7 @@ import {
   ItemContent,
   ItemTitle,
 } from "@/components/ui/item";
-import type { CharacterSkill } from "@/types/tauri";
+import type { CharacterSkill } from "@/generated/types";
 import { cn } from "@/lib/utils";
 
 interface SkillItemProps {

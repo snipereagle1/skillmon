@@ -34,7 +34,7 @@ impl From<db::Character> for Character {
 }
 
 #[derive(Debug, Clone, Serialize)]
-pub struct RateLimitInfo {
+pub struct RateLimitResponse {
     pub group: String,
     pub limit: i32,
     pub remaining: i32,
@@ -42,9 +42,9 @@ pub struct RateLimitInfo {
     pub updated_at: String,
 }
 
-impl From<&esi::RateLimitInfo> for RateLimitInfo {
+impl From<&esi::RateLimitInfo> for RateLimitResponse {
     fn from(r: &esi::RateLimitInfo) -> Self {
-        RateLimitInfo {
+        RateLimitResponse {
             group: r.group.clone(),
             limit: r.limit,
             remaining: r.remaining,
@@ -1720,7 +1720,7 @@ async fn get_type_names(
 #[derive(Debug, Clone, Serialize)]
 pub struct CharacterRateLimits {
     pub character_id: i64,
-    pub limits: Vec<RateLimitInfo>,
+    pub limits: Vec<RateLimitResponse>,
 }
 
 #[tauri::command]
@@ -1732,7 +1732,7 @@ async fn get_rate_limits(
         .iter()
         .map(|(character_id, limits_map)| CharacterRateLimits {
             character_id: *character_id,
-            limits: limits_map.values().map(RateLimitInfo::from).collect(),
+            limits: limits_map.values().map(RateLimitResponse::from).collect(),
         })
         .collect())
 }

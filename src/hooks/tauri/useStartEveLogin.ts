@@ -1,10 +1,10 @@
 import { useMutation } from "@tanstack/react-query";
-import { invoke } from "@tauri-apps/api/core";
+import { startEveLogin } from "@/generated/commands";
 
 export function useStartEveLogin() {
   return useMutation({
     mutationFn: async () => {
-      return await invoke<string>("start_eve_login");
+      return await startEveLogin();
     },
   });
 }

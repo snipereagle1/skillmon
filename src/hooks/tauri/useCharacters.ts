@@ -1,12 +1,12 @@
 import { useQuery } from "@tanstack/react-query";
-import { invoke } from "@tauri-apps/api/core";
-import type { Character } from "@/types/tauri";
+import { getCharacters } from "@/generated/commands";
+import type { Character } from "@/generated/types";
 
 export function useCharacters() {
   return useQuery<Character[]>({
     queryKey: ["characters"],
     queryFn: async () => {
-      return await invoke<Character[]>("get_characters");
+      return await getCharacters();
     },
   });
 }

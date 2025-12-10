@@ -1,6 +1,6 @@
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import type { Character, SkillQueueItem } from "@/types/tauri";
+import type { Character, SkillQueueItem } from "@/generated/types";
 import { isAfter, isBefore, isEqual } from "date-fns";
 
 interface CharacterCardProps {

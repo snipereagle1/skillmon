@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { invoke } from "@tauri-apps/api/core";
-import type { CharacterAttributesBreakdown } from "@/types/tauri";
+import { getCharacterAttributesBreakdown } from "@/generated/commands";
+import type { CharacterAttributesBreakdown } from "@/generated/types";
 
 export function useAttributes(characterId: number | null) {
   return useQuery<CharacterAttributesBreakdown>({
@@ -9,10 +9,7 @@ export function useAttributes(characterId: number | null) {
       if (characterId === null) {
         throw new Error("Character ID is required");
       }
-      return await invoke<CharacterAttributesBreakdown>(
-        "get_character_attributes_breakdown",
-        { characterId }
-      );
+      return await getCharacterAttributesBreakdown({ characterId });
     },
     enabled: characterId !== null,
   });

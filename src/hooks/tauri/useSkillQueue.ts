@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
-import { invoke } from "@tauri-apps/api/core";
-import type { CharacterSkillQueue } from "@/types/tauri";
+import { getSkillQueueForCharacter } from "@/generated/commands";
+import type { CharacterSkillQueue } from "@/generated/types";
 
 export function useSkillQueue(
   characterId: number | null,
@@ -12,7 +12,7 @@ export function useSkillQueue(
       if (characterId === null) {
         throw new Error("Character ID is required");
       }
-      return await invoke<CharacterSkillQueue>("get_skill_queue_for_character", { characterId });
+      return await getSkillQueueForCharacter({ characterId });
     },
     enabled: characterId !== null,
     refetchInterval: options?.refetchInterval,
