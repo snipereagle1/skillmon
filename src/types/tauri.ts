@@ -33,6 +33,7 @@ export interface CharacterSkillQueue {
   character_name: string;
   skill_queue: SkillQueueItem[];
   attributes?: CharacterAttributes | null;
+  unallocated_sp: number;
 }
 
 export interface CharacterSkill {
