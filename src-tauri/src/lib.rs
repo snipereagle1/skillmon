@@ -1,5 +1,8 @@
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    atomic::{AtomicU8, Ordering},
+    Arc, Mutex,
+};
 
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -15,6 +18,7 @@ mod esi;
 mod sde;
 
 type AuthStateMap = Mutex<HashMap<String, auth::AuthState>>;
+type StartupState = Arc<AtomicU8>; // 0 = complete, 1 = in progress
 
 #[derive(Debug, Clone, Serialize)]
 pub struct Character {
@@ -96,6 +100,11 @@ async fn start_eve_login(
             auth_url, e
         )),
     }
+}
+
+#[tauri::command]
+async fn is_startup_complete(startup_state: State<'_, StartupState>) -> Result<bool, String> {
+    Ok(startup_state.load(Ordering::SeqCst) == 0)
 }
 
 #[tauri::command]
@@ -2132,22 +2141,28 @@ pub fn run() {
                     HashMap<String, esi::RateLimitInfo>,
                 >::new())));
 
-                // Kick off background SDE import/refresh
+                // Initialize startup state: 1 = in progress, 0 = complete
+                let startup_state: StartupState = Arc::new(AtomicU8::new(1));
+                app.manage(startup_state.clone());
+
+                // Startup routine: sequential and declarative
                 let pool = app.state::<db::Pool>().inner().clone();
-                let app_handle_for_sde = app.handle().clone();
+                let rate_limits = app.state::<esi::RateLimitStore>().inner().clone();
+                let app_handle = app.handle().clone();
+                let startup_state_clone = startup_state.clone();
                 tauri::async_runtime::spawn(async move {
-                    match sde::ensure_latest(&app_handle_for_sde, &pool).await {
+                    // Step 1: Check for SDE updates and import if needed
+                    match sde::ensure_latest(&app_handle, &pool).await {
                         Ok(_) => eprintln!("SDE import completed successfully"),
                         Err(err) => eprintln!("SDE import failed: {:#}", err),
                     }
-                });
 
-                // Refresh all skill queues on startup
-                let pool_for_refresh = app.state::<db::Pool>().inner().clone();
-                let rate_limits_for_refresh = app.state::<esi::RateLimitStore>().inner().clone();
-                tauri::async_runtime::spawn(async move {
-                    tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                    refresh_all_skill_queues(&pool_for_refresh, &rate_limits_for_refresh).await;
+                    // Step 2: Refresh all character data from ESI
+                    refresh_all_skill_queues(&pool, &rate_limits).await;
+
+                    // Mark startup as complete and notify frontend
+                    startup_state_clone.store(0, Ordering::SeqCst);
+                    let _ = app_handle.emit("startup-complete", ());
                 });
 
                 // Start HTTP callback server for dev mode (if using HTTP callback)
@@ -2218,6 +2233,7 @@ pub fn run() {
         .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
             start_eve_login,
+            is_startup_complete,
             get_characters,
             logout_character,
             get_skill_queues,
