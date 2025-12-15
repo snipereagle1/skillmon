@@ -5,7 +5,7 @@ use std::sync::{
 };
 
 use anyhow::{Context, Result};
-use chrono::Utc;
+use chrono::{NaiveDateTime, Utc};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use serde::Serialize;
 use sqlx::{QueryBuilder, Row, Sqlite};
@@ -235,6 +235,15 @@ pub struct NotificationResponse {
 
 impl From<db::Notification> for NotificationResponse {
     fn from(n: db::Notification) -> Self {
+        let created_at = if let Ok(naive_dt) =
+            NaiveDateTime::parse_from_str(&n.created_at, "%Y-%m-%d %H:%M:%S")
+        {
+            let utc_dt = naive_dt.and_utc();
+            utc_dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, true)
+        } else {
+            n.created_at
+        };
+
         NotificationResponse {
             id: n.id,
             character_id: n.character_id,
@@ -242,7 +251,7 @@ impl From<db::Notification> for NotificationResponse {
             title: n.title,
             message: n.message,
             status: n.status,
-            created_at: n.created_at,
+            created_at,
         }
     }
 }
