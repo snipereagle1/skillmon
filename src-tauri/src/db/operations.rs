@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use anyhow::Result;
 use serde::Serialize;
-use sqlx::{FromRow, Row};
+use sqlx::{sqlite::SqliteRow, FromRow, Row};
 
 use super::Pool;
 
@@ -725,13 +725,25 @@ pub async fn get_implant_attribute_bonuses(
     Ok(result)
 }
 
-#[derive(Debug, Clone, Serialize, FromRow)]
+#[derive(Debug, Clone, Serialize)]
 pub struct NotificationSetting {
     pub id: i64,
     pub character_id: i64,
     pub notification_type: String,
     pub enabled: bool,
     pub config: Option<String>,
+}
+
+impl<'r> FromRow<'r, SqliteRow> for NotificationSetting {
+    fn from_row(row: &'r SqliteRow) -> Result<Self, sqlx::Error> {
+        Ok(NotificationSetting {
+            id: row.get("id"),
+            character_id: row.get("character_id"),
+            notification_type: row.get("notification_type"),
+            enabled: row.get::<i64, _>("enabled") != 0,
+            config: row.get("config"),
+        })
+    }
 }
 
 #[derive(Debug, Clone, Serialize, FromRow)]
@@ -749,25 +761,14 @@ pub async fn get_notification_settings(
     pool: &Pool,
     character_id: i64,
 ) -> Result<Vec<NotificationSetting>> {
-    let settings = sqlx::query_as::<_, (i64, i64, String, i64, Option<String>)>(
+    let settings = sqlx::query_as::<_, NotificationSetting>(
         "SELECT id, character_id, notification_type, enabled, config FROM notification_settings WHERE character_id = ?",
     )
     .bind(character_id)
     .fetch_all(pool)
     .await?;
 
-    Ok(settings
-        .into_iter()
-        .map(|(id, character_id, notification_type, enabled, config)| {
-            NotificationSetting {
-                id,
-                character_id,
-                notification_type,
-                enabled: enabled != 0,
-                config,
-            }
-        })
-        .collect())
+    Ok(settings)
 }
 
 pub async fn get_notification_setting(
@@ -775,7 +776,7 @@ pub async fn get_notification_setting(
     character_id: i64,
     notification_type: &str,
 ) -> Result<Option<NotificationSetting>> {
-    let setting = sqlx::query_as::<_, (i64, i64, String, i64, Option<String>)>(
+    let setting = sqlx::query_as::<_, NotificationSetting>(
         "SELECT id, character_id, notification_type, enabled, config FROM notification_settings WHERE character_id = ? AND notification_type = ?",
     )
     .bind(character_id)
@@ -783,15 +784,7 @@ pub async fn get_notification_setting(
     .fetch_optional(pool)
     .await?;
 
-    Ok(setting.map(|(id, character_id, notification_type, enabled, config)| {
-        NotificationSetting {
-            id,
-            character_id,
-            notification_type,
-            enabled: enabled != 0,
-            config,
-        }
-    }))
+    Ok(setting)
 }
 
 pub async fn upsert_notification_setting(
@@ -823,52 +816,29 @@ pub async fn get_notifications(
     character_id: Option<i64>,
     status: Option<&str>,
 ) -> Result<Vec<Notification>> {
-    let notifications = if let Some(cid) = character_id {
-        if let Some(s) = status {
-            sqlx::query_as::<_, (i64, i64, String, String, String, String, String)>(
-                "SELECT id, character_id, notification_type, title, message, status, created_at FROM notifications WHERE character_id = ? AND status = ? ORDER BY created_at DESC",
-            )
-            .bind(cid)
-            .bind(s)
-            .fetch_all(pool)
-            .await?
-        } else {
-            sqlx::query_as::<_, (i64, i64, String, String, String, String, String)>(
-                "SELECT id, character_id, notification_type, title, message, status, created_at FROM notifications WHERE character_id = ? ORDER BY created_at DESC",
-            )
-            .bind(cid)
-            .fetch_all(pool)
-            .await?
-        }
-    } else if let Some(s) = status {
-        sqlx::query_as::<_, (i64, i64, String, String, String, String, String)>(
-            "SELECT id, character_id, notification_type, title, message, status, created_at FROM notifications WHERE status = ? ORDER BY created_at DESC",
-        )
-        .bind(s)
-        .fetch_all(pool)
-        .await?
-    } else {
-        sqlx::query_as::<_, (i64, i64, String, String, String, String, String)>(
-            "SELECT id, character_id, notification_type, title, message, status, created_at FROM notifications ORDER BY created_at DESC",
-        )
-        .fetch_all(pool)
-        .await?
-    };
+    let mut query_builder: sqlx::QueryBuilder<sqlx::Sqlite> = sqlx::QueryBuilder::new(
+        "SELECT id, character_id, notification_type, title, message, status, created_at FROM notifications",
+    );
 
-    Ok(notifications
-        .into_iter()
-        .map(|(id, character_id, notification_type, title, message, status, created_at)| {
-            Notification {
-                id,
-                character_id,
-                notification_type,
-                title,
-                message,
-                status,
-                created_at,
-            }
-        })
-        .collect())
+    if character_id.is_some() || status.is_some() {
+        query_builder.push(" WHERE ");
+        let mut separated = query_builder.separated(" AND ");
+        if let Some(cid) = character_id {
+            separated.push("character_id = ");
+            separated.push_bind(cid);
+        }
+        if let Some(s) = status {
+            separated.push("status = ");
+            separated.push_bind(s);
+        }
+    }
+
+    query_builder.push(" ORDER BY created_at DESC");
+
+    let query = query_builder.build_query_as::<Notification>();
+    let notifications = query.fetch_all(pool).await?;
+
+    Ok(notifications)
 }
 
 pub async fn create_notification(
