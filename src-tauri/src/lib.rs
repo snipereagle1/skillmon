@@ -20,6 +20,7 @@ mod sde;
 type AuthStateMap = Mutex<HashMap<String, auth::AuthState>>;
 type StartupState = Arc<AtomicU8>; // 0 = complete, 1 = in progress
 
+// Must match NOTIFICATION_TYPES.SKILL_QUEUE_LOW in src/lib/notificationTypes.ts
 pub const NOTIFICATION_TYPE_SKILL_QUEUE_LOW: &str = "skill_queue_low";
 
 #[derive(Debug, Clone, Serialize)]
@@ -649,10 +650,14 @@ async fn check_skill_queue_notifications(
         };
 
         let total_hours = calculate_total_queue_hours(skill_queue);
+        // Note: Empty skill queues return 0.0 hours, which will trigger a notification
+        // if threshold > 0 (desired behavior - user should be notified when queue is empty)
         let has_active =
             db::has_active_notification(pool, character_id, NOTIFICATION_TYPE_SKILL_QUEUE_LOW)
                 .await?;
 
+        // Note: Using < (not <=) means exact threshold matches don't trigger notifications.
+        // This is intentional - only notify when queue is below the threshold, not at or above it.
         if total_hours < threshold_hours {
             // Queue is below threshold, create notification if one doesn't exist
             if !has_active {
@@ -1060,14 +1065,19 @@ async fn build_character_skill_queue(
     };
 
     // Check for notifications
-    check_skill_queue_notifications(
+    if let Err(e) = check_skill_queue_notifications(
         pool,
         character_id,
         &updated_character.character_name,
         &skill_queue,
     )
     .await
-    .ok();
+    {
+        eprintln!(
+            "Failed to check skill queue notifications for character {}: {}",
+            character_id, e
+        );
+    }
 
     Ok(Some(queue_result))
 }
