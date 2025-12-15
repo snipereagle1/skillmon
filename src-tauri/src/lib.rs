@@ -629,7 +629,6 @@ fn calculate_total_queue_hours(skill_queue: &[SkillQueueItem]) -> f64 {
 async fn check_skill_queue_notifications(
     pool: &db::Pool,
     character_id: i64,
-    character_name: &str,
     skill_queue: &[SkillQueueItem],
 ) -> Result<()> {
     let setting =
@@ -694,7 +693,7 @@ async fn check_skill_queue_notifications(
                     pool,
                     character_id,
                     NOTIFICATION_TYPE_SKILL_QUEUE_LOW,
-                    &format!("{} - Skill Queue Low", character_name),
+                    "Skill Queue Low",
                     &format!(
                         "Skill queue has {} remaining (below {} hour threshold)",
                         hours_str, threshold_hours
@@ -1089,14 +1088,7 @@ async fn build_character_skill_queue(
     };
 
     // Check for notifications
-    if let Err(e) = check_skill_queue_notifications(
-        pool,
-        character_id,
-        &updated_character.character_name,
-        &skill_queue,
-    )
-    .await
-    {
+    if let Err(e) = check_skill_queue_notifications(pool, character_id, &skill_queue).await {
         eprintln!(
             "Failed to check skill queue notifications for character {}: {}",
             character_id, e
