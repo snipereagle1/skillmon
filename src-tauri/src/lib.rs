@@ -20,6 +20,8 @@ mod sde;
 type AuthStateMap = Mutex<HashMap<String, auth::AuthState>>;
 type StartupState = Arc<AtomicU8>; // 0 = complete, 1 = in progress
 
+pub const NOTIFICATION_TYPE_SKILL_QUEUE_LOW: &str = "skill_queue_low";
+
 #[derive(Debug, Clone, Serialize)]
 pub struct Character {
     pub character_id: i64,
@@ -217,6 +219,52 @@ pub struct CharacterSkillsResponse {
     pub character_id: i64,
     pub skills: Vec<CharacterSkillResponse>,
     pub groups: Vec<SkillGroupResponse>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct NotificationResponse {
+    pub id: i64,
+    pub character_id: i64,
+    pub notification_type: String,
+    pub title: String,
+    pub message: String,
+    pub status: String,
+    pub created_at: String,
+}
+
+impl From<db::Notification> for NotificationResponse {
+    fn from(n: db::Notification) -> Self {
+        NotificationResponse {
+            id: n.id,
+            character_id: n.character_id,
+            notification_type: n.notification_type,
+            title: n.title,
+            message: n.message,
+            status: n.status,
+            created_at: n.created_at,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct NotificationSettingResponse {
+    pub id: i64,
+    pub character_id: i64,
+    pub notification_type: String,
+    pub enabled: bool,
+    pub config: Option<serde_json::Value>,
+}
+
+impl From<db::NotificationSetting> for NotificationSettingResponse {
+    fn from(s: db::NotificationSetting) -> Self {
+        NotificationSettingResponse {
+            id: s.id,
+            character_id: s.character_id,
+            notification_type: s.notification_type,
+            enabled: s.enabled,
+            config: s.config.and_then(|c| serde_json::from_str(&c).ok()),
+        }
+    }
 }
 
 fn create_authenticated_client(access_token: &str) -> Result<reqwest::Client> {
@@ -545,6 +593,96 @@ fn calculate_sp_for_level(rank: i64, level: i32) -> i64 {
     let exponent = 2.5 * (level as f64 - 1.0);
     let sp = base.powf(exponent) * 250.0 * rank as f64;
     sp as i64
+}
+
+fn calculate_total_queue_hours(skill_queue: &[SkillQueueItem]) -> f64 {
+    let mut total_hours = 0.0;
+    for skill in skill_queue {
+        if let Some(sp_per_min) = skill.sp_per_minute {
+            if sp_per_min > 0.0 {
+                if let (Some(level_start), Some(level_end)) =
+                    (skill.level_start_sp, skill.level_end_sp)
+                {
+                    let current_sp = skill.current_sp.unwrap_or(level_start);
+                    let remaining_sp = level_end - current_sp;
+                    if remaining_sp > 0 {
+                        let sp_per_hour = sp_per_min * 60.0;
+                        total_hours += remaining_sp as f64 / sp_per_hour;
+                    }
+                }
+            }
+        }
+    }
+    total_hours
+}
+
+async fn check_skill_queue_notifications(
+    pool: &db::Pool,
+    character_id: i64,
+    character_name: &str,
+    skill_queue: &[SkillQueueItem],
+) -> Result<()> {
+    let setting =
+        db::get_notification_setting(pool, character_id, NOTIFICATION_TYPE_SKILL_QUEUE_LOW).await?;
+
+    if let Some(setting) = setting {
+        if !setting.enabled {
+            // Notification disabled, clear any existing active notifications
+            db::clear_notification(pool, character_id, NOTIFICATION_TYPE_SKILL_QUEUE_LOW)
+                .await
+                .ok();
+            return Ok(());
+        }
+
+        // Parse config to get threshold
+        let threshold_hours: f64 = if let Some(config_str) = &setting.config {
+            if let Ok(config) = serde_json::from_str::<serde_json::Value>(config_str) {
+                config
+                    .get("threshold_hours")
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(24.0)
+            } else {
+                24.0
+            }
+        } else {
+            24.0
+        };
+
+        let total_hours = calculate_total_queue_hours(skill_queue);
+        let has_active =
+            db::has_active_notification(pool, character_id, NOTIFICATION_TYPE_SKILL_QUEUE_LOW)
+                .await?;
+
+        if total_hours < threshold_hours {
+            // Queue is below threshold, create notification if one doesn't exist
+            if !has_active {
+                let hours_str = if total_hours < 1.0 {
+                    format!("{:.1} hours", total_hours)
+                } else {
+                    format!("{:.0} hours", total_hours)
+                };
+                db::create_notification(
+                    pool,
+                    character_id,
+                    NOTIFICATION_TYPE_SKILL_QUEUE_LOW,
+                    &format!("{} - Skill Queue Low", character_name),
+                    &format!(
+                        "Skill queue has {} remaining (below {} hour threshold)",
+                        hours_str, threshold_hours
+                    ),
+                )
+                .await?;
+            }
+        } else {
+            // Queue is above threshold, clear notification if it exists
+            if has_active {
+                db::clear_notification(pool, character_id, NOTIFICATION_TYPE_SKILL_QUEUE_LOW)
+                    .await?;
+            }
+        }
+    }
+
+    Ok(())
 }
 
 async fn refresh_all_skill_queues(pool: &db::Pool, rate_limits: &esi::RateLimitStore) {
@@ -913,13 +1051,25 @@ async fn build_character_skill_queue(
         }
     }
 
-    Ok(Some(CharacterSkillQueue {
+    let queue_result = CharacterSkillQueue {
         character_id: updated_character.character_id,
-        character_name: updated_character.character_name,
-        skill_queue,
+        character_name: updated_character.character_name.clone(),
+        skill_queue: skill_queue.clone(),
         attributes: character_attributes,
         unallocated_sp: updated_character.unallocated_sp,
-    }))
+    };
+
+    // Check for notifications
+    check_skill_queue_notifications(
+        pool,
+        character_id,
+        &updated_character.character_name,
+        &skill_queue,
+    )
+    .await
+    .ok();
+
+    Ok(Some(queue_result))
 }
 
 #[tauri::command]
@@ -1895,6 +2045,76 @@ async fn get_character_attributes_breakdown(
 }
 
 #[tauri::command]
+async fn get_notifications(
+    pool: State<'_, db::Pool>,
+    character_id: Option<i64>,
+    status: Option<String>,
+) -> Result<Vec<NotificationResponse>, String> {
+    let notifications = db::get_notifications(&*pool, character_id, status.as_deref())
+        .await
+        .map_err(|e| format!("Failed to get notifications: {}", e))?;
+
+    Ok(notifications
+        .into_iter()
+        .map(NotificationResponse::from)
+        .collect())
+}
+
+#[tauri::command]
+async fn dismiss_notification(
+    pool: State<'_, db::Pool>,
+    notification_id: i64,
+) -> Result<(), String> {
+    db::dismiss_notification(&*pool, notification_id)
+        .await
+        .map_err(|e| format!("Failed to dismiss notification: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+async fn get_notification_settings(
+    pool: State<'_, db::Pool>,
+    character_id: i64,
+) -> Result<Vec<NotificationSettingResponse>, String> {
+    let settings = db::get_notification_settings(&*pool, character_id)
+        .await
+        .map_err(|e| format!("Failed to get notification settings: {}", e))?;
+
+    Ok(settings
+        .into_iter()
+        .map(NotificationSettingResponse::from)
+        .collect())
+}
+
+#[tauri::command]
+async fn upsert_notification_setting(
+    pool: State<'_, db::Pool>,
+    character_id: i64,
+    notification_type: String,
+    enabled: bool,
+    config: Option<serde_json::Value>,
+) -> Result<(), String> {
+    let config_str = config
+        .as_ref()
+        .map(|c| serde_json::to_string(c))
+        .transpose()
+        .map_err(|e| format!("Failed to serialize config: {}", e))?;
+
+    db::upsert_notification_setting(
+        &*pool,
+        character_id,
+        &notification_type,
+        enabled,
+        config_str.as_deref(),
+    )
+    .await
+    .map_err(|e| format!("Failed to upsert notification setting: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
 async fn get_character_skills_with_groups(
     pool: State<'_, db::Pool>,
     rate_limits: State<'_, esi::RateLimitStore>,
@@ -2245,7 +2465,11 @@ pub fn run() {
             update_clone_name,
             get_type_names,
             get_character_attributes_breakdown,
-            get_rate_limits
+            get_rate_limits,
+            get_notifications,
+            dismiss_notification,
+            get_notification_settings,
+            upsert_notification_setting
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

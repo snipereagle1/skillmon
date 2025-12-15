@@ -9,6 +9,7 @@ import { SkillQueue } from "./SkillQueue";
 import { Skills } from "./Skills";
 import { Clones } from "./Clones";
 import { Attributes } from "./Attributes";
+import { NotificationSettings } from "./NotificationSettings";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export function CharactersTab() {
@@ -114,6 +115,7 @@ export function CharactersTab() {
                 <TabsTrigger value="skills">Skills</TabsTrigger>
                 <TabsTrigger value="clones">Clones</TabsTrigger>
                 <TabsTrigger value="attributes">Attributes</TabsTrigger>
+                <TabsTrigger value="settings">Settings</TabsTrigger>
               </TabsList>
               {totalSkillpoints !== null && (
                 <span className="text-sm text-muted-foreground">
@@ -132,6 +134,9 @@ export function CharactersTab() {
             </TabsContent>
             <TabsContent value="attributes" className="flex-1 overflow-hidden m-0">
               <Attributes characterId={selectedCharacterId} />
+            </TabsContent>
+            <TabsContent value="settings" className="flex-1 overflow-auto m-0">
+              <NotificationSettings characterId={selectedCharacterId} />
             </TabsContent>
           </Tabs>
         ) : (

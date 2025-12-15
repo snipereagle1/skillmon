@@ -3,9 +3,12 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { AddCharacterDialog } from "./AddCharacterDialog";
 import { CharactersTab } from "./CharactersTab";
+import { NotificationBell } from "./NotificationBell";
+import { NotificationDrawer } from "./NotificationDrawer";
 
 export function TabLayout() {
   const [addCharacterOpen, setAddCharacterOpen] = useState(false);
+  const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
 
   return (
     <div className="flex flex-col h-screen">
@@ -15,9 +18,12 @@ export function TabLayout() {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="characters">Characters</TabsTrigger>
           </TabsList>
-          <Button onClick={() => setAddCharacterOpen(true)}>
-            Add Character
-          </Button>
+          <div className="flex items-center gap-2">
+            <NotificationBell onOpen={() => setNotificationDrawerOpen(true)} />
+            <Button onClick={() => setAddCharacterOpen(true)}>
+              Add Character
+            </Button>
+          </div>
         </div>
         <TabsContent value="overview" className="flex-1 overflow-auto p-4">
           <div className="flex items-center justify-center h-full">
@@ -31,6 +37,10 @@ export function TabLayout() {
       <AddCharacterDialog
         open={addCharacterOpen}
         onOpenChange={setAddCharacterOpen}
+      />
+      <NotificationDrawer
+        open={notificationDrawerOpen}
+        onOpenChange={setNotificationDrawerOpen}
       />
     </div>
   );
