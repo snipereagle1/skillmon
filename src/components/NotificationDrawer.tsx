@@ -7,6 +7,13 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { useNotifications } from "@/hooks/tauri/useNotifications";
 import { useDismissNotification } from "@/hooks/tauri/useDismissNotification";
 import { useCharacters } from "@/hooks/tauri/useCharacters";
@@ -28,24 +35,28 @@ function CharacterFilter({
 }) {
   const { data: characters = [] } = useCharacters();
 
+  const value = selectedCharacterId?.toString() ?? "all";
+
   return (
     <div className="px-4 pb-2">
-      <select
-        value={selectedCharacterId ?? ""}
-        onChange={(e) =>
-          onCharacterChange(
-            e.target.value === "" ? null : parseInt(e.target.value, 10)
-          )
+      <Select
+        value={value}
+        onValueChange={(newValue) =>
+          onCharacterChange(newValue === "all" ? null : parseInt(newValue, 10))
         }
-        className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <option value="">All Characters</option>
-        {characters.map((char) => (
-          <option key={char.character_id} value={char.character_id}>
-            {char.character_name}
-          </option>
-        ))}
-      </select>
+        <SelectTrigger className="w-full">
+          <SelectValue placeholder="All Characters" />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="all">All Characters</SelectItem>
+          {characters.map((char) => (
+            <SelectItem key={char.character_id} value={char.character_id.toString()}>
+              {char.character_name}
+            </SelectItem>
+          ))}
+        </SelectContent>
+      </Select>
     </div>
   );
 }
