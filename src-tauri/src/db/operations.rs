@@ -820,17 +820,26 @@ pub async fn get_notifications(
         "SELECT id, character_id, notification_type, title, message, status, created_at FROM notifications",
     );
 
-    if character_id.is_some() || status.is_some() {
-        query_builder.push(" WHERE ");
-        let mut separated = query_builder.separated(" AND ");
-        if let Some(cid) = character_id {
-            separated.push("character_id = ");
-            separated.push_bind(cid);
+    let mut has_where = false;
+    if let Some(cid) = character_id {
+        if !has_where {
+            query_builder.push(" WHERE ");
+            has_where = true;
+        } else {
+            query_builder.push(" AND ");
         }
-        if let Some(s) = status {
-            separated.push("status = ");
-            separated.push_bind(s);
+        query_builder.push("character_id = ");
+        query_builder.push_bind(cid);
+    }
+    if let Some(s) = status {
+        if !has_where {
+            query_builder.push(" WHERE ");
+            has_where = true;
+        } else {
+            query_builder.push(" AND ");
         }
+        query_builder.push("status = ");
+        query_builder.push_bind(s);
     }
 
     query_builder.push(" ORDER BY created_at DESC");

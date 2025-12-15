@@ -652,9 +652,24 @@ async fn check_skill_queue_notifications(
         let total_hours = calculate_total_queue_hours(skill_queue);
         // Note: Empty skill queues return 0.0 hours, which will trigger a notification
         // if threshold > 0 (desired behavior - user should be notified when queue is empty)
-        let has_active =
-            db::has_active_notification(pool, character_id, NOTIFICATION_TYPE_SKILL_QUEUE_LOW)
-                .await?;
+
+        // Get actual notification count to check if one exists
+        // Use get_notifications and filter to ensure we're checking the same data
+        let all_notifications = db::get_notifications(pool, Some(character_id), None)
+            .await
+            .ok();
+        let active_count = all_notifications
+            .as_ref()
+            .map(|n| {
+                n.iter()
+                    .filter(|notif| {
+                        notif.notification_type == NOTIFICATION_TYPE_SKILL_QUEUE_LOW
+                            && notif.status == "active"
+                    })
+                    .count()
+            })
+            .unwrap_or(0);
+        let has_active = active_count > 0;
 
         // Note: Using < (not <=) means exact threshold matches don't trigger notifications.
         // This is intentional - only notify when queue is below the threshold, not at or above it.
