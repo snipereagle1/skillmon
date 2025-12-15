@@ -1,5 +1,8 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { getNotificationSettings, upsertNotificationSetting } from "@/generated/commands";
+import {
+  getNotificationSettings,
+  upsertNotificationSetting,
+} from "@/generated/commands";
 import type { NotificationSettingResponse } from "@/generated/types";
 
 export function useNotificationSettings(characterId: number | null) {
@@ -23,13 +26,16 @@ export function useUpdateNotificationSetting() {
       characterId: number;
       notificationType: string;
       enabled: boolean;
-      config?: Record<string, unknown>;
+      config?: Record<string, unknown> | null;
     }) => {
+      const serializedConfig =
+        params.config != null ? JSON.stringify(params.config) : undefined;
+
       return await upsertNotificationSetting({
         characterId: params.characterId,
         notificationType: params.notificationType,
         enabled: params.enabled,
-        config: params.config ?? undefined,
+        config: serializedConfig,
       });
     },
     onSuccess: (_, variables) => {
@@ -39,5 +45,3 @@ export function useUpdateNotificationSetting() {
     },
   });
 }
-
-
