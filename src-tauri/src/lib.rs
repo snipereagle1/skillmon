@@ -262,7 +262,7 @@ pub struct NotificationSettingResponse {
     pub character_id: i64,
     pub notification_type: String,
     pub enabled: bool,
-    pub config: Option<serde_json::Value>,
+    pub config: Option<String>,
 }
 
 impl From<db::NotificationSetting> for NotificationSettingResponse {
@@ -272,7 +272,7 @@ impl From<db::NotificationSetting> for NotificationSettingResponse {
             character_id: s.character_id,
             notification_type: s.notification_type,
             enabled: s.enabled,
-            config: s.config.and_then(|c| serde_json::from_str(&c).ok()),
+            config: s.config,
         }
     }
 }
@@ -2119,9 +2119,15 @@ async fn upsert_notification_setting(
     character_id: i64,
     notification_type: String,
     enabled: bool,
-    config: Option<serde_json::Value>,
+    config: Option<String>,
 ) -> Result<(), String> {
-    let config_str = config
+    let config_value = config
+        .as_ref()
+        .map(|c| serde_json::from_str::<serde_json::Value>(c))
+        .transpose()
+        .map_err(|e| format!("Invalid config JSON: {}", e))?;
+
+    let config_str = config_value
         .as_ref()
         .map(|c| serde_json::to_string(c))
         .transpose()

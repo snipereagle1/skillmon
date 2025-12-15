@@ -20,26 +20,29 @@ export function NotificationSettings({ characterId }: NotificationSettingsProps)
     (s) => s.notification_type === NOTIFICATION_TYPES.SKILL_QUEUE_LOW
   );
 
+  const getThresholdFromConfig = (configString?: string | null) => {
+    if (!configString) return 24;
+    try {
+      const parsed = JSON.parse(configString) as { threshold_hours?: unknown };
+      return typeof parsed.threshold_hours === "number"
+        ? parsed.threshold_hours
+        : 24;
+    } catch {
+      return 24;
+    }
+  };
+
   const [enabled, setEnabled] = useState(
     skillQueueLowSetting?.enabled ?? false
   );
   const [thresholdHours, setThresholdHours] = useState(() => {
-    if (skillQueueLowSetting?.config) {
-      const config = skillQueueLowSetting.config as { threshold_hours?: number };
-      return config.threshold_hours ?? 24;
-    }
-    return 24;
+    return getThresholdFromConfig(skillQueueLowSetting?.config);
   });
 
   useEffect(() => {
     if (skillQueueLowSetting) {
       setEnabled(skillQueueLowSetting.enabled);
-      if (skillQueueLowSetting.config) {
-        const config = skillQueueLowSetting.config as {
-          threshold_hours?: number;
-        };
-        setThresholdHours(config.threshold_hours ?? 24);
-      }
+      setThresholdHours(getThresholdFromConfig(skillQueueLowSetting.config));
     } else {
       setEnabled(false);
       setThresholdHours(24);

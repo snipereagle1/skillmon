@@ -1,5 +1,5 @@
 use std::env;
-use tauri_typegen::{GenerateConfig, generate_from_config};
+use tauri_typegen::{generate_from_config, GenerateConfig};
 
 fn main() {
     // Generate TypeScript bindings before build
@@ -10,7 +10,11 @@ fn main() {
 
     let config = GenerateConfig {
         project_path: manifest_dir.clone(),
-        output_path: workspace_root.join("src").join("generated").to_string_lossy().to_string(),
+        output_path: workspace_root
+            .join("src")
+            .join("generated")
+            .to_string_lossy()
+            .to_string(),
         validation_library: "none".to_string(),
         verbose: Some(true),
         exclude_patterns: Some(Vec::new()),
@@ -26,7 +30,9 @@ fn main() {
         }
         Err(e) => {
             eprintln!("Error: Failed to generate TypeScript bindings: {}", e);
-            eprintln!("This is a build error - types must be generated for the frontend to compile.");
+            eprintln!(
+                "This is a build error - types must be generated for the frontend to compile."
+            );
             panic!("TypeScript type generation failed");
         }
     }
