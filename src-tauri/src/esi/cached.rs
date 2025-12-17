@@ -67,8 +67,8 @@ pub async fn fetch_cached<T: serde::de::DeserializeOwned>(
     let cached_entry = cache::get_cached_response(pool, cache_key).await?;
 
     if let Some((cached_body, _)) = &cached_entry {
-        let data: T = serde_json::from_str(cached_body)
-            .context("Failed to deserialize cached response")?;
+        let data: T =
+            serde_json::from_str(cached_body).context("Failed to deserialize cached response")?;
         return Ok(Some(data));
     }
 
@@ -115,14 +115,11 @@ pub async fn fetch_cached<T: serde::de::DeserializeOwned>(
         let etag = cache::extract_etag(&headers);
         let expires_at = cache::extract_expires(&headers);
 
-        cache::set_cached_response(pool, cache_key, etag.as_deref(), expires_at, &body_str)
-            .await?;
+        cache::set_cached_response(pool, cache_key, etag.as_deref(), expires_at, &body_str).await?;
 
-        let data: T = serde_json::from_str(&body_str)
-            .context("Failed to deserialize response")?;
+        let data: T = serde_json::from_str(&body_str).context("Failed to deserialize response")?;
         return Ok(Some(data));
     }
 
     Ok(None)
 }
-

@@ -23,5 +23,3 @@ pub struct JwtPayload {
     #[serde(rename = "exp")]
     pub expires_at: i64,
 }
-
-

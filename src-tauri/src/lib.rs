@@ -29,8 +29,7 @@ pub fn get_eve_client_id() -> Result<String> {
         return Ok(compile_time_id.to_string());
     }
     // Fall back to runtime environment variable (for local development)
-    std::env::var("EVE_CLIENT_ID")
-        .context("EVE_CLIENT_ID environment variable not set")
+    std::env::var("EVE_CLIENT_ID").context("EVE_CLIENT_ID environment variable not set")
 }
 
 // Must match NOTIFICATION_TYPES.SKILL_QUEUE_LOW in src/lib/notificationTypes.ts

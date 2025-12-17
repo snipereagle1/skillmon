@@ -1,13 +1,7 @@
-use axum::{
-    extract::Query,
-    http::StatusCode,
-    response::Html,
-    routing::get,
-    Router,
-};
-use tauri::Emitter;
+use axum::{extract::Query, http::StatusCode, response::Html, routing::get, Router};
 use std::collections::HashMap;
 use std::sync::Arc;
+use tauri::Emitter;
 use tower::ServiceBuilder;
 use tower_http::cors::CorsLayer;
 
@@ -134,4 +128,3 @@ impl CallbackServer {
         Ok(())
     }
 }
-
