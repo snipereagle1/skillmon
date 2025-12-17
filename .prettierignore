@@ -1,0 +1,19 @@
+node_modules
+dist
+dist-ssr
+*.local
+
+# Generated files
+src/generated/**
+src-tauri/src/esi/client.rs
+src-tauri/src/esi/types.rs
+src-tauri/src/esi/openapi.json
+src-tauri/target
+
+# Build artifacts
+*.log
+pnpm-lock.yaml
+
+# SDE data
+sde/*.jsonl
+eve-online-static-data-*.zip
