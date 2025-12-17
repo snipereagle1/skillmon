@@ -76,6 +76,8 @@ jobs:
         run: pnpm typecheck
 
       - name: Build Tauri app
+        env:
+          EVE_CLIENT_ID: ${{ secrets.EVE_CLIENT_ID }}
         run: pnpm tauri build
 
       - name: Upload installer
