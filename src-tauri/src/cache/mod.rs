@@ -8,6 +8,7 @@ use super::db::Pool;
 #[derive(Debug, FromRow)]
 struct CacheEntry {
     etag: Option<String>,
+    #[allow(dead_code)]
     expires_at: i64,
     response_body: String,
 }

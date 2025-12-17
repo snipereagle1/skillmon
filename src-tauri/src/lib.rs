@@ -8,7 +8,6 @@ use anyhow::{Context, Result};
 use chrono::{NaiveDateTime, Utc};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use serde::Serialize;
-use serde_json;
 use sqlx::{QueryBuilder, Row, Sqlite};
 use tauri::{Emitter, Listener, Manager, State};
 
@@ -122,7 +121,7 @@ async fn is_startup_complete(startup_state: State<'_, StartupState>) -> Result<b
 
 #[tauri::command]
 async fn get_characters(pool: State<'_, db::Pool>) -> Result<Vec<Character>, String> {
-    db::get_all_characters(&*pool)
+    db::get_all_characters(&pool)
         .await
         .map(|chars| chars.into_iter().map(Character::from).collect())
         .map_err(|e| format!("Failed to get characters: {}", e))
@@ -136,14 +135,14 @@ async fn logout_character(pool: State<'_, db::Pool>, character_id: i64) -> Resul
         .await
         .map_err(|e| format!("Failed to delete tokens: {}", e))?;
 
-    db::delete_character(&*pool, character_id)
+    db::delete_character(&pool, character_id)
         .await
         .map_err(|e| format!("Failed to delete character: {}", e))
 }
 
 #[tauri::command]
 async fn refresh_sde(app: tauri::AppHandle, pool: State<'_, db::Pool>) -> Result<(), String> {
-    sde::force_refresh(&app, &*pool)
+    sde::force_refresh(&app, &pool)
         .await
         .map_err(|e| format!("Failed to refresh SDE: {}", e))
 }
@@ -605,8 +604,9 @@ fn calculate_sp_per_minute(primary: i64, secondary: i64) -> f64 {
     primary as f64 + (secondary as f64 / 2.0)
 }
 
+#[allow(dead_code)]
 fn calculate_sp_for_level(rank: i64, level: i32) -> i64 {
-    if level < 1 || level > 5 {
+    if !(1..=5).contains(&level) {
         return 0;
     }
     let base: f64 = 2.0;
@@ -1113,7 +1113,7 @@ async fn get_skill_queues(
     pool: State<'_, db::Pool>,
     rate_limits: State<'_, esi::RateLimitStore>,
 ) -> Result<Vec<CharacterSkillQueue>, String> {
-    let characters = db::get_all_characters(&*pool)
+    let characters = db::get_all_characters(&pool)
         .await
         .map_err(|e| format!("Failed to get characters: {}", e))?;
 
@@ -1123,7 +1123,7 @@ async fn get_skill_queues(
 
     for character in characters {
         let access_token =
-            match auth::ensure_valid_access_token(&*pool, character.character_id).await {
+            match auth::ensure_valid_access_token(&pool, character.character_id).await {
                 Ok(token) => token,
                 Err(e) => {
                     eprintln!(
@@ -1138,10 +1138,10 @@ async fn get_skill_queues(
             .map_err(|e| format!("Failed to create client: {}", e))?;
 
         let character_attributes = match get_cached_character_attributes(
-            &*pool,
+            &pool,
             &client,
             character.character_id,
-            &*rate_limits,
+            &rate_limits,
         )
         .await
         {
@@ -1154,7 +1154,7 @@ async fn get_skill_queues(
             }),
             Ok(None) => {
                 if let Ok(Some(cached_attrs)) =
-                    db::get_character_attributes(&*pool, character.character_id).await
+                    db::get_character_attributes(&pool, character.character_id).await
                 {
                     Some(CharacterAttributesResponse {
                         charisma: cached_attrs.charisma,
@@ -1173,7 +1173,7 @@ async fn get_skill_queues(
                     character.character_id, e
                 );
                 if let Ok(Some(cached_attrs)) =
-                    db::get_character_attributes(&*pool, character.character_id).await
+                    db::get_character_attributes(&pool, character.character_id).await
                 {
                     Some(CharacterAttributesResponse {
                         charisma: cached_attrs.charisma,
@@ -1188,11 +1188,11 @@ async fn get_skill_queues(
             }
         };
 
-        get_cached_character_skills(&*pool, &client, character.character_id, &*rate_limits)
+        get_cached_character_skills(&pool, &client, character.character_id, &rate_limits)
             .await
             .ok();
         let mut skill_sp_map: HashMap<i64, i64> = HashMap::new();
-        if let Ok(skills) = db::get_character_skills(&*pool, character.character_id).await {
+        if let Ok(skills) = db::get_character_skills(&pool, character.character_id).await {
             for skill in skills {
                 skill_sp_map.insert(skill.skill_id, skill.skillpoints_in_skill);
             }
@@ -1202,7 +1202,7 @@ async fn get_skill_queues(
         // Re-read character to get updated unallocated_sp value
         let character_id = character.character_id;
         let character_name = character.character_name.clone();
-        let updated_character = db::get_character(&*pool, character_id)
+        let updated_character = db::get_character(&pool, character_id)
             .await
             .ok()
             .flatten()
@@ -1212,7 +1212,7 @@ async fn get_skill_queues(
                 unallocated_sp: 0,
             });
 
-        match get_cached_skill_queue(&*pool, &client, character_id, &*rate_limits).await {
+        match get_cached_skill_queue(&pool, &client, character_id, &rate_limits).await {
             Ok(Some(queue_data)) => {
                 let skill_queue: Vec<SkillQueueItem> = queue_data
                     .into_iter()
@@ -1277,10 +1277,10 @@ async fn get_skill_queues(
         .collect::<std::collections::HashSet<_>>()
         .into_iter()
         .collect();
-    let skill_names = get_skill_names(&*pool, &unique_skill_ids)
+    let skill_names = get_skill_names(&pool, &unique_skill_ids)
         .await
         .map_err(|e| format!("Failed to get skill names: {}", e))?;
-    let skill_attributes = get_skill_attributes(&*pool, &unique_skill_ids)
+    let skill_attributes = get_skill_attributes(&pool, &unique_skill_ids)
         .await
         .map_err(|e| format!("Failed to get skill attributes: {}", e))?;
 
@@ -1289,7 +1289,7 @@ async fn get_skill_queues(
         let mut skill_progress_map: HashMap<i64, i64> = HashMap::new();
         let skill_known_sp = character_skill_sp
             .get(&result.character_id)
-            .map(|m| m.clone())
+            .cloned()
             .unwrap_or_default();
         for skill_item in &mut result.skill_queue {
             if let Some(name) = skill_names.get(&skill_item.skill_id) {
@@ -1458,25 +1458,20 @@ async fn get_skill_queue_for_character(
     rate_limits: State<'_, esi::RateLimitStore>,
     character_id: i64,
 ) -> Result<CharacterSkillQueue, String> {
-    let character = db::get_character(&*pool, character_id)
+    let character = db::get_character(&pool, character_id)
         .await
         .map_err(|e| format!("Failed to get character: {}", e))?
         .ok_or_else(|| format!("Character {} not found", character_id))?;
 
-    build_character_skill_queue(
-        &*pool,
-        &*rate_limits,
-        character_id,
-        &character.character_name,
-    )
-    .await
-    .map_err(|e| format!("Failed to build skill queue: {}", e))?
-    .ok_or_else(|| {
-        format!(
-            "No skill queue data available for character {}",
-            character_id
-        )
-    })
+    build_character_skill_queue(&pool, &rate_limits, character_id, &character.character_name)
+        .await
+        .map_err(|e| format!("Failed to build skill queue: {}", e))?
+        .ok_or_else(|| {
+            format!(
+                "No skill queue data available for character {}",
+                character_id
+            )
+        })
 }
 
 #[tauri::command]
@@ -1485,29 +1480,24 @@ async fn force_refresh_skill_queue(
     rate_limits: State<'_, esi::RateLimitStore>,
     character_id: i64,
 ) -> Result<CharacterSkillQueue, String> {
-    cache::clear_character_cache(&*pool, character_id)
+    cache::clear_character_cache(&pool, character_id)
         .await
         .map_err(|e| format!("Failed to clear cache: {}", e))?;
 
-    let character = db::get_character(&*pool, character_id)
+    let character = db::get_character(&pool, character_id)
         .await
         .map_err(|e| format!("Failed to get character: {}", e))?
         .ok_or_else(|| format!("Character {} not found", character_id))?;
 
-    build_character_skill_queue(
-        &*pool,
-        &*rate_limits,
-        character_id,
-        &character.character_name,
-    )
-    .await
-    .map_err(|e| format!("Failed to build skill queue: {}", e))?
-    .ok_or_else(|| {
-        format!(
-            "No skill queue data available for character {}",
-            character_id
-        )
-    })
+    build_character_skill_queue(&pool, &rate_limits, character_id, &character.character_name)
+        .await
+        .map_err(|e| format!("Failed to build skill queue: {}", e))?
+        .ok_or_else(|| {
+            format!(
+                "No skill queue data available for character {}",
+                character_id
+            )
+        })
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1535,20 +1525,20 @@ async fn get_clones(
     rate_limits: State<'_, esi::RateLimitStore>,
     character_id: i64,
 ) -> Result<Vec<CloneResponse>, String> {
-    let access_token = auth::ensure_valid_access_token(&*pool, character_id)
+    let access_token = auth::ensure_valid_access_token(&pool, character_id)
         .await
         .map_err(|e| format!("Failed to get valid token: {}", e))?;
 
     let client = create_authenticated_client(&access_token)
         .map_err(|e| format!("Failed to create client: {}", e))?;
 
-    let clones_data = get_cached_character_clones(&*pool, &client, character_id, &*rate_limits)
+    let clones_data = get_cached_character_clones(&pool, &client, character_id, &rate_limits)
         .await
         .map_err(|e| format!("Failed to fetch clones: {}", e))?
         .ok_or_else(|| "No clones data returned".to_string())?;
 
     let current_implants =
-        get_cached_character_implants(&*pool, &client, character_id, &*rate_limits)
+        get_cached_character_implants(&pool, &client, character_id, &rate_limits)
             .await
             .map_err(|e| format!("Failed to fetch implants: {}", e))?
             .unwrap_or_default();
@@ -1574,12 +1564,12 @@ async fn get_clones(
 
             // Resolve location (this will check database first, then fetch from ESI if needed)
             let _location_name = resolve_clone_location(
-                &*pool,
+                &pool,
                 &client,
                 location_type_str,
                 location_id,
                 character_id,
-                &*rate_limits,
+                &rate_limits,
             )
             .await
             .unwrap_or_else(|_| "Unknown Location".to_string());
@@ -1602,7 +1592,7 @@ async fn get_clones(
     if !current_implants_sorted.is_empty() {
         // Try to find an existing clone that matches the current implants
         let matched_clone_id =
-            db::find_clone_by_implants(&*pool, character_id, &current_implants_sorted)
+            db::find_clone_by_implants(&pool, character_id, &current_implants_sorted)
                 .await
                 .map_err(|e| format!("Failed to find clone by implants: {}", e))?;
 
@@ -1627,12 +1617,12 @@ async fn get_clones(
 
                     // Resolve location (this will check database first, then fetch from ESI if needed)
                     let _location_name = resolve_clone_location(
-                        &*pool,
+                        &pool,
                         &client,
                         location_type_str,
                         location_id,
                         character_id,
-                        &*rate_limits,
+                        &rate_limits,
                     )
                     .await
                     .unwrap_or_else(|_| "Unknown Location".to_string());
@@ -1646,15 +1636,10 @@ async fn get_clones(
             // an existing clone with NULL clone_id that has the same implants using the same function.
             // This handles the case where duplicates were created previously.
             let existing_null_clone =
-                db::find_clone_by_implants(&*pool, character_id, &current_implants_sorted)
+                db::find_clone_by_implants(&pool, character_id, &current_implants_sorted)
                     .await
                     .ok()
-                    .flatten()
-                    .and_then(|id| {
-                        // Verify this clone actually has NULL clone_id
-                        // We'll check this in a separate query
-                        Some(id)
-                    });
+                    .flatten();
 
             // Check if the found clone has NULL clone_id
             let null_clone_id = if let Some(id) = existing_null_clone {
@@ -1689,12 +1674,12 @@ async fn get_clones(
 
                     // Resolve location (this will check database first, then fetch from ESI if needed)
                     let _location_name = resolve_clone_location(
-                        &*pool,
+                        &pool,
                         &client,
                         location_type_str,
                         location_id,
                         character_id,
-                        &*rate_limits,
+                        &rate_limits,
                     )
                     .await
                     .unwrap_or_else(|_| "Unknown Location".to_string());
@@ -1719,12 +1704,12 @@ async fn get_clones(
 
                     // Resolve location (this will check database first, then fetch from ESI if needed)
                     let _location_name = resolve_clone_location(
-                        &*pool,
+                        &pool,
                         &client,
                         location_type_str,
                         location_id,
                         character_id,
-                        &*rate_limits,
+                        &rate_limits,
                     )
                     .await
                     .unwrap_or_else(|_| "Unknown Location".to_string());
@@ -1742,7 +1727,7 @@ async fn get_clones(
         }
     }
 
-    db::set_character_clones(&*pool, character_id, &clones_to_store)
+    db::set_character_clones(&pool, character_id, &clones_to_store)
         .await
         .map_err(|e| format!("Failed to store clones: {}", e))?;
 
@@ -1767,13 +1752,13 @@ async fn get_clones(
         }
     }
 
-    let stored_clones = db::get_character_clones(&*pool, character_id)
+    let stored_clones = db::get_character_clones(&pool, character_id)
         .await
         .map_err(|e| format!("Failed to get stored clones: {}", e))?;
 
     let mut result = Vec::new();
     for clone in stored_clones {
-        let implants: Vec<CloneImplantResponse> = db::get_clone_implants(&*pool, clone.id)
+        let implants: Vec<CloneImplantResponse> = db::get_clone_implants(&pool, clone.id)
             .await
             .map_err(|e| format!("Failed to get clone implants: {}", e))?
             .into_iter()
@@ -1888,7 +1873,7 @@ async fn update_clone_name(
     clone_id: i64,
     name: Option<String>,
 ) -> Result<(), String> {
-    db::update_clone_name(&*pool, clone_id, name.as_deref())
+    db::update_clone_name(&pool, clone_id, name.as_deref())
         .await
         .map_err(|e| format!("Failed to update clone name: {}", e))?;
     Ok(())
@@ -1905,7 +1890,7 @@ async fn get_type_names(
     pool: State<'_, db::Pool>,
     type_ids: Vec<i64>,
 ) -> Result<Vec<TypeNameEntry>, String> {
-    let map = get_type_names_helper(&*pool, &type_ids).await?;
+    let map = get_type_names_helper(&pool, &type_ids).await?;
     Ok(map
         .into_iter()
         .map(|(type_id, name)| TypeNameEntry { type_id, name })
@@ -1948,7 +1933,7 @@ async fn get_character_attributes_breakdown(
         (168, "willpower"),
     ];
 
-    let access_token = auth::ensure_valid_access_token(&*pool, character_id)
+    let access_token = auth::ensure_valid_access_token(&pool, character_id)
         .await
         .map_err(|e| format!("Failed to get valid token: {}", e))?;
 
@@ -1956,7 +1941,7 @@ async fn get_character_attributes_breakdown(
         .map_err(|e| format!("Failed to create client: {}", e))?;
 
     let attributes =
-        match get_cached_character_attributes(&*pool, &client, character_id, &*rate_limits).await {
+        match get_cached_character_attributes(&pool, &client, character_id, &rate_limits).await {
             Ok(Some(attrs)) => db::CharacterAttributes {
                 character_id,
                 charisma: attrs.charisma,
@@ -1971,7 +1956,7 @@ async fn get_character_attributes_breakdown(
                     .map(|d| d.to_rfc3339()),
                 last_remap_date: attrs.last_remap_date.as_ref().map(|d| d.to_rfc3339()),
             },
-            Ok(None) => db::get_character_attributes(&*pool, character_id)
+            Ok(None) => db::get_character_attributes(&pool, character_id)
                 .await
                 .map_err(|e| format!("Failed to get character attributes: {}", e))?
                 .ok_or_else(|| {
@@ -1980,7 +1965,7 @@ async fn get_character_attributes_breakdown(
                 })?,
             Err(e) => {
                 eprintln!("Failed to fetch attributes from ESI: {}", e);
-                db::get_character_attributes(&*pool, character_id)
+                db::get_character_attributes(&pool, character_id)
                     .await
                     .map_err(|e| format!("Failed to get character attributes: {}", e))?
                     .ok_or_else(|| {
@@ -1991,7 +1976,7 @@ async fn get_character_attributes_breakdown(
         };
 
     let current_implants =
-        get_cached_character_implants(&*pool, &client, character_id, &*rate_limits)
+        get_cached_character_implants(&pool, &client, character_id, &rate_limits)
             .await
             .map_err(|e| format!("Failed to fetch implants: {}", e))?
             .unwrap_or_default();
@@ -1999,7 +1984,7 @@ async fn get_character_attributes_breakdown(
     let implant_bonuses = if current_implants.is_empty() {
         HashMap::new()
     } else {
-        db::get_implant_attribute_bonuses(&*pool, &current_implants)
+        db::get_implant_attribute_bonuses(&pool, &current_implants)
             .await
             .map_err(|e| format!("Failed to get implant bonuses: {}", e))?
     };
@@ -2086,7 +2071,7 @@ async fn get_notifications(
     character_id: Option<i64>,
     status: Option<String>,
 ) -> Result<Vec<NotificationResponse>, String> {
-    let notifications = db::get_notifications(&*pool, character_id, status.as_deref())
+    let notifications = db::get_notifications(&pool, character_id, status.as_deref())
         .await
         .map_err(|e| format!("Failed to get notifications: {}", e))?;
 
@@ -2101,7 +2086,7 @@ async fn dismiss_notification(
     pool: State<'_, db::Pool>,
     notification_id: i64,
 ) -> Result<(), String> {
-    db::dismiss_notification(&*pool, notification_id)
+    db::dismiss_notification(&pool, notification_id)
         .await
         .map_err(|e| format!("Failed to dismiss notification: {}", e))?;
 
@@ -2113,7 +2098,7 @@ async fn get_notification_settings(
     pool: State<'_, db::Pool>,
     character_id: i64,
 ) -> Result<Vec<NotificationSettingResponse>, String> {
-    let settings = db::get_notification_settings(&*pool, character_id)
+    let settings = db::get_notification_settings(&pool, character_id)
         .await
         .map_err(|e| format!("Failed to get notification settings: {}", e))?;
 
@@ -2139,12 +2124,12 @@ async fn upsert_notification_setting(
 
     let config_str = config_value
         .as_ref()
-        .map(|c| serde_json::to_string(c))
+        .map(serde_json::to_string)
         .transpose()
         .map_err(|e| format!("Failed to serialize config: {}", e))?;
 
     db::upsert_notification_setting(
-        &*pool,
+        &pool,
         character_id,
         &notification_type,
         enabled,
@@ -2165,12 +2150,12 @@ async fn get_character_skills_with_groups(
     const SKILL_CATEGORY_ID: i64 = 16;
 
     // Get all skill groups for the Skill category
-    let skill_groups = db::get_skill_groups_for_category(&*pool, SKILL_CATEGORY_ID)
+    let skill_groups = db::get_skill_groups_for_category(&pool, SKILL_CATEGORY_ID)
         .await
         .map_err(|e| format!("Failed to get skill groups: {}", e))?;
 
     // Get character's trained skills
-    let character_skills = db::get_character_skills(&*pool, character_id)
+    let character_skills = db::get_character_skills(&pool, character_id)
         .await
         .map_err(|e| format!("Failed to get character skills: {}", e))?;
     let character_skills_map: HashMap<i64, db::CharacterSkill> = character_skills
@@ -2182,10 +2167,10 @@ async fn get_character_skills_with_groups(
     // Try to get from cache first, fall back to empty if we can't get token
     let queued_skills: HashMap<i64, i64> = {
         let mut result = HashMap::new();
-        if let Ok(access_token) = auth::ensure_valid_access_token(&*pool, character_id).await {
+        if let Ok(access_token) = auth::ensure_valid_access_token(&pool, character_id).await {
             if let Ok(client) = create_authenticated_client(&access_token) {
                 if let Ok(Some(queue_data)) =
-                    get_cached_skill_queue(&*pool, &client, character_id, &*rate_limits).await
+                    get_cached_skill_queue(&pool, &client, character_id, &rate_limits).await
                 {
                     for item in queue_data {
                         if let Some(obj) = item.as_object() {
@@ -2263,9 +2248,9 @@ async fn get_character_skills_with_groups(
                 trained_skill_level: trained_level,
                 active_skill_level: active_level,
                 skillpoints_in_skill: skillpoints,
-                is_in_queue: is_in_queue,
-                queue_level: queue_level,
-                is_injected: is_injected,
+                is_in_queue,
+                queue_level,
+                is_injected,
             });
         }
 
@@ -2318,11 +2303,11 @@ pub async fn handle_oauth_callback(
 
     let expires_at = Utc::now().timestamp() + token_response.expires_in;
 
-    let existing_character = db::get_character(&*pool, character_info.character_id).await?;
+    let existing_character = db::get_character(&pool, character_info.character_id).await?;
 
     if existing_character.is_none() {
         db::add_character(
-            &*pool,
+            &pool,
             character_info.character_id,
             &character_info.character_name,
         )
@@ -2330,7 +2315,7 @@ pub async fn handle_oauth_callback(
         .context("Failed to add character")?;
     } else {
         db::update_character(
-            &*pool,
+            &pool,
             character_info.character_id,
             &character_info.character_name,
         )
@@ -2338,11 +2323,11 @@ pub async fn handle_oauth_callback(
         .context("Failed to update character")?;
     }
 
-    let existing_tokens = db::get_tokens(&*pool, character_info.character_id).await?;
+    let existing_tokens = db::get_tokens(&pool, character_info.character_id).await?;
 
     if existing_tokens.is_none() {
         db::set_tokens(
-            &*pool,
+            &pool,
             character_info.character_id,
             &token_response.access_token,
             &token_response.refresh_token,
@@ -2353,7 +2338,7 @@ pub async fn handle_oauth_callback(
         .context("Failed to set tokens")?;
     } else {
         db::update_tokens(
-            &*pool,
+            &pool,
             character_info.character_id,
             &token_response.access_token,
             &token_response.refresh_token,
@@ -2364,7 +2349,7 @@ pub async fn handle_oauth_callback(
         .context("Failed to update tokens")?;
     }
 
-    cache::clear_character_cache(&*pool, character_info.character_id)
+    cache::clear_character_cache(&pool, character_info.character_id)
         .await
         .context("Failed to clear character cache")?;
 
@@ -2387,7 +2372,7 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             tauri::async_runtime::block_on(async {
-                let pool = db::init_db(&app.handle()).await?;
+                let pool = db::init_db(app.handle()).await?;
                 app.manage(pool);
                 app.manage(AuthStateMap::default());
                 app.manage(Arc::new(tokio::sync::RwLock::new(HashMap::<

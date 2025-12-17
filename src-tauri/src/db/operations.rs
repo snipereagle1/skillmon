@@ -15,10 +15,12 @@ pub struct Character {
 
 #[derive(Debug, FromRow)]
 pub struct Tokens {
+    #[allow(dead_code)]
     pub character_id: i64,
     pub access_token: String,
     pub refresh_token: String,
     pub expires_at: i64,
+    #[allow(dead_code)]
     pub scopes: Option<String>,
 }
 
@@ -106,7 +108,7 @@ pub async fn set_tokens(
     scopes: Option<&[String]>,
 ) -> Result<()> {
     let scopes_json = scopes
-        .map(|s| serde_json::to_string(s))
+        .map(serde_json::to_string)
         .transpose()
         .map_err(|e| anyhow::anyhow!("Failed to serialize scopes: {}", e))?;
 
@@ -136,7 +138,7 @@ pub async fn update_tokens(
     scopes: Option<&[String]>,
 ) -> Result<()> {
     let scopes_json = scopes
-        .map(|s| serde_json::to_string(s))
+        .map(serde_json::to_string)
         .transpose()
         .map_err(|e| anyhow::anyhow!("Failed to serialize scopes: {}", e))?;
 
@@ -262,6 +264,7 @@ pub async fn set_character_skills(
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn get_character_skill(
     pool: &Pool,
     character_id: i64,
@@ -717,7 +720,7 @@ pub async fn get_implant_attribute_bonuses(
 
             result
                 .entry(type_id)
-                .or_insert_with(HashMap::new)
+                .or_default()
                 .insert(attribute_id, value_int);
         }
     }
@@ -834,7 +837,6 @@ pub async fn get_notifications(
     if let Some(s) = status {
         if !has_where {
             query_builder.push(" WHERE ");
-            has_where = true;
         } else {
             query_builder.push(" AND ");
         }
@@ -884,6 +886,7 @@ pub async fn dismiss_notification(pool: &Pool, notification_id: i64) -> Result<(
     Ok(())
 }
 
+#[allow(dead_code)]
 pub async fn has_active_notification(
     pool: &Pool,
     character_id: i64,
