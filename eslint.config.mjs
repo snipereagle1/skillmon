@@ -93,6 +93,7 @@ export default [
       "src/generated/**",
       "src-tauri/**",
       "*.config.{js,ts,mjs}",
+      "src/components/ui/**",
     ],
   },
 ];
