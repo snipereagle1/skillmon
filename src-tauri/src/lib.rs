@@ -78,9 +78,14 @@ async fn start_eve_login(
     auth_states: State<'_, AuthStateMap>,
 ) -> Result<String, String> {
     let client_id = get_eve_client_id().map_err(|e| e.to_string())?;
-    // Use HTTP callback for dev mode (can be overridden with env var)
-    let callback_url = std::env::var("EVE_CALLBACK_URL")
-        .unwrap_or_else(|_| "http://localhost:1421/callback".to_string());
+    // Use HTTP callback for dev mode, deep link for production (can be overridden with env var)
+    let callback_url = std::env::var("EVE_CALLBACK_URL").unwrap_or_else(|_| {
+        if tauri::is_dev() {
+            "http://localhost:1421/callback".to_string()
+        } else {
+            "eveauth-skillmon://callback".to_string()
+        }
+    });
 
     let scopes = [
         "esi-skills.read_skills.v1",
@@ -2404,8 +2409,13 @@ pub fn run() {
                 });
 
                 // Start HTTP callback server for dev mode (if using HTTP callback)
-                let callback_url = std::env::var("EVE_CALLBACK_URL")
-                    .unwrap_or_else(|_| "http://localhost:1421/callback".to_string());
+                let callback_url = std::env::var("EVE_CALLBACK_URL").unwrap_or_else(|_| {
+                    if tauri::is_dev() {
+                        "http://localhost:1421/callback".to_string()
+                    } else {
+                        "eveauth-skillmon://callback".to_string()
+                    }
+                });
 
                 if callback_url.starts_with("http://") {
                     let app_handle = app.handle().clone();
