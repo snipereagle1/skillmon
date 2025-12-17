@@ -102,7 +102,7 @@ export function CharactersTab() {
 
   return (
     <div className="flex h-full gap-4">
-      <div className="w-64 flex-shrink-0 overflow-y-auto">
+      <div className="w-64 shrink-0 overflow-y-auto">
         <div className="space-y-2">
           {characters.length === 0 ? (
             <p className="text-muted-foreground p-4">
@@ -118,6 +118,7 @@ export function CharactersTab() {
                   key={character.character_id}
                   character={character}
                   skillQueue={queue?.skill_queue}
+                  isPaused={queue?.is_paused ?? false}
                   isSelected={character.character_id === selectedCharacterId}
                   onClick={() => setSelectedCharacterId(character.character_id)}
                 />

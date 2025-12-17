@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 interface CharacterCardProps {
   character: Character;
   skillQueue?: SkillQueueItem[];
+  isPaused?: boolean;
   isSelected?: boolean;
   onClick?: () => void;
 }
@@ -14,10 +15,15 @@ interface CharacterCardProps {
 type TrainingStatus = 'training' | 'empty' | 'paused';
 
 function getTrainingStatus(
-  skillQueue: SkillQueueItem[] | undefined
+  skillQueue: SkillQueueItem[] | undefined,
+  isPaused?: boolean
 ): TrainingStatus {
   if (!skillQueue || skillQueue.length === 0) {
     return 'empty';
+  }
+
+  if (isPaused === true) {
+    return 'paused';
   }
 
   const now = new Date();
@@ -58,7 +64,7 @@ function getBorderColor(status: TrainingStatus): string {
     case 'empty':
       return 'border-orange-500';
     case 'paused':
-      return 'border-white';
+      return 'border-yellow-500';
     default:
       return 'border-border';
   }
@@ -67,10 +73,11 @@ function getBorderColor(status: TrainingStatus): string {
 export function CharacterCard({
   character,
   skillQueue,
+  isPaused,
   isSelected = false,
   onClick,
 }: CharacterCardProps) {
-  const status = getTrainingStatus(skillQueue);
+  const status = getTrainingStatus(skillQueue, isPaused);
   const borderColor = getBorderColor(status);
 
   const portraitUrl = `https://images.evetech.net/characters/${character.character_id}/portrait?size=64`;

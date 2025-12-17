@@ -1,5 +1,6 @@
 import { intervalToDuration, isAfter, isBefore, isEqual } from 'date-fns';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -189,10 +190,12 @@ function SkillQueueEntry({
   skill,
   totalQueueHours,
   offsetPercentage,
+  isPaused,
 }: {
   skill: SkillQueueItem;
   totalQueueHours: number;
   offsetPercentage: number;
+  isPaused?: boolean;
 }) {
   const isTraining = isCurrentlyTraining(skill);
   const levelRoman =
@@ -211,6 +214,10 @@ function SkillQueueEntry({
   const MIN_WIDTH_PERCENTAGE = 1;
   const displayWidth = Math.max(timePercentage, MIN_WIDTH_PERCENTAGE);
 
+  const useYellow = isPaused === true && isTraining;
+  const progressColor = useYellow ? 'bg-yellow-500/20' : 'bg-green-500/20';
+  const textColor = useYellow ? 'text-yellow-400' : 'text-green-400';
+
   return (
     <div
       className={cn(
@@ -220,7 +227,10 @@ function SkillQueueEntry({
     >
       {isTraining && completionPercentage > 0 && (
         <div
-          className="absolute inset-0 bg-green-500/20 pointer-events-none transition-all"
+          className={cn(
+            'absolute inset-0 pointer-events-none transition-all',
+            progressColor
+          )}
           style={{ width: `${completionPercentage}%` }}
         />
       )}
@@ -245,7 +255,7 @@ function SkillQueueEntry({
                 className={cn(
                   'text-sm whitespace-nowrap cursor-help',
                   isTraining
-                    ? 'text-green-400 font-medium'
+                    ? cn(textColor, 'font-medium')
                     : 'text-muted-foreground'
                 )}
               >
@@ -261,7 +271,7 @@ function SkillQueueEntry({
             className={cn(
               'text-sm whitespace-nowrap',
               isTraining
-                ? 'text-green-400 font-medium'
+                ? cn(textColor, 'font-medium')
                 : 'text-muted-foreground'
             )}
           >
@@ -338,9 +348,19 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
     <TooltipProvider>
       <div className="flex flex-col h-full bg-background">
         <div className="px-4 py-3 border-b border-border">
-          <h2 className="text-lg font-semibold text-foreground">
-            Training Queue {queueSize}/{MAX_QUEUE_SIZE}
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-semibold text-foreground">
+              Training Queue {queueSize}/{MAX_QUEUE_SIZE}
+            </h2>
+            {queue.is_paused && (
+              <Badge
+                variant="outline"
+                className="border-yellow-500 text-yellow-500"
+              >
+                Paused
+              </Badge>
+            )}
+          </div>
         </div>
 
         <div className="flex-1 overflow-y-auto">
@@ -363,6 +383,7 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
                     skill={skill}
                     totalQueueHours={totalHours}
                     offsetPercentage={offsetPercentage}
+                    isPaused={queue.is_paused ?? false}
                   />
                 );
               });

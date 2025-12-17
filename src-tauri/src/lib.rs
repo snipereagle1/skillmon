@@ -208,6 +208,7 @@ pub struct CharacterSkillQueue {
     pub skill_queue: Vec<SkillQueueItem>,
     pub attributes: Option<CharacterAttributesResponse>,
     pub unallocated_sp: i64,
+    pub is_paused: bool,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -1140,12 +1141,19 @@ async fn build_character_skill_queue(
         }
     }
 
+    let is_paused = if skill_queue.is_empty() {
+        false
+    } else {
+        skill_queue.iter().all(|item| item.finish_date.is_none())
+    };
+
     let queue_result = CharacterSkillQueue {
         character_id: updated_character.character_id,
         character_name: updated_character.character_name.clone(),
         skill_queue: skill_queue.clone(),
         attributes: character_attributes,
         unallocated_sp: updated_character.unallocated_sp,
+        is_paused,
     };
 
     // Check for notifications
@@ -1312,12 +1320,19 @@ async fn get_skill_queues(
                     })
                     .collect();
 
+                let is_paused = if skill_queue.is_empty() {
+                    false
+                } else {
+                    skill_queue.iter().all(|item| item.finish_date.is_none())
+                };
+
                 results.push(CharacterSkillQueue {
                     character_id: updated_character.character_id,
                     character_name: updated_character.character_name,
                     skill_queue,
                     attributes: character_attributes,
                     unallocated_sp: updated_character.unallocated_sp,
+                    is_paused,
                 });
             }
             Ok(None) => {
