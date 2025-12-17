@@ -1,0 +1,42 @@
+use serde::Serialize;
+use tauri::State;
+
+use crate::db;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct Character {
+    pub character_id: i64,
+    pub character_name: String,
+    pub unallocated_sp: i64,
+}
+
+impl From<db::Character> for Character {
+    fn from(c: db::Character) -> Self {
+        Character {
+            character_id: c.character_id,
+            character_name: c.character_name,
+            unallocated_sp: c.unallocated_sp,
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn get_characters(pool: State<'_, db::Pool>) -> Result<Vec<Character>, String> {
+    db::get_all_characters(&pool)
+        .await
+        .map(|chars| chars.into_iter().map(Character::from).collect())
+        .map_err(|e| format!("Failed to get characters: {}", e))
+}
+
+#[tauri::command]
+pub async fn logout_character(pool: State<'_, db::Pool>, character_id: i64) -> Result<(), String> {
+    sqlx::query("DELETE FROM tokens WHERE character_id = ?")
+        .bind(character_id)
+        .execute(&*pool)
+        .await
+        .map_err(|e| format!("Failed to delete tokens: {}", e))?;
+
+    db::delete_character(&pool, character_id)
+        .await
+        .map_err(|e| format!("Failed to delete character: {}", e))
+}

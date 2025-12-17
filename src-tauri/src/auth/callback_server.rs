@@ -28,7 +28,7 @@ impl CallbackServer {
                             let app_handle_inner = (*app_handle).clone();
                             let callback_url = format!("http://localhost:{}/callback", port);
                             tauri::async_runtime::spawn(async move {
-                                match crate::handle_oauth_callback(
+                                match crate::commands::auth::handle_oauth_callback(
                                     app_handle_inner.clone(),
                                     code,
                                     state,

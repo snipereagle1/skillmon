@@ -124,7 +124,7 @@ pub async fn ensure_valid_access_token(pool: &Pool, character_id: i64) -> Result
     let is_expired = tokens.expires_at <= now;
 
     if is_expired {
-        let client_id = crate::get_eve_client_id()?;
+        let client_id = crate::commands::auth::get_eve_client_id()?;
         let token_response = refresh_access_token(&client_id, &tokens.refresh_token)
             .await
             .context("Failed to refresh access token")?;
