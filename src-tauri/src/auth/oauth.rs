@@ -127,9 +127,7 @@ pub async fn ensure_valid_access_token(
     let is_expired = tokens.expires_at <= now;
 
     if is_expired {
-        let client_id = std::env::var("EVE_CLIENT_ID")
-            .context("EVE_CLIENT_ID environment variable not set")?;
-
+        let client_id = crate::get_eve_client_id()?;
         let token_response = refresh_access_token(&client_id, &tokens.refresh_token)
             .await
             .context("Failed to refresh access token")?;

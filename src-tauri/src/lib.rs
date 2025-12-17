@@ -21,6 +21,18 @@ mod sde;
 type AuthStateMap = Mutex<HashMap<String, auth::AuthState>>;
 type StartupState = Arc<AtomicU8>; // 0 = complete, 1 = in progress
 
+// EVE_CLIENT_ID is embedded at compile time from environment variable if available,
+// otherwise falls back to runtime environment variable
+pub fn get_eve_client_id() -> Result<String> {
+    // Try compile-time embedded value first (set during CI builds)
+    if let Some(compile_time_id) = option_env!("EVE_CLIENT_ID") {
+        return Ok(compile_time_id.to_string());
+    }
+    // Fall back to runtime environment variable (for local development)
+    std::env::var("EVE_CLIENT_ID")
+        .context("EVE_CLIENT_ID environment variable not set")
+}
+
 // Must match NOTIFICATION_TYPES.SKILL_QUEUE_LOW in src/lib/notificationTypes.ts
 pub const NOTIFICATION_TYPE_SKILL_QUEUE_LOW: &str = "skill_queue_low";
 
@@ -67,9 +79,7 @@ async fn start_eve_login(
     app: tauri::AppHandle,
     auth_states: State<'_, AuthStateMap>,
 ) -> Result<String, String> {
-    let client_id = std::env::var("EVE_CLIENT_ID")
-        .map_err(|_| "EVE_CLIENT_ID environment variable not set".to_string())?;
-
+    let client_id = get_eve_client_id().map_err(|e| e.to_string())?;
     // Use HTTP callback for dev mode (can be overridden with env var)
     let callback_url = std::env::var("EVE_CALLBACK_URL")
         .unwrap_or_else(|_| "http://localhost:1421/callback".to_string());
@@ -2295,9 +2305,7 @@ pub async fn handle_oauth_callback(
         auth_state.code_verifier
     };
 
-    let client_id =
-        std::env::var("EVE_CLIENT_ID").context("EVE_CLIENT_ID environment variable not set")?;
-
+    let client_id = get_eve_client_id()?;
     let token_response =
         auth::exchange_code_for_tokens(&client_id, &code, &code_verifier, callback_url)
             .await
@@ -2380,12 +2388,6 @@ pub fn run() {
     tauri::Builder::default()
         .setup(|app| {
             tauri::async_runtime::block_on(async {
-                if std::env::var("EVE_CLIENT_ID").is_err() {
-                    eprintln!("Error: EVE_CLIENT_ID environment variable is not set. The application cannot function without it.");
-                    eprintln!("Please set EVE_CLIENT_ID to your EVE Online SSO client ID.");
-                    std::process::exit(1);
-                }
-
                 let pool = db::init_db(&app.handle()).await?;
                 app.manage(pool);
                 app.manage(AuthStateMap::default());
