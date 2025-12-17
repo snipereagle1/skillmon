@@ -11,14 +11,19 @@
     "tauri": "tauri",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "format": "prettier --write .",
+    "format": "prettier --write . && pnpm format:rust",
     "format:check": "prettier --check .",
+    "format:rust": "cd src-tauri && cargo fmt",
+    "format:check:rust": "cd src-tauri && cargo fmt -- --check",
     "prepare": "husky"
   },
   "lint-staged": {
     "src/**/*.{ts,tsx,js,jsx}": [
       "eslint --fix",
       "prettier --write"
+    ],
+    "src-tauri/**/*.rs": [
+      "cd src-tauri && cargo fmt --"
     ]
   },
   "dependencies": {
