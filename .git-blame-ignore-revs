@@ -1,0 +1,17 @@
+# Formatting-only commits to ignore in git blame
+# These commits contain only formatting changes (prettier, eslint, rustfmt, clippy)
+
+# prettier format
+5bf1b5cd4954ddea34d8e091019b2369c788af0c
+
+# eslint fixes
+6cd1e3069640ca828d3051abcd66f03f87ab3a5e
+
+# run rustfmt
+f32d2b73dc563fa72f9825c7002fca0c16b5d22d
+
+# fix low hanging fruit from clippy
+50f31800d6b8a95ce00c4feb00aab44fee97c91c
+
+# update rust types to satisfy clippy
+8b7346585373e11aee31ad532dd01edbb5718a46
