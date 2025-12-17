@@ -27,7 +27,7 @@ function getTrainingStatus(skillQueue: SkillQueueItem[] | undefined): TrainingSt
 
     // Check if current time is between start_date and finish_date
     // Backend logic: now >= start_utc && now < finish_utc (inclusive start, exclusive end)
-    if (item.start_date !== null && item.finish_date !== null) {
+    if (item.start_date != null && item.finish_date != null) {
       try {
         const startDate = new Date(item.start_date);
         const finishDate = new Date(item.finish_date);

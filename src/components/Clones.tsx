@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { getTypeNames } from "@/generated/commands";
 import { useClones } from "@/hooks/tauri/useClones";
-import type { Clone } from "@/generated/types";
+import type { CloneResponse } from "@/generated/types";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface ClonesProps {
@@ -91,7 +91,7 @@ export function Clones({ characterId }: ClonesProps) {
 }
 
 interface CloneRowProps {
-  clone: Clone;
+  clone: CloneResponse;
   implantNames: Map<number, string>;
 }
 

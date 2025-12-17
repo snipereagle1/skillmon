@@ -3,11 +3,11 @@ import {
   ItemContent,
   ItemTitle,
 } from "@/components/ui/item";
-import type { CharacterSkill } from "@/generated/types";
+import type { CharacterSkillResponse } from "@/generated/types";
 import { cn } from "@/lib/utils";
 
 interface SkillItemProps {
-  skill: CharacterSkill;
+  skill: CharacterSkillResponse;
 }
 
 export function SkillItem({ skill }: SkillItemProps) {

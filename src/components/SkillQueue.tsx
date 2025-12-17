@@ -11,7 +11,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
-function formatTimeRemaining(finishDate: string | null): string {
+function formatTimeRemaining(finishDate: string | null | undefined): string {
   if (!finishDate) return "Paused";
 
   const finish = new Date(finishDate);
@@ -74,11 +74,14 @@ function calculateTimeToTrain(skill: SkillQueueItem): string | null {
     return null;
   }
 
-  if (skill.level_start_sp === null || skill.level_end_sp === null) {
+  if (skill.level_start_sp == null || skill.level_end_sp == null) {
     return null;
   }
 
   const currentSP = skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
+  if (currentSP == null) {
+    return null;
+  }
   const remainingSP = skill.level_end_sp - currentSP;
 
   if (remainingSP <= 0) {
@@ -92,11 +95,14 @@ function calculateTimeToTrain(skill: SkillQueueItem): string | null {
 }
 
 function calculateCompletionPercentage(skill: SkillQueueItem): number {
-  if (skill.level_start_sp === null || skill.level_end_sp === null) {
+  if (skill.level_start_sp == null || skill.level_end_sp == null) {
     return 0;
   }
 
   const currentSP = skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
+  if (currentSP == null) {
+    return 0;
+  }
   const totalSP = skill.level_end_sp - skill.level_start_sp;
   const completedSP = currentSP - skill.level_start_sp;
 
@@ -120,11 +126,14 @@ function calculateTrainingHours(skill: SkillQueueItem): number {
     return 0;
   }
 
-  if (skill.level_start_sp === null || skill.level_end_sp === null) {
+  if (skill.level_start_sp == null || skill.level_end_sp == null) {
     return 0;
   }
 
   const currentSP = skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
+  if (currentSP == null) {
+    return 0;
+  }
   const remainingSP = skill.level_end_sp - currentSP;
 
   if (remainingSP <= 0) {
@@ -158,7 +167,7 @@ function isCurrentlyTraining(skill: SkillQueueItem): boolean {
 
   // Check if current time is between start_date and finish_date
   // Backend logic: now >= start_utc && now < finish_utc (inclusive start, exclusive end)
-  if (skill.start_date !== null && skill.finish_date !== null) {
+  if (skill.start_date != null && skill.finish_date != null) {
     try {
       const now = new Date();
       const startDate = new Date(skill.start_date);
@@ -282,7 +291,7 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
 
   const calculateTotalSP = (): number => {
     return queue.skill_queue.reduce((total, skill) => {
-      if (skill.level_start_sp !== null && skill.level_end_sp !== null) {
+      if (skill.level_start_sp != null && skill.level_end_sp != null) {
         return total + (skill.level_end_sp - skill.level_start_sp);
       }
       return total;

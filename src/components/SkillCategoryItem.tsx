@@ -1,15 +1,14 @@
 import {
   Item,
   ItemContent,
-  ItemDescription,
   ItemMedia,
   ItemTitle,
 } from "@/components/ui/item";
-import type { SkillGroup } from "@/generated/types";
+import type { SkillGroupResponse } from "@/generated/types";
 import { cn } from "@/lib/utils";
 
 interface SkillCategoryItemProps {
-  group: SkillGroup;
+  group: SkillGroupResponse;
   isSelected: boolean;
   onClick: () => void;
 }

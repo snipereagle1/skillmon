@@ -1,9 +1,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { getClones } from "@/generated/commands";
-import type { Clone } from "@/generated/types";
+import type { CloneResponse } from "@/generated/types";
 
 export function useClones(characterId: number | null) {
-  return useQuery<Clone[]>({
+  return useQuery<CloneResponse[]>({
     queryKey: ["clones", characterId],
     queryFn: async () => {
       if (characterId === null) {
@@ -14,4 +14,3 @@ export function useClones(characterId: number | null) {
     enabled: characterId !== null,
   });
 }
-

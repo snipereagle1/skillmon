@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { forceRefreshSkillQueue } from "@/generated/commands";
-import type { CharacterSkillQueue } from "@/generated/types";
 
 export function useForceRefreshSkillQueue() {
   const queryClient = useQueryClient();
@@ -14,4 +13,3 @@ export function useForceRefreshSkillQueue() {
     },
   });
 }
-
