@@ -305,29 +305,29 @@ async fn import_from_files(
 
     let mut tx = pool.begin().await?;
 
-    clear_tables(&mut *tx).await?;
-    import_categories(&mut *tx, categories)
+    clear_tables(&mut tx).await?;
+    import_categories(&mut tx, categories)
         .await
         .context("failed to import categories")?;
-    import_groups(&mut *tx, groups)
+    import_groups(&mut tx, groups)
         .await
         .context("failed to import groups")?;
-    import_types(&mut *tx, types)
+    import_types(&mut tx, types)
         .await
         .context("failed to import types")?;
-    import_dogma_attributes(&mut *tx, dogma_attributes)
+    import_dogma_attributes(&mut tx, dogma_attributes)
         .await
         .context("failed to import dogma attributes")?;
-    import_dogma_effects(&mut *tx, dogma_effects)
+    import_dogma_effects(&mut tx, dogma_effects)
         .await
         .context("failed to import dogma effects")?;
-    import_type_dogma(&mut *tx, type_dogma)
+    import_type_dogma(&mut tx, type_dogma)
         .await
         .context("failed to import type dogma")?;
-    import_character_attributes(&mut *tx, character_attributes)
+    import_character_attributes(&mut tx, character_attributes)
         .await
         .context("failed to import character attributes")?;
-    upsert_metadata(&mut *tx, latest)
+    upsert_metadata(&mut tx, latest)
         .await
         .context("failed to update metadata")?;
 
@@ -385,7 +385,7 @@ async fn import_categories(conn: &mut SqliteConnection, path: &Path) -> Result<(
             continue;
         }
 
-        let row: CategoryRow = serde_json::from_str(&line)
+        let row: CategoryRow = serde_json::from_str(line)
             .with_context(|| format!("failed to parse category line {}: {}", line_number, line))?;
         let name = extract_text(row.name).unwrap_or_default();
         batch.push((row.id, name, row.published.unwrap_or(false)));

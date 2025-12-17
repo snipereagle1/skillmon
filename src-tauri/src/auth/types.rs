@@ -14,6 +14,7 @@ pub struct CharacterInfo {
     pub character_name: String,
 }
 
+#[allow(dead_code)]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct JwtPayload {
     pub sub: String,

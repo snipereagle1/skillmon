@@ -8,6 +8,7 @@ use super::pkce::generate_pkce_pair;
 use super::types::{CharacterInfo, TokenResponse};
 use crate::db::{self, Pool};
 
+#[allow(dead_code)]
 const EVE_SSO_BASE_URL: &str = "https://login.eveonline.com/v2/oauth";
 const EVE_SSO_TOKEN_URL: &str = "https://login.eveonline.com/v2/oauth/token";
 const EVE_SSO_AUTHORIZE_URL: &str = "https://login.eveonline.com/v2/oauth/authorize";
@@ -219,7 +220,7 @@ pub fn extract_character_from_jwt(access_token: &str) -> Result<CharacterInfo> {
         // Fallback for other formats like "CHARACTER:12345678"
         sub_str
             .strip_prefix("CHARACTER:")
-            .and_then(|s| s.split(':').last())
+            .and_then(|s| s.split(':').next_back())
             .and_then(|s| s.parse::<i64>().ok())
             .context(format!(
                 "Failed to parse character ID from sub: {}",
@@ -251,6 +252,7 @@ pub fn extract_character_from_jwt(access_token: &str) -> Result<CharacterInfo> {
 /// Check if a token has the required scopes.
 /// Returns a list of missing scopes, or empty vector if all required scopes are present.
 /// Logs missing scopes for graceful degradation.
+#[allow(dead_code)]
 pub async fn check_token_scopes(
     pool: &Pool,
     character_id: i64,
