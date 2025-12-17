@@ -9,7 +9,11 @@ use chrono::{NaiveDateTime, Utc};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use serde::Serialize;
 use sqlx::{QueryBuilder, Row, Sqlite};
+use tauri::image::Image;
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, Listener, Manager, State};
+use tauri_plugin_notification::NotificationExt;
 
 mod auth;
 mod cache;
@@ -641,6 +645,7 @@ fn calculate_total_queue_hours(skill_queue: &[SkillQueueItem]) -> f64 {
 }
 
 async fn check_skill_queue_notifications(
+    app: &tauri::AppHandle,
     pool: &db::Pool,
     character_id: i64,
     skill_queue: &[SkillQueueItem],
@@ -703,17 +708,40 @@ async fn check_skill_queue_notifications(
                 } else {
                     format!("{:.0} hours", total_hours)
                 };
+                let title = "Skill Queue Low";
+                let message = format!(
+                    "Skill queue has {} remaining (below {} hour threshold)",
+                    hours_str, threshold_hours
+                );
+
+                // Get character name for more informative notification
+                let character_name = db::get_character(pool, character_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|c| c.character_name)
+                    .unwrap_or_else(|| format!("Character {}", character_id));
+
                 db::create_notification(
                     pool,
                     character_id,
                     NOTIFICATION_TYPE_SKILL_QUEUE_LOW,
-                    "Skill Queue Low",
-                    &format!(
-                        "Skill queue has {} remaining (below {} hour threshold)",
-                        hours_str, threshold_hours
-                    ),
+                    title,
+                    &message,
                 )
                 .await?;
+
+                // Send system notification
+                let notification_title = format!("{} - {}", character_name, title);
+                if let Err(e) = app
+                    .notification()
+                    .builder()
+                    .title(&notification_title)
+                    .body(&message)
+                    .show()
+                {
+                    eprintln!("Failed to send system notification: {}", e);
+                }
             }
         } else {
             // Queue is above threshold, clear notification if it exists
@@ -727,7 +755,11 @@ async fn check_skill_queue_notifications(
     Ok(())
 }
 
-async fn refresh_all_skill_queues(pool: &db::Pool, rate_limits: &esi::RateLimitStore) {
+async fn refresh_all_skill_queues(
+    app: &tauri::AppHandle,
+    pool: &db::Pool,
+    rate_limits: &esi::RateLimitStore,
+) {
     let characters = match db::get_all_characters(pool).await {
         Ok(chars) => chars,
         Err(e) => {
@@ -738,6 +770,7 @@ async fn refresh_all_skill_queues(pool: &db::Pool, rate_limits: &esi::RateLimitS
 
     for character in characters {
         let _ = build_character_skill_queue(
+            app,
             pool,
             rate_limits,
             character.character_id,
@@ -748,6 +781,7 @@ async fn refresh_all_skill_queues(pool: &db::Pool, rate_limits: &esi::RateLimitS
 }
 
 async fn build_character_skill_queue(
+    app: &tauri::AppHandle,
     pool: &db::Pool,
     rate_limits: &esi::RateLimitStore,
     character_id: i64,
@@ -1102,7 +1136,7 @@ async fn build_character_skill_queue(
     };
 
     // Check for notifications
-    if let Err(e) = check_skill_queue_notifications(pool, character_id, &skill_queue).await {
+    if let Err(e) = check_skill_queue_notifications(app, pool, character_id, &skill_queue).await {
         eprintln!(
             "Failed to check skill queue notifications for character {}: {}",
             character_id, e
@@ -1456,8 +1490,44 @@ async fn get_skill_queues(
     Ok(results)
 }
 
+fn is_skill_actively_training(skill: &SkillQueueItem) -> bool {
+    if skill.queue_position == 0 {
+        return true;
+    }
+
+    if let (Some(start_str), Some(finish_str)) = (&skill.start_date, &skill.finish_date) {
+        if let (Ok(start), Ok(finish)) = (
+            chrono::DateTime::parse_from_rfc3339(start_str),
+            chrono::DateTime::parse_from_rfc3339(finish_str),
+        ) {
+            let start_utc = start.with_timezone(&chrono::Utc);
+            let finish_utc = finish.with_timezone(&chrono::Utc);
+            let now = chrono::Utc::now();
+            return now >= start_utc && now < finish_utc;
+        }
+    }
+
+    false
+}
+
+#[tauri::command]
+async fn get_training_characters_count(
+    pool: State<'_, db::Pool>,
+    rate_limits: State<'_, esi::RateLimitStore>,
+) -> Result<i32, String> {
+    let skill_queues = get_skill_queues(pool, rate_limits).await?;
+
+    let count = skill_queues
+        .iter()
+        .filter(|queue| queue.skill_queue.iter().any(is_skill_actively_training))
+        .count();
+
+    Ok(count as i32)
+}
+
 #[tauri::command]
 async fn get_skill_queue_for_character(
+    app: tauri::AppHandle,
     pool: State<'_, db::Pool>,
     rate_limits: State<'_, esi::RateLimitStore>,
     character_id: i64,
@@ -1467,19 +1537,26 @@ async fn get_skill_queue_for_character(
         .map_err(|e| format!("Failed to get character: {}", e))?
         .ok_or_else(|| format!("Character {} not found", character_id))?;
 
-    build_character_skill_queue(&pool, &rate_limits, character_id, &character.character_name)
-        .await
-        .map_err(|e| format!("Failed to build skill queue: {}", e))?
-        .ok_or_else(|| {
-            format!(
-                "No skill queue data available for character {}",
-                character_id
-            )
-        })
+    build_character_skill_queue(
+        &app,
+        &pool,
+        &rate_limits,
+        character_id,
+        &character.character_name,
+    )
+    .await
+    .map_err(|e| format!("Failed to build skill queue: {}", e))?
+    .ok_or_else(|| {
+        format!(
+            "No skill queue data available for character {}",
+            character_id
+        )
+    })
 }
 
 #[tauri::command]
 async fn force_refresh_skill_queue(
+    app: tauri::AppHandle,
     pool: State<'_, db::Pool>,
     rate_limits: State<'_, esi::RateLimitStore>,
     character_id: i64,
@@ -1493,15 +1570,21 @@ async fn force_refresh_skill_queue(
         .map_err(|e| format!("Failed to get character: {}", e))?
         .ok_or_else(|| format!("Character {} not found", character_id))?;
 
-    build_character_skill_queue(&pool, &rate_limits, character_id, &character.character_name)
-        .await
-        .map_err(|e| format!("Failed to build skill queue: {}", e))?
-        .ok_or_else(|| {
-            format!(
-                "No skill queue data available for character {}",
-                character_id
-            )
-        })
+    build_character_skill_queue(
+        &app,
+        &pool,
+        &rate_limits,
+        character_id,
+        &character.character_name,
+    )
+    .await
+    .map_err(|e| format!("Failed to build skill queue: {}", e))?
+    .ok_or_else(|| {
+        format!(
+            "No skill queue data available for character {}",
+            character_id
+        )
+    })
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -2371,6 +2454,93 @@ pub async fn handle_oauth_callback(
     Ok(())
 }
 
+async fn count_training_characters(
+    pool: &db::Pool,
+    rate_limits: &esi::RateLimitStore,
+) -> Result<i32, String> {
+    let characters = db::get_all_characters(pool)
+        .await
+        .map_err(|e| format!("Failed to get characters: {}", e))?;
+
+    let mut count = 0;
+
+    for character in characters {
+        let access_token = match auth::ensure_valid_access_token(pool, character.character_id).await
+        {
+            Ok(token) => token,
+            Err(_) => continue,
+        };
+
+        let client = match create_authenticated_client(&access_token) {
+            Ok(client) => client,
+            Err(_) => continue,
+        };
+
+        if let Ok(Some(queue_data)) =
+            get_cached_skill_queue(pool, &client, character.character_id, rate_limits).await
+        {
+            let is_training = queue_data.iter().any(|item: &serde_json::Value| {
+                if let Some(obj) = item.as_object() {
+                    // Check if queue_position is 0
+                    if let Some(queue_pos) = obj.get("queue_position").and_then(|v| v.as_i64()) {
+                        if queue_pos == 0 {
+                            return true;
+                        }
+                    }
+
+                    // Check if current time is between start_date and finish_date
+                    if let (Some(start_str), Some(finish_str)) = (
+                        obj.get("start_date").and_then(|v| v.as_str()),
+                        obj.get("finish_date").and_then(|v| v.as_str()),
+                    ) {
+                        if let (Ok(start), Ok(finish)) = (
+                            chrono::DateTime::parse_from_rfc3339(start_str),
+                            chrono::DateTime::parse_from_rfc3339(finish_str),
+                        ) {
+                            let start_utc = start.with_timezone(&chrono::Utc);
+                            let finish_utc = finish.with_timezone(&chrono::Utc);
+                            let now = chrono::Utc::now();
+                            if now >= start_utc && now < finish_utc {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                false
+            });
+
+            if is_training {
+                count += 1;
+            }
+        }
+    }
+
+    Ok(count)
+}
+
+async fn update_tray_menu<R: tauri::Runtime>(
+    _app: &tauri::AppHandle<R>,
+    pool: &db::Pool,
+    rate_limits: &esi::RateLimitStore,
+    training_count_item: &MenuItem<R>,
+) {
+    let count = count_training_characters(pool, rate_limits)
+        .await
+        .unwrap_or(-1);
+
+    let text = if count < 0 {
+        "? characters training".to_string()
+    } else if count == 1 {
+        "1 character training".to_string()
+    } else {
+        format!("{} characters training", count)
+    };
+
+    if let Err(e) = training_count_item.set_text(&text) {
+        eprintln!("Failed to update tray menu text: {}", e);
+    }
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
@@ -2388,6 +2558,59 @@ pub fn run() {
                 let startup_state: StartupState = Arc::new(AtomicU8::new(1));
                 app.manage(startup_state.clone());
 
+                // Set up tray icon
+                let pool_for_tray = app.state::<db::Pool>().inner().clone();
+                let rate_limits_for_tray = app.state::<esi::RateLimitStore>().inner().clone();
+
+                let training_count_item = MenuItem::with_id(
+                    app,
+                    "training_count",
+                    "0 characters training",
+                    true,
+                    None::<&str>,
+                )?;
+                let show_item = MenuItem::with_id(app, "show", "Show", true, None::<&str>)?;
+                let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
+
+                let menu = Menu::with_items(app, &[&training_count_item, &show_item, &quit_item])?;
+
+                let icon = Image::from_bytes(include_bytes!("../icons/32x32.png"))
+                    .map_err(|e| anyhow::anyhow!("Failed to load tray icon: {}", e))?;
+
+                let _tray = TrayIconBuilder::new()
+                    .icon(icon)
+                    .menu(&menu)
+                    .tooltip("skillmon")
+                    .build(app)?;
+
+                // Set up periodic menu updates
+                let training_count_item_clone = training_count_item.clone();
+                let app_handle_for_updates = app.handle().clone();
+                tauri::async_runtime::spawn(async move {
+                    // Initial update after a short delay to allow startup to complete
+                    tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                    update_tray_menu(
+                        &app_handle_for_updates,
+                        &pool_for_tray,
+                        &rate_limits_for_tray,
+                        &training_count_item_clone,
+                    )
+                    .await;
+
+                    // Periodic updates every 30 seconds
+                    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+                    loop {
+                        interval.tick().await;
+                        update_tray_menu(
+                            &app_handle_for_updates,
+                            &pool_for_tray,
+                            &rate_limits_for_tray,
+                            &training_count_item_clone,
+                        )
+                        .await;
+                    }
+                });
+
                 // Startup routine: sequential and declarative
                 let pool = app.state::<db::Pool>().inner().clone();
                 let rate_limits = app.state::<esi::RateLimitStore>().inner().clone();
@@ -2401,7 +2624,7 @@ pub fn run() {
                     }
 
                     // Step 2: Refresh all character data from ESI
-                    refresh_all_skill_queues(&pool, &rate_limits).await;
+                    refresh_all_skill_queues(&app_handle, &pool, &rate_limits).await;
 
                     // Mark startup as complete and notify frontend
                     startup_state_clone.store(0, Ordering::SeqCst);
@@ -2515,14 +2738,28 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
+        .on_menu_event(|app, event| match event.id().as_ref() {
+            "show" => {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.show();
+                    let _ = window.set_focus();
+                }
+            }
+            "quit" => {
+                app.exit(0);
+            }
+            _ => {}
+        })
         .invoke_handler(tauri::generate_handler![
             start_eve_login,
             is_startup_complete,
             get_characters,
             logout_character,
             get_skill_queues,
+            get_training_characters_count,
             get_skill_queue_for_character,
             force_refresh_skill_queue,
             get_character_skills_with_groups,
