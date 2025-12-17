@@ -8,6 +8,7 @@ use anyhow::{Context, Result};
 use chrono::{NaiveDateTime, Utc};
 use reqwest::header::{HeaderMap, HeaderValue, AUTHORIZATION};
 use serde::Serialize;
+use serde_json;
 use sqlx::{QueryBuilder, Row, Sqlite};
 use tauri::{Emitter, Listener, Manager, State};
 
@@ -372,7 +373,7 @@ async fn get_cached_character_skills(
         let skills_data: Vec<(i64, i64, i64, i64)> = data
             .skills
             .iter()
-            .filter_map(|skill| {
+            .filter_map(|skill: &serde_json::Value| {
                 let obj = skill.as_object()?;
                 Some((
                     obj.get("skill_id")?.as_i64()?,
@@ -822,7 +823,7 @@ async fn build_character_skill_queue(
         Ok(Some(data)) => {
             // Check if the currently training skill (queue_position 0) has finished
             // If so, the cache is stale and we need to refresh
-            let should_refresh = data.iter().any(|item| {
+            let should_refresh = data.iter().any(|item: &serde_json::Value| {
                 if let Some(obj) = item.as_object() {
                     if let (Some(queue_pos), Some(finish_str)) = (
                         obj.get("queue_position").and_then(|v| v.as_i64()),
@@ -883,7 +884,7 @@ async fn build_character_skill_queue(
     let mut skill_ids = Vec::new();
     let mut skill_queue: Vec<SkillQueueItem> = queue_data
         .into_iter()
-        .filter_map(|item| {
+        .filter_map(|item: serde_json::Value| {
             let obj = item.as_object()?;
             let skill_id = obj.get("skill_id")?.as_i64()?;
             let queue_pos = obj.get("queue_position")?.as_i64()? as i32;
@@ -1206,7 +1207,7 @@ async fn get_skill_queues(
             Ok(Some(queue_data)) => {
                 let skill_queue: Vec<SkillQueueItem> = queue_data
                     .into_iter()
-                    .filter_map(|item| {
+                    .filter_map(|item: serde_json::Value| {
                         let obj = item.as_object()?;
                         let skill_id = obj.get("skill_id")?.as_i64()?;
                         let queue_pos = obj.get("queue_position")?.as_i64()? as i32;
