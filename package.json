@@ -26,7 +26,7 @@
     ],
     "src-tauri/**/*.rs": [
       "sh -c 'cd src-tauri && cargo clippy -- -D warnings'",
-      "sh -c 'cd src-tauri && cargo fmt'"
+      "sh -c 'cd src-tauri && cargo fmt -- --check'"
     ]
   },
   "dependencies": {
