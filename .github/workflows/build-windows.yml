@@ -37,8 +37,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install
 
-      - name: Build frontend
-        run: pnpm build
+      - name: Type check
+        run: pnpm typecheck
 
       - name: Build Tauri app
         run: pnpm tauri build
