@@ -1,8 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
-import { getTypeNames } from "@/generated/commands";
-import { useClones } from "@/hooks/tauri/useClones";
-import type { CloneResponse } from "@/generated/types";
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { useEffect, useMemo, useState } from 'react';
+import { getTypeNames } from '@/generated/commands';
+import { useClones } from '@/hooks/tauri/useClones';
+import type { CloneResponse } from '@/generated/types';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 
 interface ClonesProps {
   characterId: number | null;
@@ -10,7 +14,9 @@ interface ClonesProps {
 
 export function Clones({ characterId }: ClonesProps) {
   const { data: clones = [], isLoading, error } = useClones(characterId);
-  const [implantNames, setImplantNames] = useState<Map<number, string>>(new Map());
+  const [implantNames, setImplantNames] = useState<Map<number, string>>(
+    new Map()
+  );
 
   const allImplantIds = useMemo(() => {
     const ids = new Set<number>();
@@ -35,7 +41,7 @@ export function Clones({ characterId }: ClonesProps) {
         setImplantNames(map);
       })
       .catch((err) => {
-        console.error("Failed to fetch implant names:", err);
+        console.error('Failed to fetch implant names:', err);
       });
   }, [allImplantIds]);
 
@@ -61,7 +67,8 @@ export function Clones({ characterId }: ClonesProps) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-destructive">
-          Error: {error instanceof Error ? error.message : "Failed to load clones"}
+          Error:{' '}
+          {error instanceof Error ? error.message : 'Failed to load clones'}
         </p>
       </div>
     );
@@ -79,11 +86,7 @@ export function Clones({ characterId }: ClonesProps) {
     <div className="flex flex-col h-full overflow-y-auto p-4">
       <div className="space-y-2">
         {sortedClones.map((clone) => (
-          <CloneRow
-            key={clone.id}
-            clone={clone}
-            implantNames={implantNames}
-          />
+          <CloneRow key={clone.id} clone={clone} implantNames={implantNames} />
         ))}
       </div>
     </div>
@@ -96,13 +99,15 @@ interface CloneRowProps {
 }
 
 function CloneRow({ clone, implantNames }: CloneRowProps) {
-  const displayName = clone.name || (clone.clone_id ? `Clone ${clone.clone_id}` : "Current Clone");
-  const bgColor = clone.is_current ? "bg-muted/50" : "bg-background";
+  const displayName =
+    clone.name ||
+    (clone.clone_id ? `Clone ${clone.clone_id}` : 'Current Clone');
+  const bgColor = clone.is_current ? 'bg-muted/50' : 'bg-background';
 
   return (
     <div
       className={`border rounded-lg p-3 ${bgColor} ${
-        clone.is_current ? "border-primary" : "border-border"
+        clone.is_current ? 'border-primary' : 'border-border'
       }`}
     >
       <div className="flex items-start gap-3">
@@ -124,7 +129,7 @@ function CloneRow({ clone, implantNames }: CloneRowProps) {
         <div className="flex-1 min-w-0">
           <div className="font-medium text-foreground">{displayName}</div>
           <div className="text-sm text-muted-foreground mt-1">
-            {clone.location_name || "Unknown Location"}
+            {clone.location_name || 'Unknown Location'}
           </div>
           {clone.implants.length > 0 ? (
             <div className="flex flex-wrap gap-1.5 mt-2">
@@ -132,12 +137,17 @@ function CloneRow({ clone, implantNames }: CloneRowProps) {
                 <ImplantIcon
                   key={implant.implant_type_id}
                   implantId={implant.implant_type_id}
-                  name={implantNames.get(implant.implant_type_id) || `Implant ${implant.implant_type_id}`}
+                  name={
+                    implantNames.get(implant.implant_type_id) ||
+                    `Implant ${implant.implant_type_id}`
+                  }
                 />
               ))}
             </div>
           ) : (
-            <div className="text-sm text-muted-foreground mt-2">No Implants Installed</div>
+            <div className="text-sm text-muted-foreground mt-2">
+              No Implants Installed
+            </div>
           )}
         </div>
       </div>
@@ -188,4 +198,3 @@ function ImplantIcon({ implantId, name }: ImplantIconProps) {
     </Tooltip>
   );
 }
-

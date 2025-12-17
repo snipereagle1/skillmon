@@ -1,5 +1,5 @@
-import { useAttributes } from "@/hooks/tauri/useAttributes";
-import type { AttributeBreakdown } from "@/generated/types";
+import { useAttributes } from '@/hooks/tauri/useAttributes';
+import type { AttributeBreakdown } from '@/generated/types';
 import {
   Table,
   TableBody,
@@ -7,18 +7,18 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from '@/components/ui/table';
 
 interface AttributesProps {
   characterId: number | null;
 }
 
 const ATTRIBUTE_NAMES = [
-  { key: "perception", label: "Perception" },
-  { key: "memory", label: "Memory" },
-  { key: "willpower", label: "Willpower" },
-  { key: "intelligence", label: "Intelligence" },
-  { key: "charisma", label: "Charisma" },
+  { key: 'perception', label: 'Perception' },
+  { key: 'memory', label: 'Memory' },
+  { key: 'willpower', label: 'Willpower' },
+  { key: 'intelligence', label: 'Intelligence' },
+  { key: 'charisma', label: 'Charisma' },
 ] as const;
 
 export function Attributes({ characterId }: AttributesProps) {
@@ -36,9 +36,7 @@ export function Attributes({ characterId }: AttributesProps) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     return (
       <div className="flex items-center justify-center h-full">
-        <p className="text-destructive">
-          Error: {errorMessage}
-        </p>
+        <p className="text-destructive">Error: {errorMessage}</p>
       </div>
     );
   }
@@ -52,7 +50,7 @@ export function Attributes({ characterId }: AttributesProps) {
   }
 
   const formatBonus = (value: number): string => {
-    if (value === 0) return "—";
+    if (value === 0) return '—';
     return value > 0 ? `+${value}` : `${value}`;
   };
 
@@ -88,4 +86,3 @@ export function Attributes({ characterId }: AttributesProps) {
     </div>
   );
 }
-

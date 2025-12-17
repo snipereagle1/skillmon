@@ -1,18 +1,20 @@
-import { useState, useEffect } from "react";
-import { Switch } from "@/components/ui/switch";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { useState, useEffect } from 'react';
+import { Switch } from '@/components/ui/switch';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   useNotificationSettings,
   useUpdateNotificationSetting,
-} from "@/hooks/tauri/useNotificationSettings";
-import { NOTIFICATION_TYPES } from "@/lib/notificationTypes";
+} from '@/hooks/tauri/useNotificationSettings';
+import { NOTIFICATION_TYPES } from '@/lib/notificationTypes';
 
 interface NotificationSettingsProps {
   characterId: number | null;
 }
 
-export function NotificationSettings({ characterId }: NotificationSettingsProps) {
+export function NotificationSettings({
+  characterId,
+}: NotificationSettingsProps) {
   const { data: settings = [] } = useNotificationSettings(characterId);
   const updateSetting = useUpdateNotificationSetting();
 
@@ -24,7 +26,7 @@ export function NotificationSettings({ characterId }: NotificationSettingsProps)
     if (!configString) return 24;
     try {
       const parsed = JSON.parse(configString) as { threshold_hours?: unknown };
-      return typeof parsed.threshold_hours === "number"
+      return typeof parsed.threshold_hours === 'number'
         ? parsed.threshold_hours
         : 24;
     } catch {
@@ -57,9 +59,7 @@ export function NotificationSettings({ characterId }: NotificationSettingsProps)
       characterId,
       notificationType: NOTIFICATION_TYPES.SKILL_QUEUE_LOW,
       enabled: newEnabled,
-      config: newEnabled
-        ? { threshold_hours: thresholdHours }
-        : undefined,
+      config: newEnabled ? { threshold_hours: thresholdHours } : undefined,
     });
   };
 
@@ -133,5 +133,3 @@ export function NotificationSettings({ characterId }: NotificationSettingsProps)
     </div>
   );
 }
-
-

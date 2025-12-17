@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
-import { useCharacterSkills } from "@/hooks/tauri/useCharacterSkills";
-import { SkillCategoryItem } from "./SkillCategoryItem";
-import { SkillItem } from "./SkillItem";
+import { useState, useEffect } from 'react';
+import { useCharacterSkills } from '@/hooks/tauri/useCharacterSkills';
+import { SkillCategoryItem } from './SkillCategoryItem';
+import { SkillItem } from './SkillItem';
 
 interface SkillsProps {
   characterId: number | null;
@@ -35,7 +35,8 @@ export function Skills({ characterId }: SkillsProps) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-destructive">
-          Error: {error instanceof Error ? error.message : "Failed to load skills"}
+          Error:{' '}
+          {error instanceof Error ? error.message : 'Failed to load skills'}
         </p>
       </div>
     );
@@ -133,4 +134,3 @@ export function Skills({ characterId }: SkillsProps) {
     </div>
   );
 }
-

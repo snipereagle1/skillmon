@@ -1,13 +1,13 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   getNotificationSettings,
   upsertNotificationSetting,
-} from "@/generated/commands";
-import type { NotificationSettingResponse } from "@/generated/types";
+} from '@/generated/commands';
+import type { NotificationSettingResponse } from '@/generated/types';
 
 export function useNotificationSettings(characterId: number | null) {
   return useQuery<NotificationSettingResponse[]>({
-    queryKey: ["notificationSettings", characterId],
+    queryKey: ['notificationSettings', characterId],
     queryFn: async () => {
       if (!characterId) {
         return [];
@@ -40,7 +40,7 @@ export function useUpdateNotificationSetting() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
-        queryKey: ["notificationSettings", variables.characterId],
+        queryKey: ['notificationSettings', variables.characterId],
       });
     },
   });

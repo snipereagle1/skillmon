@@ -1,5 +1,5 @@
-import { useEffect, useState } from "react";
-import { isStartupComplete } from "@/generated/commands";
+import { useEffect, useState } from 'react';
+import { isStartupComplete } from '@/generated/commands';
 
 export function useStartupState() {
   const [isStartingUp, setIsStartingUp] = useState(true);
@@ -19,9 +19,9 @@ export function useStartupState() {
         }
 
         // Listen for startup-complete event
-        const { listen } = await import("@tauri-apps/api/event");
+        const { listen } = await import('@tauri-apps/api/event');
 
-        const unlisten = await listen("startup-complete", () => {
+        const unlisten = await listen('startup-complete', () => {
           setIsStartingUp(false);
         });
 
@@ -29,9 +29,9 @@ export function useStartupState() {
           unlisten();
         };
       } catch (error) {
-        console.error("Failed to setup startup state listener:", error);
-        if (error instanceof Error && error.message.includes("Tauri")) {
-          console.log("Not in Tauri environment (expected in browser dev)");
+        console.error('Failed to setup startup state listener:', error);
+        if (error instanceof Error && error.message.includes('Tauri')) {
+          console.log('Not in Tauri environment (expected in browser dev)');
           // In browser dev mode, assume startup is complete
           setIsStartingUp(false);
         }

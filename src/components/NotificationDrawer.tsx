@@ -1,24 +1,24 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect } from 'react';
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
-} from "@/components/ui/sheet";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
+} from '@/components/ui/sheet';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { useNotifications } from "@/hooks/tauri/useNotifications";
-import { useDismissNotification } from "@/hooks/tauri/useDismissNotification";
-import { useCharacters } from "@/hooks/tauri/useCharacters";
-import type { NotificationResponse } from "@/generated/types";
-import { formatDistanceToNow } from "date-fns";
+} from '@/components/ui/select';
+import { useNotifications } from '@/hooks/tauri/useNotifications';
+import { useDismissNotification } from '@/hooks/tauri/useDismissNotification';
+import { useCharacters } from '@/hooks/tauri/useCharacters';
+import type { NotificationResponse } from '@/generated/types';
+import { formatDistanceToNow } from 'date-fns';
 
 interface NotificationDrawerProps {
   open: boolean;
@@ -35,14 +35,14 @@ function CharacterFilter({
 }) {
   const { data: characters = [] } = useCharacters();
 
-  const value = selectedCharacterId?.toString() ?? "all";
+  const value = selectedCharacterId?.toString() ?? 'all';
 
   return (
     <div className="px-4 pb-2">
       <Select
         value={value}
         onValueChange={(newValue) =>
-          onCharacterChange(newValue === "all" ? null : parseInt(newValue, 10))
+          onCharacterChange(newValue === 'all' ? null : parseInt(newValue, 10))
         }
       >
         <SelectTrigger className="w-full">
@@ -51,7 +51,10 @@ function CharacterFilter({
         <SelectContent>
           <SelectItem value="all">All Characters</SelectItem>
           {characters.map((char) => (
-            <SelectItem key={char.character_id} value={char.character_id.toString()}>
+            <SelectItem
+              key={char.character_id}
+              value={char.character_id.toString()}
+            >
               {char.character_name}
             </SelectItem>
           ))}
@@ -71,7 +74,9 @@ function NotificationItem({
   canDismiss: boolean;
 }) {
   const { data: characters = [] } = useCharacters();
-  const character = characters.find((c) => c.character_id === notification.character_id);
+  const character = characters.find(
+    (c) => c.character_id === notification.character_id
+  );
 
   const timeAgo = formatDistanceToNow(new Date(notification.created_at), {
     addSuffix: true,
@@ -89,7 +94,9 @@ function NotificationItem({
               </span>
             )}
           </div>
-          <p className="text-sm text-muted-foreground">{notification.message}</p>
+          <p className="text-sm text-muted-foreground">
+            {notification.message}
+          </p>
           <p className="text-xs text-muted-foreground mt-1">{timeAgo}</p>
         </div>
         {canDismiss && (
@@ -147,9 +154,9 @@ export function NotificationDrawer({
     initialSelectedCharacterId ?? null
   );
   const { data: activeNotifications = [], isLoading: isLoadingActive } =
-    useNotifications(filterCharacterId ?? undefined, "active");
+    useNotifications(filterCharacterId ?? undefined, 'active');
   const { data: dismissedNotifications = [], isLoading: isLoadingDismissed } =
-    useNotifications(filterCharacterId ?? undefined, "dismissed");
+    useNotifications(filterCharacterId ?? undefined, 'dismissed');
   const dismissNotification = useDismissNotification();
 
   // Update filter when initial selected character changes
@@ -165,7 +172,10 @@ export function NotificationDrawer({
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0">
+      <SheetContent
+        side="right"
+        className="w-full sm:max-w-md flex flex-col p-0"
+      >
         <SheetHeader className="px-4 py-4 border-b">
           <SheetTitle>Notifications</SheetTitle>
         </SheetHeader>
@@ -173,7 +183,10 @@ export function NotificationDrawer({
           selectedCharacterId={filterCharacterId}
           onCharacterChange={setFilterCharacterId}
         />
-        <Tabs defaultValue="active" className="flex flex-col flex-1 overflow-hidden">
+        <Tabs
+          defaultValue="active"
+          className="flex flex-col flex-1 overflow-hidden"
+        >
           <div className="px-4 pt-4 border-b">
             <TabsList>
               <TabsTrigger value="active">
@@ -215,4 +228,3 @@ export function NotificationDrawer({
     </Sheet>
   );
 }
-

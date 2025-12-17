@@ -1,11 +1,6 @@
-import {
-  Item,
-  ItemContent,
-  ItemMedia,
-  ItemTitle,
-} from "@/components/ui/item";
-import type { SkillGroupResponse } from "@/generated/types";
-import { cn } from "@/lib/utils";
+import { Item, ItemContent, ItemMedia, ItemTitle } from '@/components/ui/item';
+import type { SkillGroupResponse } from '@/generated/types';
+import { cn } from '@/lib/utils';
 
 interface SkillCategoryItemProps {
   group: SkillGroupResponse;
@@ -25,12 +20,12 @@ export function SkillCategoryItem({
 
   return (
     <Item
-      variant={isSelected ? "muted" : "outline"}
+      variant={isSelected ? 'muted' : 'outline'}
       size="sm"
       className={cn(
-        "cursor-pointer relative overflow-hidden py-1.5",
-        isSelected && "bg-primary/10",
-        !group.has_trained_skills && "opacity-50"
+        'cursor-pointer relative overflow-hidden py-1.5',
+        isSelected && 'bg-primary/10',
+        !group.has_trained_skills && 'opacity-50'
       )}
       onClick={onClick}
     >
@@ -56,4 +51,3 @@ export function SkillCategoryItem({
     </Item>
   );
 }
-
