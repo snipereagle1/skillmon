@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useStartEveLogin } from "@/hooks/tauri/useStartEveLogin";
+import { useState } from 'react';
+import { useStartEveLogin } from '@/hooks/tauri/useStartEveLogin';
 
 export function LoginButton() {
   const [authUrl, setAuthUrl] = useState<string | null>(null);
@@ -24,7 +24,7 @@ export function LoginButton() {
     try {
       await navigator.clipboard.writeText(text);
     } catch (err) {
-      console.error("Failed to copy:", err);
+      console.error('Failed to copy:', err);
     }
   };
 
@@ -35,16 +35,22 @@ export function LoginButton() {
         disabled={loginMutation.isPending}
         className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
       >
-        {loginMutation.isPending ? "Opening browser..." : "Login with EVE Online"}
+        {loginMutation.isPending
+          ? 'Opening browser...'
+          : 'Login with EVE Online'}
       </button>
       {loginMutation.isError && (
         <p className="text-red-600 mt-2">
-          {loginMutation.error instanceof Error ? loginMutation.error.message : "Failed to start login"}
+          {loginMutation.error instanceof Error
+            ? loginMutation.error.message
+            : 'Failed to start login'}
         </p>
       )}
       {authUrl && (
         <div className="mt-4 p-4 bg-gray-100 rounded border border-gray-300">
-          <p className="text-sm font-semibold mb-2 text-gray-700">Authentication URL:</p>
+          <p className="text-sm font-semibold mb-2 text-gray-700">
+            Authentication URL:
+          </p>
           <div className="flex items-center gap-2">
             <input
               type="text"
@@ -61,12 +67,11 @@ export function LoginButton() {
             </button>
           </div>
           <p className="text-xs text-gray-600 mt-2">
-            Open this URL in your browser to authenticate with EVE Online. After logging in, you'll be redirected back automatically.
+            Open this URL in your browser to authenticate with EVE Online. After
+            logging in, you'll be redirected back automatically.
           </p>
         </div>
       )}
     </div>
   );
 }
-
-

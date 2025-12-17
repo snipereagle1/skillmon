@@ -1,5 +1,5 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { forceRefreshSkillQueue } from "@/generated/commands";
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { forceRefreshSkillQueue } from '@/generated/commands';
 
 export function useForceRefreshSkillQueue() {
   const queryClient = useQueryClient();
@@ -9,7 +9,7 @@ export function useForceRefreshSkillQueue() {
       return await forceRefreshSkillQueue({ characterId });
     },
     onSuccess: (data, characterId) => {
-      queryClient.setQueryData(["skillQueue", characterId], data);
+      queryClient.setQueryData(['skillQueue', characterId], data);
     },
   });
 }

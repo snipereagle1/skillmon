@@ -1,23 +1,23 @@
-import { useSkillQueue } from "@/hooks/tauri/useSkillQueue";
-import { useForceRefreshSkillQueue } from "@/hooks/tauri/useForceRefreshSkillQueue";
-import type { SkillQueueItem, CharacterSkillQueue } from "@/generated/types";
-import { intervalToDuration, isAfter, isBefore, isEqual } from "date-fns";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { useSkillQueue } from '@/hooks/tauri/useSkillQueue';
+import { useForceRefreshSkillQueue } from '@/hooks/tauri/useForceRefreshSkillQueue';
+import type { SkillQueueItem, CharacterSkillQueue } from '@/generated/types';
+import { intervalToDuration, isAfter, isBefore, isEqual } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
-} from "@/components/ui/tooltip";
+} from '@/components/ui/tooltip';
 
 function formatTimeRemaining(finishDate: string | null | undefined): string {
-  if (!finishDate) return "Paused";
+  if (!finishDate) return 'Paused';
 
   const finish = new Date(finishDate);
   const now = new Date();
 
-  if (finish <= now) return "Complete";
+  if (finish <= now) return 'Complete';
 
   const duration = intervalToDuration({ start: now, end: finish });
 
@@ -37,14 +37,14 @@ function formatTimeRemaining(finishDate: string | null | undefined): string {
   }
 
   if (parts.length === 0) {
-    return "0s";
+    return '0s';
   }
 
-  return parts.join(" ");
+  return parts.join(' ');
 }
 
 function formatDurationFromHours(hours: number): string {
-  if (hours <= 0) return "0h";
+  if (hours <= 0) return '0h';
 
   const days = Math.floor(hours / 24);
   const remainingHours = Math.floor(hours % 24);
@@ -63,10 +63,10 @@ function formatDurationFromHours(hours: number): string {
   }
 
   if (parts.length === 0) {
-    return "0h";
+    return '0h';
   }
 
-  return parts.join(" ");
+  return parts.join(' ');
 }
 
 function calculateTimeToTrain(skill: SkillQueueItem): string | null {
@@ -78,14 +78,15 @@ function calculateTimeToTrain(skill: SkillQueueItem): string | null {
     return null;
   }
 
-  const currentSP = skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
+  const currentSP =
+    skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
   if (currentSP == null) {
     return null;
   }
   const remainingSP = skill.level_end_sp - currentSP;
 
   if (remainingSP <= 0) {
-    return "Complete";
+    return 'Complete';
   }
 
   const spPerHour = skill.sp_per_minute * 60;
@@ -99,7 +100,8 @@ function calculateCompletionPercentage(skill: SkillQueueItem): number {
     return 0;
   }
 
-  const currentSP = skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
+  const currentSP =
+    skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
   if (currentSP == null) {
     return 0;
   }
@@ -130,7 +132,8 @@ function calculateTrainingHours(skill: SkillQueueItem): number {
     return 0;
   }
 
-  const currentSP = skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
+  const currentSP =
+    skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
   if (currentSP == null) {
     return 0;
   }
@@ -146,17 +149,10 @@ function calculateTrainingHours(skill: SkillQueueItem): number {
 
 function LevelIndicator({ level }: { level: number }) {
   const squares = Array.from({ length: level }, (_, i) => (
-    <div
-      key={i}
-      className="w-2 h-2 bg-blue-400 dark:bg-blue-500 rounded-sm"
-    />
+    <div key={i} className="w-2 h-2 bg-blue-400 dark:bg-blue-500 rounded-sm" />
   ));
 
-  return (
-    <div className="flex gap-0.5 w-14">
-      {squares}
-    </div>
-  );
+  return <div className="flex gap-0.5 w-14">{squares}</div>;
 }
 
 function isCurrentlyTraining(skill: SkillQueueItem): boolean {
@@ -173,7 +169,8 @@ function isCurrentlyTraining(skill: SkillQueueItem): boolean {
       const startDate = new Date(skill.start_date);
       const finishDate = new Date(skill.finish_date);
 
-      const isAfterOrEqualStart = isAfter(now, startDate) || isEqual(now, startDate);
+      const isAfterOrEqualStart =
+        isAfter(now, startDate) || isEqual(now, startDate);
       const isBeforeFinish = isBefore(now, finishDate);
 
       if (isAfterOrEqualStart && isBeforeFinish) {
@@ -187,21 +184,39 @@ function isCurrentlyTraining(skill: SkillQueueItem): boolean {
   return false;
 }
 
-function SkillQueueEntry({ skill, totalQueueHours, offsetPercentage }: { skill: SkillQueueItem; totalQueueHours: number; offsetPercentage: number }) {
+function SkillQueueEntry({
+  skill,
+  totalQueueHours,
+  offsetPercentage,
+}: {
+  skill: SkillQueueItem;
+  totalQueueHours: number;
+  offsetPercentage: number;
+}) {
   const isTraining = isCurrentlyTraining(skill);
-  const levelRoman = ["I", "II", "III", "IV", "V"][skill.finished_level - 1] || skill.finished_level.toString();
+  const levelRoman =
+    ['I', 'II', 'III', 'IV', 'V'][skill.finished_level - 1] ||
+    skill.finished_level.toString();
   const spPerHour = skill.sp_per_minute ? skill.sp_per_minute * 60 : null;
   const timeToTrain = calculateTimeToTrain(skill);
   const completionTime = formatTimeRemaining(skill.finish_date);
 
-  const completionPercentage = isTraining ? calculateCompletionPercentage(skill) : 0;
+  const completionPercentage = isTraining
+    ? calculateCompletionPercentage(skill)
+    : 0;
   const skillHours = calculateTrainingHours(skill);
-  const timePercentage = totalQueueHours > 0 ? (skillHours / totalQueueHours) * 100 : 0;
+  const timePercentage =
+    totalQueueHours > 0 ? (skillHours / totalQueueHours) * 100 : 0;
   const MIN_WIDTH_PERCENTAGE = 1;
   const displayWidth = Math.max(timePercentage, MIN_WIDTH_PERCENTAGE);
 
   return (
-    <div className={cn("relative px-4 py-3 border-b last:border-b-0 border-border/50", isTraining && "bg-primary/5")}>
+    <div
+      className={cn(
+        'relative px-4 py-3 border-b last:border-b-0 border-border/50',
+        isTraining && 'bg-primary/5'
+      )}
+    >
       {isTraining && completionPercentage > 0 && (
         <div
           className="absolute inset-0 bg-green-500/20 pointer-events-none transition-all"
@@ -225,7 +240,14 @@ function SkillQueueEntry({ skill, totalQueueHours, offsetPercentage }: { skill: 
         {timeToTrain !== null ? (
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
-              <span className={cn("text-sm whitespace-nowrap cursor-help", isTraining ? "text-green-400 font-medium" : "text-muted-foreground")}>
+              <span
+                className={cn(
+                  'text-sm whitespace-nowrap cursor-help',
+                  isTraining
+                    ? 'text-green-400 font-medium'
+                    : 'text-muted-foreground'
+                )}
+              >
                 {timeToTrain}
               </span>
             </TooltipTrigger>
@@ -234,7 +256,14 @@ function SkillQueueEntry({ skill, totalQueueHours, offsetPercentage }: { skill: 
             </TooltipContent>
           </Tooltip>
         ) : (
-          <span className={cn("text-sm whitespace-nowrap", isTraining ? "text-green-400 font-medium" : "text-muted-foreground")}>
+          <span
+            className={cn(
+              'text-sm whitespace-nowrap',
+              isTraining
+                ? 'text-green-400 font-medium'
+                : 'text-muted-foreground'
+            )}
+          >
             {completionTime}
           </span>
         )}
@@ -262,7 +291,7 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
   const queueSize = queue.skill_queue.length;
 
   const calculateTotalTime = (): string => {
-    if (queue.skill_queue.length === 0) return "0d 0h 0m";
+    if (queue.skill_queue.length === 0) return '0d 0h 0m';
 
     let totalHours = 0;
 
@@ -271,7 +300,7 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
     }
 
     if (totalHours === 0) {
-      return "0d 0h 0m";
+      return '0d 0h 0m';
     }
 
     return formatDurationFromHours(totalHours);
@@ -318,48 +347,53 @@ function CharacterQueue({ queue }: { queue: CharacterSkillQueue }) {
             <div className="flex items-center justify-center h-full p-8">
               <p className="text-muted-foreground">No skills in queue</p>
             </div>
-          ) : (() => {
-            const totalHours = calculateTotalTimeHours();
-            let cumulativeHours = 0;
-            return queue.skill_queue.map((skill, idx) => {
-              const offsetPercentage = totalHours > 0 ? (cumulativeHours / totalHours) * 100 : 0;
-              const skillHours = calculateTrainingHours(skill);
-              cumulativeHours += skillHours;
-              return (
-                <SkillQueueEntry
-                  key={`${skill.skill_id}-${idx}`}
-                  skill={skill}
-                  totalQueueHours={totalHours}
-                  offsetPercentage={offsetPercentage}
-                />
-              );
-            });
-          })()}
+          ) : (
+            (() => {
+              const totalHours = calculateTotalTimeHours();
+              let cumulativeHours = 0;
+              return queue.skill_queue.map((skill, idx) => {
+                const offsetPercentage =
+                  totalHours > 0 ? (cumulativeHours / totalHours) * 100 : 0;
+                const skillHours = calculateTrainingHours(skill);
+                cumulativeHours += skillHours;
+                return (
+                  <SkillQueueEntry
+                    key={`${skill.skill_id}-${idx}`}
+                    skill={skill}
+                    totalQueueHours={totalHours}
+                    offsetPercentage={offsetPercentage}
+                  />
+                );
+              });
+            })()
+          )}
         </div>
 
-      <div className="border-t border-border bg-muted/30 px-4 py-3 space-y-3">
-        <div className="text-sm text-green-400">
-          {unallocatedSP.toLocaleString('en-US')} unallocated skill points
+        <div className="border-t border-border bg-muted/30 px-4 py-3 space-y-3">
+          <div className="text-sm text-green-400">
+            {unallocatedSP.toLocaleString('en-US')} unallocated skill points
+          </div>
+
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-foreground">
+                Training Time
+              </span>
+              <span className="text-sm text-foreground">{totalTime}</span>
+            </div>
+
+            <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
+              <div
+                className="h-full bg-white/80 transition-all"
+                style={{ width: `${progressPercentage}%` }}
+              />
+            </div>
+
+            <div className="text-sm text-muted-foreground">
+              {totalSP.toLocaleString('en-US')} skill points in queue
+            </div>
+          </div>
         </div>
-
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium text-foreground">Training Time</span>
-            <span className="text-sm text-foreground">{totalTime}</span>
-          </div>
-
-          <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
-            <div
-              className="h-full bg-white/80 transition-all"
-              style={{ width: `${progressPercentage}%` }}
-            />
-          </div>
-
-          <div className="text-sm text-muted-foreground">
-            {totalSP.toLocaleString('en-US')} skill points in queue
-          </div>
-        </div>
-      </div>
       </div>
     </TooltipProvider>
   );
@@ -378,11 +412,20 @@ export function SkillQueue({ characterId }: SkillQueueProps) {
   }
 
   if (error) {
-    return <p className="text-destructive">Error: {error instanceof Error ? error.message : "Failed to load skill queue"}</p>;
+    return (
+      <p className="text-destructive">
+        Error:{' '}
+        {error instanceof Error ? error.message : 'Failed to load skill queue'}
+      </p>
+    );
   }
 
   if (!queue) {
-    return <p className="text-muted-foreground">No skill queue found for this character.</p>;
+    return (
+      <p className="text-muted-foreground">
+        No skill queue found for this character.
+      </p>
+    );
   }
 
   return (
@@ -394,7 +437,7 @@ export function SkillQueue({ characterId }: SkillQueueProps) {
           onClick={() => characterId && forceRefresh.mutate(characterId)}
           disabled={forceRefresh.isPending || !characterId}
         >
-          {forceRefresh.isPending ? "Refreshing..." : "Refresh"}
+          {forceRefresh.isPending ? 'Refreshing...' : 'Refresh'}
         </Button>
       </div>
       <div className="flex-1 min-h-0">
@@ -403,4 +446,3 @@ export function SkillQueue({ characterId }: SkillQueueProps) {
     </div>
   );
 }
-

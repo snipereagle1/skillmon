@@ -1,5 +1,5 @@
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { dismissNotification } from "@/generated/commands";
+import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { dismissNotification } from '@/generated/commands';
 
 export function useDismissNotification() {
   const queryClient = useQueryClient();
@@ -9,9 +9,7 @@ export function useDismissNotification() {
       return await dismissNotification({ notificationId });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["notifications"] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
     },
   });
 }
-
-

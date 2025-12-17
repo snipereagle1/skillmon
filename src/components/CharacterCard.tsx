@@ -1,7 +1,7 @@
-import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
-import type { Character, SkillQueueItem } from "@/generated/types";
-import { isAfter, isBefore, isEqual } from "date-fns";
+import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import type { Character, SkillQueueItem } from '@/generated/types';
+import { isAfter, isBefore, isEqual } from 'date-fns';
 
 interface CharacterCardProps {
   character: Character;
@@ -10,11 +10,13 @@ interface CharacterCardProps {
   onClick?: () => void;
 }
 
-type TrainingStatus = "training" | "empty" | "paused";
+type TrainingStatus = 'training' | 'empty' | 'paused';
 
-function getTrainingStatus(skillQueue: SkillQueueItem[] | undefined): TrainingStatus {
+function getTrainingStatus(
+  skillQueue: SkillQueueItem[] | undefined
+): TrainingStatus {
   if (!skillQueue || skillQueue.length === 0) {
-    return "empty";
+    return 'empty';
   }
 
   const now = new Date();
@@ -22,7 +24,7 @@ function getTrainingStatus(skillQueue: SkillQueueItem[] | undefined): TrainingSt
   for (const item of skillQueue) {
     // Check if queue_position is 0 (currently training)
     if (item.queue_position === 0) {
-      return "training";
+      return 'training';
     }
 
     // Check if current time is between start_date and finish_date
@@ -32,11 +34,12 @@ function getTrainingStatus(skillQueue: SkillQueueItem[] | undefined): TrainingSt
         const startDate = new Date(item.start_date);
         const finishDate = new Date(item.finish_date);
 
-        const isAfterOrEqualStart = isAfter(now, startDate) || isEqual(now, startDate);
+        const isAfterOrEqualStart =
+          isAfter(now, startDate) || isEqual(now, startDate);
         const isBeforeFinish = isBefore(now, finishDate);
 
         if (isAfterOrEqualStart && isBeforeFinish) {
-          return "training";
+          return 'training';
         }
       } catch (e) {
         // Invalid date format, skip this check
@@ -44,19 +47,19 @@ function getTrainingStatus(skillQueue: SkillQueueItem[] | undefined): TrainingSt
     }
   }
 
-  return "paused";
+  return 'paused';
 }
 
 function getBorderColor(status: TrainingStatus): string {
   switch (status) {
-    case "training":
-      return "border-green-500";
-    case "empty":
-      return "border-orange-500";
-    case "paused":
-      return "border-white";
+    case 'training':
+      return 'border-green-500';
+    case 'empty':
+      return 'border-orange-500';
+    case 'paused':
+      return 'border-white';
     default:
-      return "border-border";
+      return 'border-border';
   }
 }
 
@@ -74,8 +77,8 @@ export function CharacterCard({
   return (
     <Card
       className={cn(
-        "cursor-pointer transition-all hover:shadow-md py-4",
-        isSelected && "bg-muted/50"
+        'cursor-pointer transition-all hover:shadow-md py-4',
+        isSelected && 'bg-muted/50'
       )}
       onClick={onClick}
     >
@@ -83,7 +86,7 @@ export function CharacterCard({
         <img
           src={portraitUrl}
           alt={character.character_name}
-          className={cn("size-12 rounded border-2", borderColor)}
+          className={cn('size-12 rounded border-2', borderColor)}
         />
         <div className="flex-1 min-w-0">
           <p className="font-medium truncate">{character.character_name}</p>
@@ -92,4 +95,3 @@ export function CharacterCard({
     </Card>
   );
 }
-

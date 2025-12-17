@@ -1,6 +1,6 @@
-import { useAuthEvents } from "./hooks/tauri/useAuthEvents";
-import { useStartupState } from "./hooks/tauri/useStartupState";
-import { TabLayout } from "./components/TabLayout";
+import { useAuthEvents } from './hooks/tauri/useAuthEvents';
+import { useStartupState } from './hooks/tauri/useStartupState';
+import { TabLayout } from './components/TabLayout';
 
 function App() {
   useAuthEvents();

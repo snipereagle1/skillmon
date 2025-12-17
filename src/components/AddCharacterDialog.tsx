@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
-import { useStartEveLogin } from "@/hooks/tauri/useStartEveLogin";
+import { useState, useEffect } from 'react';
+import { useStartEveLogin } from '@/hooks/tauri/useStartEveLogin';
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 interface AddCharacterDialogProps {
   open: boolean;
@@ -29,8 +29,8 @@ export function AddCharacterDialog({
     let unlistenFn: (() => void) | null = null;
     const setupAuthListener = async () => {
       try {
-        const { listen } = await import("@tauri-apps/api/event");
-        const unlisten = await listen("auth-success", () => {
+        const { listen } = await import('@tauri-apps/api/event');
+        const unlisten = await listen('auth-success', () => {
           setAuthUrl(null);
           loginMutation.reset();
           onOpenChange(false);
@@ -40,7 +40,7 @@ export function AddCharacterDialog({
         });
         unlistenFn = unlisten;
       } catch (error) {
-        console.error("Failed to setup auth listener:", error);
+        console.error('Failed to setup auth listener:', error);
       }
     };
 
@@ -72,7 +72,7 @@ export function AddCharacterDialog({
     try {
       await navigator.clipboard.writeText(text);
     } catch (err) {
-      console.error("Failed to copy:", err);
+      console.error('Failed to copy:', err);
     }
   };
 
@@ -91,11 +91,15 @@ export function AddCharacterDialog({
             disabled={loginMutation.isPending}
             className="w-full"
           >
-            {loginMutation.isPending ? "Opening browser..." : "Login with EVE Online"}
+            {loginMutation.isPending
+              ? 'Opening browser...'
+              : 'Login with EVE Online'}
           </Button>
           {loginMutation.isError && (
             <p className="text-sm text-destructive">
-              {loginMutation.error instanceof Error ? loginMutation.error.message : "Failed to start login"}
+              {loginMutation.error instanceof Error
+                ? loginMutation.error.message
+                : 'Failed to start login'}
             </p>
           )}
           {authUrl && (
@@ -118,7 +122,8 @@ export function AddCharacterDialog({
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">
-                Open this URL in your browser to authenticate. After logging in, you'll be redirected back automatically.
+                Open this URL in your browser to authenticate. After logging in,
+                you'll be redirected back automatically.
               </p>
             </div>
           )}
@@ -127,4 +132,3 @@ export function AddCharacterDialog({
     </Dialog>
   );
 }
-
