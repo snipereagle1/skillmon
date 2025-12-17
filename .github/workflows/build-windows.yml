@@ -27,15 +27,50 @@ jobs:
         with:
           version: 10
 
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            src-tauri/target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - name: Cache oas3-gen
+        id: cache-oas3-gen
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/oas3-gen.exe
+          key: ${{ runner.os }}-oas3-gen-0.22.1
+
       - name: Install oas3-gen
+        if: steps.cache-oas3-gen.outputs.cache-hit != 'true'
         run: cargo install oas3-gen --version 0.22.1
 
       - name: Generate ESI client
         shell: bash
         run: bash scripts/generate-esi.sh
 
+      - name: Get pnpm store directory
+        shell: bash
+        id: pnpm-cache
+        run: |
+          echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Type check
         run: pnpm typecheck
