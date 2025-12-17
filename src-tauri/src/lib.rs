@@ -929,12 +929,25 @@ async fn build_character_skill_queue(
     };
 
     let mut skill_ids = Vec::new();
+    let now = chrono::Utc::now();
     let mut skill_queue: Vec<SkillQueueItem> = queue_data
         .into_iter()
         .filter_map(|item: serde_json::Value| {
             let obj = item.as_object()?;
             let skill_id = obj.get("skill_id")?.as_i64()?;
             let queue_pos = obj.get("queue_position")?.as_i64()? as i32;
+
+            // Filter out skills with past finish dates (stale data before login)
+            if let Some(finish_str) = obj.get("finish_date").and_then(|v| v.as_str()) {
+                if let Ok(finish) = chrono::DateTime::parse_from_rfc3339(finish_str) {
+                    let finish_utc = finish.with_timezone(&chrono::Utc);
+                    if now >= finish_utc {
+                        // Skill has already finished, filter it out
+                        return None;
+                    }
+                }
+            }
+
             skill_ids.push(skill_id);
             Some(SkillQueueItem {
                 skill_id,
@@ -1252,12 +1265,25 @@ async fn get_skill_queues(
 
         match get_cached_skill_queue(&pool, &client, character_id, &rate_limits).await {
             Ok(Some(queue_data)) => {
+                let now = chrono::Utc::now();
                 let skill_queue: Vec<SkillQueueItem> = queue_data
                     .into_iter()
                     .filter_map(|item: serde_json::Value| {
                         let obj = item.as_object()?;
                         let skill_id = obj.get("skill_id")?.as_i64()?;
                         let queue_pos = obj.get("queue_position")?.as_i64()? as i32;
+
+                        // Filter out skills with past finish dates (stale data before login)
+                        if let Some(finish_str) = obj.get("finish_date").and_then(|v| v.as_str()) {
+                            if let Ok(finish) = chrono::DateTime::parse_from_rfc3339(finish_str) {
+                                let finish_utc = finish.with_timezone(&chrono::Utc);
+                                if now >= finish_utc {
+                                    // Skill has already finished, filter it out
+                                    return None;
+                                }
+                            }
+                        }
+
                         all_skill_ids.push(skill_id);
                         Some(SkillQueueItem {
                             skill_id,
@@ -2252,27 +2278,45 @@ async fn get_character_skills_with_groups(
 
     // Get character's skill queue to check which skills are queued
     // Try to get from cache first, fall back to empty if we can't get token
-    let queued_skills: HashMap<i64, i64> = {
-        let mut result = HashMap::new();
+    // Also track skills that have finished training (past finish dates) to count as trained
+    let (queued_skills, trained_from_queue): (HashMap<i64, i64>, HashMap<i64, i64>) = {
+        let mut queued = HashMap::new();
+        let mut trained = HashMap::new();
         if let Ok(access_token) = auth::ensure_valid_access_token(&pool, character_id).await {
             if let Ok(client) = create_authenticated_client(&access_token) {
                 if let Ok(Some(queue_data)) =
                     get_cached_skill_queue(&pool, &client, character_id, &rate_limits).await
                 {
+                    let now = chrono::Utc::now();
                     for item in queue_data {
                         if let Some(obj) = item.as_object() {
-                            if let (Some(skill_id), Some(finished_level)) = (
+                            if let (Some(skill_id), Some(finished_level), finish_date_opt) = (
                                 obj.get("skill_id").and_then(|v| v.as_i64()),
                                 obj.get("finished_level").and_then(|v| v.as_i64()),
+                                obj.get("finish_date").and_then(|v| v.as_str()),
                             ) {
-                                result.insert(skill_id, finished_level);
+                                // Check if skill has finished training (past finish date)
+                                if let Some(finish_str) = finish_date_opt {
+                                    if let Ok(finish) =
+                                        chrono::DateTime::parse_from_rfc3339(finish_str)
+                                    {
+                                        let finish_utc = finish.with_timezone(&chrono::Utc);
+                                        if now >= finish_utc {
+                                            // Skill has finished training, count as trained
+                                            trained.insert(skill_id, finished_level);
+                                            continue;
+                                        }
+                                    }
+                                }
+                                // Still training, add to queued skills
+                                queued.insert(skill_id, finished_level);
                             }
                         }
                     }
                 }
             }
         }
-        result
+        (queued, trained)
     };
 
     // Get all skills in each group from SDE
@@ -2313,7 +2357,10 @@ async fn get_character_skills_with_groups(
             total_levels += 5; // Each skill has 5 levels
 
             let char_skill = character_skills_map.get(skill_id);
-            let trained_level = char_skill.map(|s| s.trained_skill_level).unwrap_or(0);
+            let db_trained_level = char_skill.map(|s| s.trained_skill_level).unwrap_or(0);
+            // Use the maximum of database level and trained level from completed queue items
+            let trained_level =
+                db_trained_level.max(trained_from_queue.get(skill_id).copied().unwrap_or(0));
             let active_level = char_skill.map(|s| s.active_skill_level).unwrap_or(0);
             let skillpoints = char_skill.map(|s| s.skillpoints_in_skill).unwrap_or(0);
             let is_injected = char_skill.is_some();
