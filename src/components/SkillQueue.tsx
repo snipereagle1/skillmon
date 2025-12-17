@@ -1,8 +1,5 @@
-import { useSkillQueue } from '@/hooks/tauri/useSkillQueue';
-import { useForceRefreshSkillQueue } from '@/hooks/tauri/useForceRefreshSkillQueue';
-import type { SkillQueueItem, CharacterSkillQueue } from '@/generated/types';
 import { intervalToDuration, isAfter, isBefore, isEqual } from 'date-fns';
-import { cn } from '@/lib/utils';
+
 import { Button } from '@/components/ui/button';
 import {
   Tooltip,
@@ -10,6 +7,10 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import type { CharacterSkillQueue, SkillQueueItem } from '@/generated/types';
+import { useForceRefreshSkillQueue } from '@/hooks/tauri/useForceRefreshSkillQueue';
+import { useSkillQueue } from '@/hooks/tauri/useSkillQueue';
+import { cn } from '@/lib/utils';
 
 function formatTimeRemaining(finishDate: string | null | undefined): string {
   if (!finishDate) return 'Paused';
@@ -176,7 +177,7 @@ function isCurrentlyTraining(skill: SkillQueueItem): boolean {
       if (isAfterOrEqualStart && isBeforeFinish) {
         return true;
       }
-    } catch (e) {
+    } catch {
       // Invalid date format, skip this check
     }
   }

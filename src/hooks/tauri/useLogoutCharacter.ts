@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+
 import { logoutCharacter } from '@/generated/commands';
 
 export function useLogoutCharacter() {

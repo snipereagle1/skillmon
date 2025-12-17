@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+
 import { getCharacterSkillsWithGroups } from '@/generated/commands';
 import type { CharacterSkillsResponse } from '@/generated/types';
 

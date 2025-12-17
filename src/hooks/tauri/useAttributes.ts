@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+
 import { getCharacterAttributesBreakdown } from '@/generated/commands';
 import type { CharacterAttributesBreakdown } from '@/generated/types';
 

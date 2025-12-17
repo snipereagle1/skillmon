@@ -1,5 +1,6 @@
-import { useState, useEffect } from 'react';
-import { useStartEveLogin } from '@/hooks/tauri/useStartEveLogin';
+import { useEffect, useState } from 'react';
+
+import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
@@ -7,7 +8,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
+import { useStartEveLogin } from '@/hooks/tauri/useStartEveLogin';
 
 interface AddCharacterDialogProps {
   open: boolean;
@@ -63,7 +64,7 @@ export function AddCharacterDialog({
       } else {
         setAuthUrl(result);
       }
-    } catch (err) {
+    } catch {
       // Error is handled by react-query and displayed via loginMutation.error
     }
   };
@@ -123,7 +124,7 @@ export function AddCharacterDialog({
               </div>
               <p className="text-xs text-muted-foreground">
                 Open this URL in your browser to authenticate. After logging in,
-                you'll be redirected back automatically.
+                you&apos;ll be redirected back automatically.
               </p>
             </div>
           )}

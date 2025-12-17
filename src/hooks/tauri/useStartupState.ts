@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+
 import { isStartupComplete } from '@/generated/commands';
 
 export function useStartupState() {

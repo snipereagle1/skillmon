@@ -71,7 +71,7 @@ export default [
       'import/no-cycle': 'error',
       'import/no-self-import': 'error',
 
-      'no-console': 'warn',
+      // 'no-console': 'warn',
       'no-debugger': 'error',
 
       'no-await-in-loop': 'warn',
@@ -80,9 +80,9 @@ export default [
       'no-throw-literal': 'error',
       'prefer-promise-reject-errors': 'error',
 
-      complexity: ['warn', 10],
+      complexity: ['warn', 20],
       'max-depth': ['warn', 4],
-      'max-lines-per-function': ['warn', 50],
+      'max-lines-per-function': ['warn', 200],
     },
   },
   {

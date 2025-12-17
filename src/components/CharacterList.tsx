@@ -1,4 +1,5 @@
 import { useQueryClient } from '@tanstack/react-query';
+
 import { useCharacters } from '@/hooks/tauri/useCharacters';
 import { useLogoutCharacter } from '@/hooks/tauri/useLogoutCharacter';
 

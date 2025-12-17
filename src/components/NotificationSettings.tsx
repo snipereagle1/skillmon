@@ -1,7 +1,8 @@
-import { useState, useEffect } from 'react';
-import { Switch } from '@/components/ui/switch';
+import { startTransition, useEffect, useMemo, useState } from 'react';
+
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import {
   useNotificationSettings,
   useUpdateNotificationSetting,
@@ -34,20 +35,29 @@ export function NotificationSettings({
     }
   };
 
-  const [enabled, setEnabled] = useState(
-    skillQueueLowSetting?.enabled ?? false
+  const computedEnabled = useMemo(
+    () => skillQueueLowSetting?.enabled ?? false,
+    [skillQueueLowSetting]
   );
-  const [thresholdHours, setThresholdHours] = useState(() => {
-    return getThresholdFromConfig(skillQueueLowSetting?.config);
-  });
+  const computedThresholdHours = useMemo(
+    () => getThresholdFromConfig(skillQueueLowSetting?.config),
+    [skillQueueLowSetting]
+  );
+
+  const [enabled, setEnabled] = useState(computedEnabled);
+  const [thresholdHours, setThresholdHours] = useState(computedThresholdHours);
 
   useEffect(() => {
     if (skillQueueLowSetting) {
-      setEnabled(skillQueueLowSetting.enabled);
-      setThresholdHours(getThresholdFromConfig(skillQueueLowSetting.config));
+      startTransition(() => {
+        setEnabled(skillQueueLowSetting.enabled);
+        setThresholdHours(getThresholdFromConfig(skillQueueLowSetting.config));
+      });
     } else {
-      setEnabled(false);
-      setThresholdHours(24);
+      startTransition(() => {
+        setEnabled(false);
+        setThresholdHours(24);
+      });
     }
   }, [skillQueueLowSetting]);
 

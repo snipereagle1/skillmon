@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+
 import { getNotifications } from '@/generated/commands';
 import type { NotificationResponse } from '@/generated/types';
 

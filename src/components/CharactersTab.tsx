@@ -1,16 +1,18 @@
-import { useEffect, useState, useMemo } from 'react';
 import { useQueries } from '@tanstack/react-query';
-import { useCharacters } from '@/hooks/tauri/useCharacters';
-import { useCharacterSkills } from '@/hooks/tauri/useCharacterSkills';
+import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
+
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { getSkillQueueForCharacter } from '@/generated/commands';
 import type { CharacterSkillQueue } from '@/generated/types';
+import { useCharacters } from '@/hooks/tauri/useCharacters';
+import { useCharacterSkills } from '@/hooks/tauri/useCharacterSkills';
+
+import { Attributes } from './Attributes';
 import { CharacterCard } from './CharacterCard';
+import { Clones } from './Clones';
+import { NotificationSettings } from './NotificationSettings';
 import { SkillQueue } from './SkillQueue';
 import { Skills } from './Skills';
-import { Clones } from './Clones';
-import { Attributes } from './Attributes';
-import { NotificationSettings } from './NotificationSettings';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 export function CharactersTab() {
   const {
@@ -21,6 +23,7 @@ export function CharactersTab() {
   const [selectedCharacterId, setSelectedCharacterId] = useState<number | null>(
     null
   );
+  const hasInitializedRef = useRef(false);
   const { data: characterSkills } = useCharacterSkills(selectedCharacterId);
 
   const skillQueueQueriesConfig = useMemo(
@@ -51,10 +54,13 @@ export function CharactersTab() {
   const error = charactersError;
 
   useEffect(() => {
-    if (characters.length > 0 && selectedCharacterId === null) {
-      setSelectedCharacterId(characters[0].character_id);
+    if (characters.length > 0 && !hasInitializedRef.current) {
+      hasInitializedRef.current = true;
+      startTransition(() => {
+        setSelectedCharacterId(characters[0].character_id);
+      });
     }
-  }, [characters, selectedCharacterId]);
+  }, [characters]);
 
   const selectedCharacter = characters.find(
     (c) => c.character_id === selectedCharacterId

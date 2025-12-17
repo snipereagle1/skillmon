@@ -1,5 +1,3 @@
-import { useAttributes } from '@/hooks/tauri/useAttributes';
-import type { AttributeBreakdown } from '@/generated/types';
 import {
   Table,
   TableBody,
@@ -8,6 +6,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import type { AttributeBreakdown } from '@/generated/types';
+import { useAttributes } from '@/hooks/tauri/useAttributes';
 
 interface AttributesProps {
   characterId: number | null;

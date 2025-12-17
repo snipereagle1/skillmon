@@ -1,11 +1,6 @@
-import { useState, useEffect } from 'react';
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-} from '@/components/ui/sheet';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+import { formatDistanceToNow } from 'date-fns';
+import { startTransition, useEffect, useRef, useState } from 'react';
+
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -14,11 +9,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useNotifications } from '@/hooks/tauri/useNotifications';
-import { useDismissNotification } from '@/hooks/tauri/useDismissNotification';
-import { useCharacters } from '@/hooks/tauri/useCharacters';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import type { NotificationResponse } from '@/generated/types';
-import { formatDistanceToNow } from 'date-fns';
+import { useCharacters } from '@/hooks/tauri/useCharacters';
+import { useDismissNotification } from '@/hooks/tauri/useDismissNotification';
+import { useNotifications } from '@/hooks/tauri/useNotifications';
 
 interface NotificationDrawerProps {
   open: boolean;
@@ -153,16 +154,22 @@ export function NotificationDrawer({
   const [filterCharacterId, setFilterCharacterId] = useState<number | null>(
     initialSelectedCharacterId ?? null
   );
+  const previousInitialIdRef = useRef(initialSelectedCharacterId);
   const { data: activeNotifications = [], isLoading: isLoadingActive } =
     useNotifications(filterCharacterId ?? undefined, 'active');
   const { data: dismissedNotifications = [], isLoading: isLoadingDismissed } =
     useNotifications(filterCharacterId ?? undefined, 'dismissed');
   const dismissNotification = useDismissNotification();
 
-  // Update filter when initial selected character changes
   useEffect(() => {
-    if (initialSelectedCharacterId !== undefined) {
-      setFilterCharacterId(initialSelectedCharacterId);
+    if (
+      initialSelectedCharacterId !== undefined &&
+      previousInitialIdRef.current !== initialSelectedCharacterId
+    ) {
+      previousInitialIdRef.current = initialSelectedCharacterId;
+      startTransition(() => {
+        setFilterCharacterId(initialSelectedCharacterId);
+      });
     }
   }, [initialSelectedCharacterId]);
 

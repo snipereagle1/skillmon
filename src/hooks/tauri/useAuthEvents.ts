@@ -1,5 +1,5 @@
-import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 
 export function useAuthEvents() {
   const queryClient = useQueryClient();
