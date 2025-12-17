@@ -10,16 +10,28 @@ Located in `src-tauri/src/`:
 
 ### Core Files
 
-- **lib.rs**: Main entry point, Tauri application setup, all Tauri commands
+- **lib.rs**: Main entry point, Tauri application setup, command registration via `invoke_handler![]`, module declarations
 - **main.rs**: Entry point (minimal, delegates to lib.rs)
 - **sde.rs**: Static Data Export import and management
+- **esi_helpers.rs**: ESI API helper utilities
+- **skill_queue.rs**: Skill queue refresh logic and notifications
+- **tray.rs**: System tray menu updates
+- **utils.rs**: General utility functions
 
 ### Modules
 
+#### `commands/` - Tauri Commands
+
+- **mod.rs**: Module exports for all command modules
+- Domain-specific files: Commands are organized by domain (e.g., characters, skills, clones, notifications, attributes, auth, sde, rate_limits, skill_queues)
+- Each file contains `#[tauri::command]` functions for a specific domain
+- Commands are registered in `lib.rs` via `invoke_handler![]`
+
 #### `db/` - Database Operations
 
-- **mod.rs**: Database pool initialization, exports operations
-- **operations.rs**: All database CRUD operations (characters, tokens, attributes)
+- **mod.rs**: Database pool initialization, exports all database operations
+- Domain-specific files: Database operations are split into files by domain (e.g., characters, skills, clones, tokens, notifications, attributes, locations, sde)
+- Each file handles CRUD operations for a specific domain
 
 #### `esi/` - ESI Client (Auto-Generated)
 
@@ -53,7 +65,8 @@ Located in `src/`:
 #### `components/`
 
 - **ui/**: shadcn/ui components (auto-generated, do not edit manually)
-- Custom components (e.g., `CharacterList.tsx`, `TabLayout.tsx`)
+- Custom components: Individual component files (e.g., `CharacterList.tsx`, `TabLayout.tsx`)
+- Feature subdirectories: Components organized by feature in subdirectories when they form a cohesive group (e.g., `Clones/`, `NotificationDrawer/`, `SkillQueue/`)
 
 #### `hooks/`
 
@@ -112,15 +125,16 @@ Located in `src/`:
 use crate::db;
 use crate::esi;
 use crate::cache;
+use crate::commands;
 ```
 
 ### TypeScript
 
 ```typescript
-import { Component } from "@/components/ui/component";
-import { useHook } from "@/hooks/tauri/useHook";
-import { commandName } from "@/generated/commands";
-import type { Type } from "@/generated/types";
+import { Component } from '@/components/ui/component';
+import { useHook } from '@/hooks/tauri/useHook';
+import { commandName } from '@/generated/commands';
+import type { Type } from '@/generated/types';
 ```
 
 ## Best Practices

@@ -1,6 +1,6 @@
 ---
 globs:
-  - "src-tauri/src/lib.rs"
+  - 'src-tauri/src/lib.rs'
 alwaysApply: false
 ---
 
@@ -8,19 +8,19 @@ alwaysApply: false
 
 ## Location
 
-All Tauri commands are defined in `src-tauri/src/lib.rs` with the `#[tauri::command]` attribute.
+All Tauri commands are defined in `src-tauri/src/commands/` directory, organized by domain in separate files. Each file contains commands for a specific domain (e.g., characters, skills, clones, notifications). Commands use the `#[tauri::command]` attribute.
 
 ## Command Registration
 
-Commands are registered in the `invoke_handler![]` macro within the `run()` function:
+Commands are registered in the `invoke_handler![]` macro within the `run()` function in `lib.rs`. Commands are imported from the `commands::` module namespace:
 
 ```rust
 .invoke_handler(tauri::generate_handler![
-    start_eve_login,
-    get_characters,
-    logout_character,
-    get_skill_queues,
-    refresh_sde
+    commands::auth::start_eve_login,
+    commands::characters::get_characters,
+    commands::characters::logout_character,
+    commands::skill_queues::get_skill_queues,
+    commands::sde::refresh_sde
 ])
 ```
 
@@ -120,11 +120,13 @@ async fn my_command(pool: State<'_, db::Pool>) -> Result<MyType, String> {
 
 ## Adding New Commands
 
-1. Define the command function with `#[tauri::command]` attribute
-2. Add it to the `invoke_handler![]` macro in `run()`
-3. TypeScript types and command bindings are auto-generated during build (see `src-tauri/build.rs`)
-4. Create a custom hook in `src/hooks/tauri/` if it's a data-fetching command
-5. Use the hook in components
+1. Determine which domain the command belongs to (characters, skills, clones, notifications, etc.)
+2. Add the command function with `#[tauri::command]` attribute to the appropriate file in `src-tauri/src/commands/` (or create a new domain file if needed)
+3. Ensure the command module is exported in `commands/mod.rs`
+4. Add it to the `invoke_handler![]` macro in `lib.rs` using the `commands::` namespace (e.g., `commands::domain::command_name`)
+5. TypeScript types and command bindings are auto-generated during build (see `src-tauri/build.rs`)
+6. Create a custom hook in `src/hooks/tauri/` if it's a data-fetching command
+7. Use the hook in components
 
 **Note**: TypeScript bindings are generated automatically via `tauri-typegen` during the build process. No manual type definitions needed.
 
