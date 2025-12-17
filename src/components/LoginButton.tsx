@@ -1,4 +1,5 @@
 import { useState } from 'react';
+
 import { useStartEveLogin } from '@/hooks/tauri/useStartEveLogin';
 
 export function LoginButton() {
@@ -15,7 +16,7 @@ export function LoginButton() {
       } else {
         setAuthUrl(result);
       }
-    } catch (err) {
+    } catch {
       // Error is handled by react-query and displayed via loginMutation.error
     }
   };
@@ -68,7 +69,7 @@ export function LoginButton() {
           </div>
           <p className="text-xs text-gray-600 mt-2">
             Open this URL in your browser to authenticate with EVE Online. After
-            logging in, you'll be redirected back automatically.
+            logging in, you&apos;ll be redirected back automatically.
           </p>
         </div>
       )}

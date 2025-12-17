@@ -1,6 +1,8 @@
 import { useState } from 'react';
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
+
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { AddCharacterDialog } from './AddCharacterDialog';
 import { CharactersTab } from './CharactersTab';
 import { NotificationBell } from './NotificationBell';

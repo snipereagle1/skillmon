@@ -1,7 +1,8 @@
-import { Card } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
-import type { Character, SkillQueueItem } from '@/generated/types';
 import { isAfter, isBefore, isEqual } from 'date-fns';
+
+import { Card } from '@/components/ui/card';
+import type { Character, SkillQueueItem } from '@/generated/types';
+import { cn } from '@/lib/utils';
 
 interface CharacterCardProps {
   character: Character;
@@ -41,7 +42,7 @@ function getTrainingStatus(
         if (isAfterOrEqualStart && isBeforeFinish) {
           return 'training';
         }
-      } catch (e) {
+      } catch {
         // Invalid date format, skip this check
       }
     }

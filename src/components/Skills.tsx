@@ -1,5 +1,7 @@
-import { useState, useEffect } from 'react';
+import { startTransition, useEffect, useRef, useState } from 'react';
+
 import { useCharacterSkills } from '@/hooks/tauri/useCharacterSkills';
+
 import { SkillCategoryItem } from './SkillCategoryItem';
 import { SkillItem } from './SkillItem';
 
@@ -10,15 +12,17 @@ interface SkillsProps {
 export function Skills({ characterId }: SkillsProps) {
   const { data, isLoading, error } = useCharacterSkills(characterId);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
+  const hasInitializedRef = useRef(false);
 
-  // Set default selected group
   useEffect(() => {
-    if (data && selectedGroupId === null) {
-      // Find first group with trained skills, or first group
+    if (data && selectedGroupId === null && !hasInitializedRef.current) {
+      hasInitializedRef.current = true;
       const groupWithSkills = data.groups.find((g) => g.has_trained_skills);
       const defaultGroup = groupWithSkills || data.groups[0];
       if (defaultGroup) {
-        setSelectedGroupId(defaultGroup.group_id);
+        startTransition(() => {
+          setSelectedGroupId(defaultGroup.group_id);
+        });
       }
     }
   }, [data, selectedGroupId]);

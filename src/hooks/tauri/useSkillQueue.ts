@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+
 import { getSkillQueueForCharacter } from '@/generated/commands';
 import type { CharacterSkillQueue } from '@/generated/types';
 

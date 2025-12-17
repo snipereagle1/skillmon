@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react';
-import { getTypeNames } from '@/generated/commands';
-import { useClones } from '@/hooks/tauri/useClones';
-import type { CloneResponse } from '@/generated/types';
+import { startTransition, useEffect, useMemo, useState } from 'react';
+
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { getTypeNames } from '@/generated/commands';
+import type { CloneResponse } from '@/generated/types';
+import { useClones } from '@/hooks/tauri/useClones';
 
 interface ClonesProps {
   characterId: number | null;
@@ -28,12 +29,16 @@ export function Clones({ characterId }: ClonesProps) {
 
   useEffect(() => {
     if (allImplantIds.length === 0) {
-      setImplantNames(new Map());
+      startTransition(() => {
+        setImplantNames(new Map());
+      });
       return;
     }
 
+    let cancelled = false;
     getTypeNames({ typeIds: allImplantIds })
       .then((names) => {
+        if (cancelled) return;
         const map = new Map<number, string>();
         names.forEach((entry) => {
           map.set(entry.type_id, entry.name);
@@ -41,8 +46,13 @@ export function Clones({ characterId }: ClonesProps) {
         setImplantNames(map);
       })
       .catch((err) => {
+        if (cancelled) return;
         console.error('Failed to fetch implant names:', err);
       });
+
+    return () => {
+      cancelled = true;
+    };
   }, [allImplantIds]);
 
   const sortedClones = useMemo(() => {
