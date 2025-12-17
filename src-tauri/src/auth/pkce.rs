@@ -27,5 +27,3 @@ pub fn generate_state() -> String {
     rand::thread_rng().fill_bytes(&mut state);
     URL_SAFE_NO_PAD.encode(&state)
 }
-
-
