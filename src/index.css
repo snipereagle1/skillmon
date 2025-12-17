@@ -1,5 +1,9 @@
 @import 'tailwindcss';
 
+/* Safelist: Force inclusion of TabsTrigger data attribute variants in production builds */
+/* These classes are used by TabsTrigger but may not be detected by Tailwind v4's static analysis */
+@source inline("data-[state=active]:bg-background data-[state=active]:shadow-sm dark:data-[state=active]:bg-input/30 dark:data-[state=active]:text-foreground dark:data-[state=active]:border-input");
+
 @theme {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
