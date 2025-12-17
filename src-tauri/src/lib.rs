@@ -2477,6 +2477,44 @@ pub fn run() {
                 Ok(())
             })
         })
+        .plugin(tauri_plugin_single_instance::init(|app, argv, _cwd| {
+            // Check for deep link URL in argv (Windows/Linux pass URLs as CLI args)
+            for arg in argv {
+                if arg.starts_with("eveauth-skillmon://callback") {
+                    if let Ok(url) = url::Url::parse(&arg) {
+                        let code = url
+                            .query_pairs()
+                            .find(|(k, _)| k == "code")
+                            .map(|(_, v)| v.to_string());
+                        let state = url
+                            .query_pairs()
+                            .find(|(k, _)| k == "state")
+                            .map(|(_, v)| v.to_string());
+
+                        if let (Some(code), Some(state)) = (code, state) {
+                            let app_handle = app.clone();
+                            tauri::async_runtime::spawn(async move {
+                                if let Err(e) = handle_oauth_callback(
+                                    app_handle.clone(),
+                                    code,
+                                    state,
+                                    "eveauth-skillmon://callback",
+                                )
+                                .await
+                                {
+                                    let _ = app_handle.emit("auth-error", e.to_string());
+                                }
+                            });
+                        }
+                    }
+                    break;
+                }
+            }
+            // Focus the main window
+            if let Some(window) = app.get_webview_window("main") {
+                let _ = window.set_focus();
+            }
+        }))
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
         .invoke_handler(tauri::generate_handler![
