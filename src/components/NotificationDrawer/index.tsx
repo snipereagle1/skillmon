@@ -1,14 +1,5 @@
-import { formatDistanceToNow } from 'date-fns';
 import { startTransition, useEffect, useRef, useState } from 'react';
 
-import { Button } from '@/components/ui/button';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Sheet,
   SheetContent,
@@ -16,134 +7,16 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import type { NotificationResponse } from '@/generated/types';
-import { useCharacters } from '@/hooks/tauri/useCharacters';
 import { useDismissNotification } from '@/hooks/tauri/useDismissNotification';
 import { useNotifications } from '@/hooks/tauri/useNotifications';
+
+import { CharacterFilter } from './CharacterFilter';
+import { NotificationList } from './NotificationList';
 
 interface NotificationDrawerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedCharacterId?: number | null;
-}
-
-function CharacterFilter({
-  selectedCharacterId,
-  onCharacterChange,
-}: {
-  selectedCharacterId: number | null | undefined;
-  onCharacterChange: (characterId: number | null) => void;
-}) {
-  const { data: characters = [] } = useCharacters();
-
-  const value = selectedCharacterId?.toString() ?? 'all';
-
-  return (
-    <div className="px-4 pb-2">
-      <Select
-        value={value}
-        onValueChange={(newValue) =>
-          onCharacterChange(newValue === 'all' ? null : parseInt(newValue, 10))
-        }
-      >
-        <SelectTrigger className="w-full">
-          <SelectValue placeholder="All Characters" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Characters</SelectItem>
-          {characters.map((char) => (
-            <SelectItem
-              key={char.character_id}
-              value={char.character_id.toString()}
-            >
-              {char.character_name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
-function NotificationItem({
-  notification,
-  onDismiss,
-  canDismiss,
-}: {
-  notification: NotificationResponse;
-  onDismiss: () => void;
-  canDismiss: boolean;
-}) {
-  const { data: characters = [] } = useCharacters();
-  const character = characters.find(
-    (c) => c.character_id === notification.character_id
-  );
-
-  const timeAgo = formatDistanceToNow(new Date(notification.created_at), {
-    addSuffix: true,
-  });
-
-  return (
-    <div className="border-b border-border/50 p-4 space-y-2">
-      <div className="flex items-start justify-between gap-2">
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <h4 className="font-semibold text-sm">{notification.title}</h4>
-            {character && (
-              <span className="text-xs text-muted-foreground">
-                {character.character_name}
-              </span>
-            )}
-          </div>
-          <p className="text-sm text-muted-foreground">
-            {notification.message}
-          </p>
-          <p className="text-xs text-muted-foreground mt-1">{timeAgo}</p>
-        </div>
-        {canDismiss && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={onDismiss}
-            className="shrink-0"
-          >
-            Dismiss
-          </Button>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function NotificationList({
-  notifications,
-  onDismiss,
-  canDismiss,
-}: {
-  notifications: NotificationResponse[];
-  onDismiss: (id: number) => void;
-  canDismiss: boolean;
-}) {
-  if (notifications.length === 0) {
-    return (
-      <div className="flex items-center justify-center h-32 text-muted-foreground">
-        <p>No notifications</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex-1 overflow-y-auto">
-      {notifications.map((notification) => (
-        <NotificationItem
-          key={notification.id}
-          notification={notification}
-          onDismiss={() => onDismiss(notification.id)}
-          canDismiss={canDismiss}
-        />
-      ))}
-    </div>
-  );
 }
 
 export function NotificationDrawer({
