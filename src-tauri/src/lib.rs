@@ -336,22 +336,21 @@ async fn get_cached_character_attributes(
     )
     .await?
     {
-        db::set_character_attributes(
-            pool,
+        let attributes = db::CharacterAttributes {
             character_id,
-            data.charisma,
-            data.intelligence,
-            data.memory,
-            data.perception,
-            data.willpower,
-            data.bonus_remaps,
-            data.accrued_remap_cooldown_date
+            charisma: data.charisma,
+            intelligence: data.intelligence,
+            memory: data.memory,
+            perception: data.perception,
+            willpower: data.willpower,
+            bonus_remaps: data.bonus_remaps,
+            accrued_remap_cooldown_date: data
+                .accrued_remap_cooldown_date
                 .as_ref()
                 .map(|d| d.to_rfc3339()),
-            data.last_remap_date.as_ref().map(|d| d.to_rfc3339()),
-        )
-        .await
-        .ok();
+            last_remap_date: data.last_remap_date.as_ref().map(|d| d.to_rfc3339()),
+        };
+        db::set_character_attributes(pool, &attributes).await.ok();
 
         Ok(Some(data))
     } else {

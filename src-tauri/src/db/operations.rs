@@ -6,6 +6,8 @@ use sqlx::{sqlite::SqliteRow, FromRow, Row};
 
 use super::Pool;
 
+type CloneRow = (Option<i64>, Option<String>, String, i64, bool, Vec<i64>);
+
 #[derive(Debug, Clone, Serialize, FromRow)]
 pub struct Character {
     pub character_id: i64,
@@ -187,18 +189,7 @@ pub async fn get_character_attributes(
     Ok(attributes)
 }
 
-pub async fn set_character_attributes(
-    pool: &Pool,
-    character_id: i64,
-    charisma: i64,
-    intelligence: i64,
-    memory: i64,
-    perception: i64,
-    willpower: i64,
-    bonus_remaps: Option<i64>,
-    accrued_remap_cooldown_date: Option<String>,
-    last_remap_date: Option<String>,
-) -> Result<()> {
+pub async fn set_character_attributes(pool: &Pool, attributes: &CharacterAttributes) -> Result<()> {
     sqlx::query(
         r#"
       INSERT OR REPLACE INTO character_attributes
@@ -206,15 +197,15 @@ pub async fn set_character_attributes(
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%s','now'))
     "#,
     )
-    .bind(character_id)
-    .bind(charisma)
-    .bind(intelligence)
-    .bind(memory)
-    .bind(perception)
-    .bind(willpower)
-    .bind(bonus_remaps)
-    .bind(accrued_remap_cooldown_date.as_deref())
-    .bind(last_remap_date.as_deref())
+    .bind(attributes.character_id)
+    .bind(attributes.charisma)
+    .bind(attributes.intelligence)
+    .bind(attributes.memory)
+    .bind(attributes.perception)
+    .bind(attributes.willpower)
+    .bind(attributes.bonus_remaps)
+    .bind(attributes.accrued_remap_cooldown_date.as_deref())
+    .bind(attributes.last_remap_date.as_deref())
     .execute(pool)
     .await?;
 
@@ -485,7 +476,7 @@ pub async fn get_clone_implants(pool: &Pool, clone_db_id: i64) -> Result<Vec<Clo
 pub async fn set_character_clones(
     pool: &Pool,
     character_id: i64,
-    clones: &[(Option<i64>, Option<String>, String, i64, bool, Vec<i64>)],
+    clones: &[CloneRow],
 ) -> Result<()> {
     let mut tx = pool.begin().await?;
 
