@@ -11,6 +11,8 @@
     "tauri": "tauri",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "lint:rust": "cd src-tauri && cargo clippy -- -D warnings",
+    "lint:rust:fix": "cd src-tauri && cargo clippy --fix --allow-dirty --allow-staged",
     "format": "prettier --write . && pnpm format:rust",
     "format:check": "prettier --check .",
     "format:rust": "cd src-tauri && cargo fmt",
@@ -23,6 +25,7 @@
       "prettier --write"
     ],
     "src-tauri/**/*.rs": [
+      "sh -c 'cd src-tauri && cargo clippy -- -D warnings'",
       "sh -c 'cd src-tauri && cargo fmt'"
     ]
   },
