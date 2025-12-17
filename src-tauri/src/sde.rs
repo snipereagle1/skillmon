@@ -29,6 +29,43 @@ const TARGET_FILES: &[&str] = &[
     "characterAttributes.jsonl",
 ];
 
+type GroupInsertRow = (i64, Option<i64>, String, Option<i64>, bool);
+type TypeInsertRow = (
+    i64,
+    i64,
+    Option<i64>,
+    String,
+    Option<String>,
+    bool,
+    Option<i64>,
+    Option<i64>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+    Option<f64>,
+);
+type DogmaAttributeInsertRow = (
+    i64,
+    Option<i64>,
+    Option<i64>,
+    Option<f64>,
+    Option<i64>,
+    Option<bool>,
+    Option<bool>,
+    Option<bool>,
+    String,
+    Option<String>,
+);
+type DogmaEffectInsertRow = (
+    i64,
+    String,
+    Option<i64>,
+    Option<bool>,
+    Option<bool>,
+    Option<bool>,
+);
+type CharacterAttributeInsertRow = (i64, String, Option<String>, Option<String>, Option<i64>);
+
 #[derive(Debug, Deserialize)]
 struct LatestBuild {
     #[serde(rename = "buildNumber")]
@@ -460,10 +497,7 @@ async fn import_groups(conn: &mut SqliteConnection, path: &Path) -> Result<()> {
     Ok(())
 }
 
-async fn insert_groups(
-    conn: &mut SqliteConnection,
-    rows: &[(i64, Option<i64>, String, Option<i64>, bool)],
-) -> Result<()> {
+async fn insert_groups(conn: &mut SqliteConnection, rows: &[GroupInsertRow]) -> Result<()> {
     if rows.is_empty() {
         return Ok(());
     }
@@ -525,23 +559,7 @@ async fn import_types(conn: &mut SqliteConnection, path: &Path) -> Result<()> {
 }
 
 #[allow(clippy::too_many_arguments)]
-async fn insert_types(
-    conn: &mut SqliteConnection,
-    rows: &[(
-        i64,
-        i64,
-        Option<i64>,
-        String,
-        Option<String>,
-        bool,
-        Option<i64>,
-        Option<i64>,
-        Option<f64>,
-        Option<f64>,
-        Option<f64>,
-        Option<f64>,
-    )],
-) -> Result<()> {
+async fn insert_types(conn: &mut SqliteConnection, rows: &[TypeInsertRow]) -> Result<()> {
     if rows.is_empty() {
         return Ok(());
     }
@@ -603,18 +621,7 @@ async fn import_dogma_attributes(conn: &mut SqliteConnection, path: &Path) -> Re
 
 async fn insert_dogma_attributes(
     conn: &mut SqliteConnection,
-    rows: &[(
-        i64,
-        Option<i64>,
-        Option<i64>,
-        Option<f64>,
-        Option<i64>,
-        Option<bool>,
-        Option<bool>,
-        Option<bool>,
-        String,
-        Option<String>,
-    )],
+    rows: &[DogmaAttributeInsertRow],
 ) -> Result<()> {
     if rows.is_empty() {
         return Ok(());
@@ -668,14 +675,7 @@ async fn import_dogma_effects(conn: &mut SqliteConnection, path: &Path) -> Resul
 
 async fn insert_dogma_effects(
     conn: &mut SqliteConnection,
-    rows: &[(
-        i64,
-        String,
-        Option<i64>,
-        Option<bool>,
-        Option<bool>,
-        Option<bool>,
-    )],
+    rows: &[DogmaEffectInsertRow],
 ) -> Result<()> {
     if rows.is_empty() {
         return Ok(());
@@ -864,7 +864,7 @@ async fn import_character_attributes(conn: &mut SqliteConnection, path: &Path) -
 
 async fn insert_character_attributes(
     conn: &mut SqliteConnection,
-    rows: &[(i64, String, Option<String>, Option<String>, Option<i64>)],
+    rows: &[CharacterAttributeInsertRow],
 ) -> Result<()> {
     if rows.is_empty() {
         return Ok(());
