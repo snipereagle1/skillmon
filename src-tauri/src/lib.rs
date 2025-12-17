@@ -13,6 +13,7 @@ use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
 use tauri::{Emitter, Listener, Manager, State};
+use tauri_plugin_notification::NotificationExt;
 
 mod auth;
 mod cache;
@@ -644,6 +645,7 @@ fn calculate_total_queue_hours(skill_queue: &[SkillQueueItem]) -> f64 {
 }
 
 async fn check_skill_queue_notifications(
+    app: &tauri::AppHandle,
     pool: &db::Pool,
     character_id: i64,
     skill_queue: &[SkillQueueItem],
@@ -706,17 +708,40 @@ async fn check_skill_queue_notifications(
                 } else {
                     format!("{:.0} hours", total_hours)
                 };
+                let title = "Skill Queue Low";
+                let message = format!(
+                    "Skill queue has {} remaining (below {} hour threshold)",
+                    hours_str, threshold_hours
+                );
+
+                // Get character name for more informative notification
+                let character_name = db::get_character(pool, character_id)
+                    .await
+                    .ok()
+                    .flatten()
+                    .map(|c| c.character_name)
+                    .unwrap_or_else(|| format!("Character {}", character_id));
+
                 db::create_notification(
                     pool,
                     character_id,
                     NOTIFICATION_TYPE_SKILL_QUEUE_LOW,
-                    "Skill Queue Low",
-                    &format!(
-                        "Skill queue has {} remaining (below {} hour threshold)",
-                        hours_str, threshold_hours
-                    ),
+                    title,
+                    &message,
                 )
                 .await?;
+
+                // Send system notification
+                let notification_title = format!("{} - {}", character_name, title);
+                if let Err(e) = app
+                    .notification()
+                    .builder()
+                    .title(&notification_title)
+                    .body(&message)
+                    .show()
+                {
+                    eprintln!("Failed to send system notification: {}", e);
+                }
             }
         } else {
             // Queue is above threshold, clear notification if it exists
@@ -730,7 +755,11 @@ async fn check_skill_queue_notifications(
     Ok(())
 }
 
-async fn refresh_all_skill_queues(pool: &db::Pool, rate_limits: &esi::RateLimitStore) {
+async fn refresh_all_skill_queues(
+    app: &tauri::AppHandle,
+    pool: &db::Pool,
+    rate_limits: &esi::RateLimitStore,
+) {
     let characters = match db::get_all_characters(pool).await {
         Ok(chars) => chars,
         Err(e) => {
@@ -741,6 +770,7 @@ async fn refresh_all_skill_queues(pool: &db::Pool, rate_limits: &esi::RateLimitS
 
     for character in characters {
         let _ = build_character_skill_queue(
+            app,
             pool,
             rate_limits,
             character.character_id,
@@ -751,6 +781,7 @@ async fn refresh_all_skill_queues(pool: &db::Pool, rate_limits: &esi::RateLimitS
 }
 
 async fn build_character_skill_queue(
+    app: &tauri::AppHandle,
     pool: &db::Pool,
     rate_limits: &esi::RateLimitStore,
     character_id: i64,
@@ -1105,7 +1136,7 @@ async fn build_character_skill_queue(
     };
 
     // Check for notifications
-    if let Err(e) = check_skill_queue_notifications(pool, character_id, &skill_queue).await {
+    if let Err(e) = check_skill_queue_notifications(app, pool, character_id, &skill_queue).await {
         eprintln!(
             "Failed to check skill queue notifications for character {}: {}",
             character_id, e
@@ -1496,6 +1527,7 @@ async fn get_training_characters_count(
 
 #[tauri::command]
 async fn get_skill_queue_for_character(
+    app: tauri::AppHandle,
     pool: State<'_, db::Pool>,
     rate_limits: State<'_, esi::RateLimitStore>,
     character_id: i64,
@@ -1505,19 +1537,26 @@ async fn get_skill_queue_for_character(
         .map_err(|e| format!("Failed to get character: {}", e))?
         .ok_or_else(|| format!("Character {} not found", character_id))?;
 
-    build_character_skill_queue(&pool, &rate_limits, character_id, &character.character_name)
-        .await
-        .map_err(|e| format!("Failed to build skill queue: {}", e))?
-        .ok_or_else(|| {
-            format!(
-                "No skill queue data available for character {}",
-                character_id
-            )
-        })
+    build_character_skill_queue(
+        &app,
+        &pool,
+        &rate_limits,
+        character_id,
+        &character.character_name,
+    )
+    .await
+    .map_err(|e| format!("Failed to build skill queue: {}", e))?
+    .ok_or_else(|| {
+        format!(
+            "No skill queue data available for character {}",
+            character_id
+        )
+    })
 }
 
 #[tauri::command]
 async fn force_refresh_skill_queue(
+    app: tauri::AppHandle,
     pool: State<'_, db::Pool>,
     rate_limits: State<'_, esi::RateLimitStore>,
     character_id: i64,
@@ -1531,15 +1570,21 @@ async fn force_refresh_skill_queue(
         .map_err(|e| format!("Failed to get character: {}", e))?
         .ok_or_else(|| format!("Character {} not found", character_id))?;
 
-    build_character_skill_queue(&pool, &rate_limits, character_id, &character.character_name)
-        .await
-        .map_err(|e| format!("Failed to build skill queue: {}", e))?
-        .ok_or_else(|| {
-            format!(
-                "No skill queue data available for character {}",
-                character_id
-            )
-        })
+    build_character_skill_queue(
+        &app,
+        &pool,
+        &rate_limits,
+        character_id,
+        &character.character_name,
+    )
+    .await
+    .map_err(|e| format!("Failed to build skill queue: {}", e))?
+    .ok_or_else(|| {
+        format!(
+            "No skill queue data available for character {}",
+            character_id
+        )
+    })
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -2579,7 +2624,7 @@ pub fn run() {
                     }
 
                     // Step 2: Refresh all character data from ESI
-                    refresh_all_skill_queues(&pool, &rate_limits).await;
+                    refresh_all_skill_queues(&app_handle, &pool, &rate_limits).await;
 
                     // Mark startup as complete and notify frontend
                     startup_state_clone.store(0, Ordering::SeqCst);
@@ -2693,6 +2738,7 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
+        .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
         .on_menu_event(|app, event| match event.id().as_ref() {
