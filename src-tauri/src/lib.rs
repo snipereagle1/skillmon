@@ -12,7 +12,7 @@ use sqlx::{QueryBuilder, Row, Sqlite};
 use tauri::image::Image;
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::TrayIconBuilder;
-use tauri::{Emitter, Listener, Manager, State};
+use tauri::{Emitter, Listener, Manager, State, WindowEvent};
 use tauri_plugin_notification::NotificationExt;
 
 mod auth;
@@ -2752,6 +2752,12 @@ pub fn run() {
                 app.exit(0);
             }
             _ => {}
+        })
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event {
+                window.hide().unwrap_or_default();
+                api.prevent_close();
+            }
         })
         .invoke_handler(tauri::generate_handler![
             start_eve_login,
