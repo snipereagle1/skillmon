@@ -1,0 +1,7 @@
+# Clippy configuration for skillmon
+
+# Set minimum supported Rust version (if needed)
+# msrv = "1.70.0"
+
+# Avoid breaking exported API (set to false to allow more aggressive lints)
+avoid-breaking-exported-api = false
