@@ -9,6 +9,7 @@ src-tauri/src/esi/client.rs
 src-tauri/src/esi/types.rs
 src-tauri/src/esi/openapi.json
 src-tauri/target
+src/components/ui/**
 
 # Build artifacts
 *.log
