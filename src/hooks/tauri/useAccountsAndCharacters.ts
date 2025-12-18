@@ -74,7 +74,6 @@ export function useAddCharacterToAccount() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accountsAndCharacters'] });
-      queryClient.invalidateQueries({ queryKey: ['characters'] });
     },
   });
 }
@@ -88,7 +87,6 @@ export function useRemoveCharacterFromAccount() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['accountsAndCharacters'] });
-      queryClient.invalidateQueries({ queryKey: ['characters'] });
     },
   });
 }

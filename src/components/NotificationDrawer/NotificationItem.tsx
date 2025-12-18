@@ -1,8 +1,9 @@
 import { formatDistanceToNow } from 'date-fns';
+import { useMemo } from 'react';
 
 import { Button } from '@/components/ui/button';
 import type { NotificationResponse } from '@/generated/types';
-import { useCharacters } from '@/hooks/tauri/useCharacters';
+import { useAccountsAndCharacters } from '@/hooks/tauri/useAccountsAndCharacters';
 
 interface NotificationItemProps {
   notification: NotificationResponse;
@@ -15,8 +16,13 @@ export function NotificationItem({
   onDismiss,
   canDismiss,
 }: NotificationItemProps) {
-  const { data: characters = [] } = useCharacters();
-  const character = characters.find(
+  const { data: accountsData } = useAccountsAndCharacters();
+  const allCharacters = useMemo(() => {
+    if (!accountsData) return [];
+    const accountChars = accountsData.accounts.flatMap((acc) => acc.characters);
+    return [...accountChars, ...accountsData.unassigned_characters];
+  }, [accountsData]);
+  const character = allCharacters.find(
     (c) => c.character_id === notification.character_id
   );
 
