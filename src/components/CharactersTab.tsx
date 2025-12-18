@@ -1,14 +1,12 @@
-import { useQueries } from '@tanstack/react-query';
 import { startTransition, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { getSkillQueueForCharacter } from '@/generated/commands';
-import type { CharacterSkillQueue } from '@/generated/types';
-import { useCharacters } from '@/hooks/tauri/useCharacters';
+import { useAccountsAndCharacters } from '@/hooks/tauri/useAccountsAndCharacters';
 import { useCharacterSkills } from '@/hooks/tauri/useCharacterSkills';
+import { useSkillQueue } from '@/hooks/tauri/useSkillQueue';
 
+import { AccountSidebar } from './Accounts/AccountSidebar';
 import { Attributes } from './Attributes';
-import { CharacterCard } from './CharacterCard';
 import { Clones } from './Clones';
 import { NotificationSettings } from './NotificationSettings';
 import { SkillQueue } from './SkillQueue';
@@ -16,57 +14,39 @@ import { Skills } from './Skills';
 
 export function CharactersTab() {
   const {
-    data: characters = [],
-    isLoading: isLoadingCharacters,
-    error: charactersError,
-  } = useCharacters();
+    data: accountsData,
+    isLoading: isLoadingAccounts,
+    error: accountsError,
+  } = useAccountsAndCharacters();
   const [selectedCharacterId, setSelectedCharacterId] = useState<number | null>(
     null
   );
   const hasInitializedRef = useRef(false);
   const { data: characterSkills } = useCharacterSkills(selectedCharacterId);
-
-  const skillQueueQueriesConfig = useMemo(
-    () =>
-      characters.map((character) => ({
-        queryKey: ['skillQueue', character.character_id] as const,
-        queryFn: async (): Promise<CharacterSkillQueue> => {
-          return await getSkillQueueForCharacter({
-            characterId: character.character_id,
-          });
-        },
-        refetchInterval:
-          character.character_id === selectedCharacterId ? 60_000 : 600_000,
-      })),
-    [characters, selectedCharacterId]
-  );
-
-  const skillQueueQueries = useQueries({
-    queries: skillQueueQueriesConfig,
+  const { data: selectedSkillQueue } = useSkillQueue(selectedCharacterId, {
+    refetchInterval: 60_000,
   });
 
-  const skillQueues: CharacterSkillQueue[] = skillQueueQueries
-    .map((query) => query.data)
-    .filter((q): q is CharacterSkillQueue => q !== undefined);
-  const isLoadingQueues = skillQueueQueries.some((query) => query.isLoading);
+  const allCharacters = useMemo(() => {
+    if (!accountsData) return [];
+    const accountChars = accountsData.accounts.flatMap((acc) => acc.characters);
+    return [...accountChars, ...accountsData.unassigned_characters];
+  }, [accountsData]);
 
-  const isLoading = isLoadingCharacters || isLoadingQueues;
-  const error = charactersError;
+  const isLoading = isLoadingAccounts;
+  const error = accountsError;
 
   useEffect(() => {
-    if (characters.length > 0 && !hasInitializedRef.current) {
+    if (allCharacters.length > 0 && !hasInitializedRef.current) {
       hasInitializedRef.current = true;
       startTransition(() => {
-        setSelectedCharacterId(characters[0].character_id);
+        setSelectedCharacterId(allCharacters[0].character_id);
       });
     }
-  }, [characters]);
+  }, [allCharacters]);
 
-  const selectedCharacter = characters.find(
+  const selectedCharacter = allCharacters.find(
     (c) => c.character_id === selectedCharacterId
-  );
-  const selectedSkillQueue = skillQueues.find(
-    (q) => q.character_id === selectedCharacterId
   );
 
   const totalSkillpoints = useMemo(() => {
@@ -103,29 +83,16 @@ export function CharactersTab() {
   return (
     <div className="flex h-full gap-4">
       <div className="w-64 shrink-0 overflow-y-auto">
-        <div className="space-y-2">
-          {characters.length === 0 ? (
-            <p className="text-muted-foreground p-4">
-              No characters added yet.
-            </p>
-          ) : (
-            characters.map((character) => {
-              const queue = skillQueueQueries.find(
-                (q) => q.data?.character_id === character.character_id
-              )?.data;
-              return (
-                <CharacterCard
-                  key={character.character_id}
-                  character={character}
-                  skillQueue={queue?.skill_queue}
-                  isPaused={queue?.is_paused ?? false}
-                  isSelected={character.character_id === selectedCharacterId}
-                  onClick={() => setSelectedCharacterId(character.character_id)}
-                />
-              );
-            })
-          )}
-        </div>
+        {accountsData &&
+        accountsData.accounts.length === 0 &&
+        accountsData.unassigned_characters.length === 0 ? (
+          <p className="text-muted-foreground p-4">No characters added yet.</p>
+        ) : (
+          <AccountSidebar
+            selectedCharacterId={selectedCharacterId}
+            onSelectCharacter={setSelectedCharacterId}
+          />
+        )}
       </div>
       <div className="flex-1 border rounded-lg overflow-hidden flex flex-col">
         {selectedCharacter ? (
