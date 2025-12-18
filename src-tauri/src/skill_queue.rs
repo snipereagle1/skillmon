@@ -244,6 +244,8 @@ pub async fn build_character_skill_queue(
             character_id,
             character_name: character_name.to_string(),
             unallocated_sp: 0,
+            account_id: None,
+            sort_order: 0,
         });
 
     let queue_data = match esi_helpers::get_cached_skill_queue(

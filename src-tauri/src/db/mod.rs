@@ -7,6 +7,7 @@ use sqlx::{
 };
 use tauri::Manager;
 
+pub mod accounts;
 pub mod character_attributes;
 pub mod character_skills;
 pub mod characters;
@@ -16,6 +17,11 @@ pub mod notifications;
 pub mod sde;
 pub mod tokens;
 
+pub use accounts::{
+    add_character_to_account, create_account, delete_account, get_all_accounts,
+    get_characters_for_account, get_unassigned_characters, remove_character_from_account,
+    reorder_accounts, reorder_characters_in_account, update_account_name,
+};
 pub use character_attributes::{
     get_character_attributes, set_character_attributes, CharacterAttributes,
 };

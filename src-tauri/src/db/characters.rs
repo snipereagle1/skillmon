@@ -9,11 +9,14 @@ pub struct Character {
     pub character_id: i64,
     pub character_name: String,
     pub unallocated_sp: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub account_id: Option<i64>,
+    pub sort_order: i64,
 }
 
 pub async fn get_character(pool: &Pool, character_id: i64) -> Result<Option<Character>> {
     let character = sqlx::query_as::<_, Character>(
-        "SELECT character_id, character_name, unallocated_sp FROM characters WHERE character_id = ?",
+        "SELECT character_id, character_name, unallocated_sp, account_id, sort_order FROM characters WHERE character_id = ?",
     )
     .bind(character_id)
     .fetch_optional(pool)
@@ -24,7 +27,7 @@ pub async fn get_character(pool: &Pool, character_id: i64) -> Result<Option<Char
 
 pub async fn get_all_characters(pool: &Pool) -> Result<Vec<Character>> {
     let characters = sqlx::query_as::<_, Character>(
-        "SELECT character_id, character_name, unallocated_sp FROM characters ORDER BY character_name",
+        "SELECT character_id, character_name, unallocated_sp, account_id, sort_order FROM characters ORDER BY account_id, sort_order, character_name",
     )
     .fetch_all(pool)
     .await?;
@@ -33,7 +36,7 @@ pub async fn get_all_characters(pool: &Pool) -> Result<Vec<Character>> {
 }
 
 pub async fn add_character(pool: &Pool, character_id: i64, character_name: &str) -> Result<()> {
-    sqlx::query("INSERT INTO characters (character_id, character_name) VALUES (?, ?)")
+    sqlx::query("INSERT INTO characters (character_id, character_name, account_id, sort_order) VALUES (?, ?, NULL, 0)")
         .bind(character_id)
         .bind(character_name)
         .execute(pool)
