@@ -111,7 +111,7 @@ pub async fn add_character_to_account(
 }
 
 pub async fn remove_character_from_account(pool: &Pool, character_id: i64) -> Result<()> {
-    sqlx::query("UPDATE characters SET account_id = NULL WHERE character_id = ?")
+    sqlx::query("UPDATE characters SET account_id = NULL, sort_order = 0 WHERE character_id = ?")
         .bind(character_id)
         .execute(pool)
         .await?;
