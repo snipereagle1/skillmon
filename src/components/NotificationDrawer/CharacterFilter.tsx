@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 import {
   Select,
   SelectContent,
@@ -5,7 +7,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useCharacters } from '@/hooks/tauri/useCharacters';
+import { useAccountsAndCharacters } from '@/hooks/tauri/useAccountsAndCharacters';
 
 interface CharacterFilterProps {
   selectedCharacterId: number | null | undefined;
@@ -16,7 +18,12 @@ export function CharacterFilter({
   selectedCharacterId,
   onCharacterChange,
 }: CharacterFilterProps) {
-  const { data: characters = [] } = useCharacters();
+  const { data: accountsData } = useAccountsAndCharacters();
+  const characters = useMemo(() => {
+    if (!accountsData) return [];
+    const accountChars = accountsData.accounts.flatMap((acc) => acc.characters);
+    return [...accountChars, ...accountsData.unassigned_characters];
+  }, [accountsData]);
 
   const value = selectedCharacterId?.toString() ?? 'all';
 

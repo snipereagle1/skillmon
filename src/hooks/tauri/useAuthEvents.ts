@@ -27,7 +27,9 @@ export function useAuthEvents() {
             await queryClient.invalidateQueries({
               queryKey: ['clones', characterId],
             });
-            await queryClient.invalidateQueries({ queryKey: ['characters'] });
+            await queryClient.invalidateQueries({
+              queryKey: ['accountsAndCharacters'],
+            });
           }
         );
 

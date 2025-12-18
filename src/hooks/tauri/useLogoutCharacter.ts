@@ -10,7 +10,7 @@ export function useLogoutCharacter() {
       return await logoutCharacter({ characterId });
     },
     onSuccess: (_, characterId) => {
-      queryClient.invalidateQueries({ queryKey: ['characters'] });
+      queryClient.invalidateQueries({ queryKey: ['accountsAndCharacters'] });
       queryClient.invalidateQueries({ queryKey: ['skillQueue', characterId] });
     },
   });

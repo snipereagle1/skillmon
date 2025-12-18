@@ -167,6 +167,8 @@ pub async fn get_skill_queues(
                 character_id,
                 character_name: character_name.clone(),
                 unallocated_sp: 0,
+                account_id: None,
+                sort_order: 0,
             });
 
         match esi_helpers::get_cached_skill_queue(&pool, &client, character_id, &rate_limits).await

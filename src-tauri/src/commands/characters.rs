@@ -2,7 +2,7 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::db;
-
+#[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct Character {
     pub character_id: i64,
@@ -18,14 +18,6 @@ impl From<db::Character> for Character {
             unallocated_sp: c.unallocated_sp,
         }
     }
-}
-
-#[tauri::command]
-pub async fn get_characters(pool: State<'_, db::Pool>) -> Result<Vec<Character>, String> {
-    db::get_all_characters(&pool)
-        .await
-        .map(|chars| chars.into_iter().map(Character::from).collect())
-        .map_err(|e| format!("Failed to get characters: {}", e))
 }
 
 #[tauri::command]
