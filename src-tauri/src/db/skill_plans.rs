@@ -32,7 +32,7 @@ pub struct SkillPrerequisite {
 
 pub async fn create_skill_plan(pool: &Pool, name: &str, description: Option<&str>) -> Result<i64> {
     let now = chrono::Utc::now().timestamp();
-    sqlx::query(
+    let result = sqlx::query(
         "INSERT INTO skill_plans (name, description, created_at, updated_at) VALUES (?, ?, ?, ?)",
     )
     .bind(name)
@@ -42,9 +42,7 @@ pub async fn create_skill_plan(pool: &Pool, name: &str, description: Option<&str
     .execute(pool)
     .await?;
 
-    let plan_id = sqlx::query_scalar::<_, i64>("SELECT last_insert_rowid()")
-        .fetch_one(pool)
-        .await?;
+    let plan_id = result.last_insert_rowid();
 
     Ok(plan_id)
 }
