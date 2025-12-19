@@ -15,6 +15,7 @@ pub mod clones;
 pub mod locations;
 pub mod notifications;
 pub mod sde;
+pub mod skill_plans;
 pub mod tokens;
 
 pub use accounts::{

@@ -4511,6 +4511,7 @@ dependencies = [
  "hyper",
  "jsonwebtoken",
  "oas3-gen-support",
+ "quick-xml 0.37.5",
  "rand 0.8.5",
  "reqwest",
  "serde",

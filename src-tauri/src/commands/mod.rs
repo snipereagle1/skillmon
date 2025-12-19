@@ -6,5 +6,6 @@ pub mod clones;
 pub mod notifications;
 pub mod rate_limits;
 pub mod sde;
+pub mod skill_plans;
 pub mod skill_queues;
 pub mod skills;
