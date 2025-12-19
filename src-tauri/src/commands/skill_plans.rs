@@ -46,6 +46,12 @@ pub struct SkillPlanWithEntriesResponse {
     pub entries: Vec<SkillPlanEntryResponse>,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct SkillSearchResult {
+    pub skill_type_id: i64,
+    pub name: String,
+}
+
 #[tauri::command]
 pub async fn create_skill_plan(
     pool: State<'_, db::Pool>,
@@ -615,4 +621,34 @@ pub async fn export_skill_plan_xml(
 
     let result = writer.into_inner().into_inner();
     String::from_utf8(result).map_err(|e| format!("Failed to convert XML to string: {}", e))
+}
+
+#[tauri::command]
+pub async fn search_skills(
+    pool: State<'_, db::Pool>,
+    query: String,
+) -> Result<Vec<SkillSearchResult>, String> {
+    let search_pattern = format!("%{}%", query);
+    let skills: Vec<(i64, String)> = sqlx::query_as::<_, (i64, String)>(
+        "SELECT type_id, name FROM sde_types
+         WHERE group_id IN (SELECT group_id FROM sde_groups WHERE category_id = 16)
+         AND published = 1
+         AND name LIKE ?
+         ORDER BY name
+         LIMIT 100",
+    )
+    .bind(&search_pattern)
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| format!("Failed to search skills: {}", e))?;
+
+    let results: Vec<SkillSearchResult> = skills
+        .into_iter()
+        .map(|(skill_type_id, name)| SkillSearchResult {
+            skill_type_id,
+            name,
+        })
+        .collect();
+
+    Ok(results)
 }

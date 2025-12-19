@@ -1,0 +1,126 @@
+import { useState } from 'react';
+
+import { Button } from '@/components/ui/button';
+import { useDeleteSkillPlan, useSkillPlans } from '@/hooks/tauri/useSkillPlans';
+
+import { CreatePlanDialog } from './CreatePlanDialog';
+
+interface PlanListProps {
+  selectedPlanId: number | null;
+  onSelectPlan: (planId: number | null) => void;
+}
+
+export function PlanList({ selectedPlanId, onSelectPlan }: PlanListProps) {
+  const { data: plans, isLoading, error } = useSkillPlans();
+  const deletePlanMutation = useDeleteSkillPlan();
+  const [createDialogOpen, setCreateDialogOpen] = useState(false);
+
+  const handleDelete = async (planId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (
+      !window.confirm(
+        'Are you sure you want to delete this plan? This action cannot be undone.'
+      )
+    ) {
+      return;
+    }
+
+    try {
+      await deletePlanMutation.mutateAsync({ planId });
+      if (selectedPlanId === planId) {
+        onSelectPlan(null);
+      }
+    } catch (err) {
+      console.error('Failed to delete plan:', err);
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <p className="text-muted-foreground">Loading plans...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center h-full p-4">
+        <p className="text-sm text-destructive">
+          Error:{' '}
+          {error instanceof Error ? error.message : 'Failed to load plans'}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      <div className="p-4 border-b border-border">
+        <Button onClick={() => setCreateDialogOpen(true)} className="w-full">
+          Create Plan
+        </Button>
+      </div>
+      <div className="flex-1 overflow-y-auto">
+        {!plans || plans.length === 0 ? (
+          <div className="flex items-center justify-center h-full p-4">
+            <p className="text-sm text-muted-foreground text-center">
+              No plans yet. Create your first plan to get started.
+            </p>
+          </div>
+        ) : (
+          <div className="p-2 space-y-1">
+            {plans.map((plan) => (
+              <div
+                key={plan.plan_id}
+                onClick={() => onSelectPlan(plan.plan_id)}
+                className={`
+                  p-3 rounded-md cursor-pointer transition-colors
+                  ${
+                    selectedPlanId === plan.plan_id
+                      ? 'bg-primary text-primary-foreground'
+                      : 'hover:bg-muted'
+                  }
+                `}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <h3 className="font-semibold truncate">{plan.name}</h3>
+                    {plan.description && (
+                      <p
+                        className={`text-sm mt-1 line-clamp-2 ${
+                          selectedPlanId === plan.plan_id
+                            ? 'text-primary-foreground/80'
+                            : 'text-muted-foreground'
+                        }`}
+                      >
+                        {plan.description}
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={(e) => handleDelete(plan.plan_id, e)}
+                    disabled={deletePlanMutation.isPending}
+                    className="shrink-0 size-6 p-0"
+                  >
+                    ×
+                  </Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+      <CreatePlanDialog
+        open={createDialogOpen}
+        onOpenChange={setCreateDialogOpen}
+        onSuccess={(planId) => {
+          setCreateDialogOpen(false);
+          onSelectPlan(planId);
+        }}
+      />
+    </>
+  );
+}
