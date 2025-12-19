@@ -55,7 +55,7 @@ export function CharacterQueue({ queue }: CharacterQueueProps) {
   const unallocatedSP = queue.unallocated_sp;
 
   const progressPercentage = Math.min((queueSize / MAX_QUEUE_SIZE) * 100, 100);
-
+  console.table(queue.skill_queue);
   return (
     <TooltipProvider>
       <div className="flex flex-col h-full bg-background">

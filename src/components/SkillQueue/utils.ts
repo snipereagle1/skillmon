@@ -71,11 +71,12 @@ export function calculateTimeToTrain(skill: SkillQueueItem): string | null {
     return null;
   }
 
-  const currentSP =
+  const rawCurrentSP =
     skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
-  if (currentSP == null) {
+  if (rawCurrentSP == null) {
     return null;
   }
+  const currentSP = Math.max(rawCurrentSP, skill.level_start_sp);
   const remainingSP = skill.level_end_sp - currentSP;
 
   if (remainingSP <= 0) {
@@ -93,11 +94,12 @@ export function calculateCompletionPercentage(skill: SkillQueueItem): number {
     return 0;
   }
 
-  const currentSP =
+  const rawCurrentSP =
     skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
-  if (currentSP == null) {
+  if (rawCurrentSP == null) {
     return 0;
   }
+  const currentSP = Math.max(rawCurrentSP, skill.level_start_sp);
   const totalSP = skill.level_end_sp - skill.level_start_sp;
   const completedSP = currentSP - skill.level_start_sp;
 
@@ -125,11 +127,12 @@ export function calculateTrainingHours(skill: SkillQueueItem): number {
     return 0;
   }
 
-  const currentSP =
+  const rawCurrentSP =
     skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
-  if (currentSP == null) {
+  if (rawCurrentSP == null) {
     return 0;
   }
+  const currentSP = Math.max(rawCurrentSP, skill.level_start_sp);
   const remainingSP = skill.level_end_sp - currentSP;
 
   if (remainingSP <= 0) {
