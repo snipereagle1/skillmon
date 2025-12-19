@@ -9,6 +9,9 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
+    "test": "vitest",
+    "test:watch": "vitest --watch",
+    "test:coverage": "vitest --coverage",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:rust": "cd src-tauri && cargo clippy -- -D warnings",
@@ -76,6 +79,7 @@
     "tailwindcss": "^4.1.17",
     "typescript": "~5.8.3",
     "typescript-eslint": "^8.50.0",
-    "vite": "^7.0.4"
+    "vite": "^7.0.4",
+    "vitest": "^4.0.16"
   }
 }

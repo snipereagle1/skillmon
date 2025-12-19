@@ -56,13 +56,15 @@ export function SkillQueueEntry({
         isTraining && 'bg-primary/5'
       )}
     >
-      {isTraining && completionPercentage > 0 && (
+      {isTraining && (
         <div
           className={cn(
             'absolute inset-0 pointer-events-none transition-all',
             progressColor
           )}
-          style={{ width: `${completionPercentage}%` }}
+          style={{
+            width: `${Math.max(completionPercentage, 1)}%`,
+          }}
         />
       )}
       <div className="flex items-center justify-between gap-4 relative z-10">
