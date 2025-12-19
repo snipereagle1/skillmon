@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useDeleteSkillPlan, useSkillPlans } from '@/hooks/tauri/useSkillPlans';
 
 import { CreatePlanDialog } from './CreatePlanDialog';
+import { DeletePlanDialog } from './DeletePlanDialog';
 
 interface PlanListProps {
   selectedPlanId: number | null;
@@ -14,22 +15,32 @@ export function PlanList({ selectedPlanId, onSelectPlan }: PlanListProps) {
   const { data: plans, isLoading, error } = useSkillPlans();
   const deletePlanMutation = useDeleteSkillPlan();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [planToDelete, setPlanToDelete] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
 
-  const handleDelete = async (planId: number, e: React.MouseEvent) => {
+  const handleDeleteClick = (
+    planId: number,
+    planName: string,
+    e: React.MouseEvent
+  ) => {
     e.stopPropagation();
-    if (
-      !window.confirm(
-        'Are you sure you want to delete this plan? This action cannot be undone.'
-      )
-    ) {
-      return;
-    }
+    setPlanToDelete({ id: planId, name: planName });
+    setDeleteDialogOpen(true);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!planToDelete) return;
 
     try {
-      await deletePlanMutation.mutateAsync({ planId });
-      if (selectedPlanId === planId) {
+      await deletePlanMutation.mutateAsync({ planId: planToDelete.id });
+      if (selectedPlanId === planToDelete.id) {
         onSelectPlan(null);
       }
+      setDeleteDialogOpen(false);
+      setPlanToDelete(null);
     } catch (err) {
       console.error('Failed to delete plan:', err);
     }
@@ -101,7 +112,9 @@ export function PlanList({ selectedPlanId, onSelectPlan }: PlanListProps) {
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={(e) => handleDelete(plan.plan_id, e)}
+                    onClick={(e) =>
+                      handleDeleteClick(plan.plan_id, plan.name, e)
+                    }
                     disabled={deletePlanMutation.isPending}
                     className="shrink-0 size-6 p-0"
                   >
@@ -120,6 +133,13 @@ export function PlanList({ selectedPlanId, onSelectPlan }: PlanListProps) {
           setCreateDialogOpen(false);
           onSelectPlan(planId);
         }}
+      />
+      <DeletePlanDialog
+        open={deleteDialogOpen}
+        onOpenChange={setDeleteDialogOpen}
+        planName={planToDelete?.name}
+        onConfirm={handleDeleteConfirm}
+        isDeleting={deletePlanMutation.isPending}
       />
     </>
   );
