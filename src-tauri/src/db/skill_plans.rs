@@ -243,7 +243,6 @@ pub async fn reorder_plan_entries(pool: &Pool, plan_id: i64, entry_ids: &[i64]) 
 pub async fn get_prerequisites_recursive(
     pool: &Pool,
     skill_type_id: i64,
-    target_level: i64,
 ) -> Result<Vec<SkillPrerequisite>> {
     let mut prerequisites = Vec::new();
     let mut visited = std::collections::HashSet::new();
@@ -265,15 +264,13 @@ pub async fn get_prerequisites_recursive(
         .await?;
 
         for (required_skill_id, required_level) in reqs {
-            if required_level <= target_level {
-                prerequisites.push(SkillPrerequisite {
-                    required_skill_id,
-                    required_level,
-                });
+            prerequisites.push(SkillPrerequisite {
+                required_skill_id,
+                required_level,
+            });
 
-                if !visited.contains(&required_skill_id) {
-                    stack.push(required_skill_id);
-                }
+            if !visited.contains(&required_skill_id) {
+                stack.push(required_skill_id);
             }
         }
     }

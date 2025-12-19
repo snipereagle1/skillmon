@@ -149,12 +149,10 @@ async fn resolve_and_add_prerequisites(
     pool: &db::Pool,
     plan_id: i64,
     skill_type_id: i64,
-    target_level: i64,
 ) -> Result<(), String> {
-    let prerequisites =
-        db::skill_plans::get_prerequisites_recursive(pool, skill_type_id, target_level)
-            .await
-            .map_err(|e| format!("Failed to get prerequisites: {}", e))?;
+    let prerequisites = db::skill_plans::get_prerequisites_recursive(pool, skill_type_id)
+        .await
+        .map_err(|e| format!("Failed to get prerequisites: {}", e))?;
 
     for prereq in prerequisites {
         for level in 1..=prereq.required_level {
@@ -229,7 +227,7 @@ pub async fn add_plan_entry(
     .await
     .map_err(|e| format!("Failed to add plan entry: {}", e))?;
 
-    resolve_and_add_prerequisites(&pool, plan_id, skill_type_id, planned_level).await?;
+    resolve_and_add_prerequisites(&pool, plan_id, skill_type_id).await?;
 
     get_skill_plan_with_entries(pool, plan_id)
         .await?
@@ -328,7 +326,7 @@ pub async fn import_skill_plan_text(
                     .await
                     .map_err(|e| format!("Failed to add entry: {}", e))?;
 
-                resolve_and_add_prerequisites(&pool, plan_id, id, level).await?;
+                resolve_and_add_prerequisites(&pool, plan_id, id).await?;
                 entries_added += 1;
             }
             None => {
@@ -444,16 +442,17 @@ pub async fn import_skill_plan_xml(
         return Err("No entries found in XML".to_string());
     }
 
-    for (skill_id, level, entry_type, notes) in entries.iter() {
-        let max_sort_order: Option<i64> =
+    let mut sort_order: i64 = {
+        let max: Option<i64> =
             sqlx::query_scalar("SELECT MAX(sort_order) FROM skill_plan_entries WHERE plan_id = ?")
                 .bind(plan_id)
                 .fetch_optional(&*pool)
                 .await
                 .map_err(|e| format!("Failed to get max sort order: {}", e))?;
+        max.unwrap_or(-1) + 1
+    };
 
-        let next_sort_order = max_sort_order.unwrap_or(-1) + 1;
-
+    for (skill_id, level, entry_type, notes) in entries.iter() {
         sqlx::query(
             "INSERT INTO skill_plan_entries (plan_id, skill_type_id, planned_level, sort_order, entry_type, notes)
              VALUES (?, ?, ?, ?, ?, ?)
@@ -469,7 +468,7 @@ pub async fn import_skill_plan_xml(
         .bind(plan_id)
         .bind(skill_id)
         .bind(level)
-        .bind(next_sort_order)
+        .bind(sort_order)
         .bind(entry_type)
         .bind(notes.as_deref())
         .execute(&*pool)
@@ -477,8 +476,25 @@ pub async fn import_skill_plan_xml(
         .map_err(|e| format!("Failed to add entry: {}", e))?;
 
         if entry_type == "Planned" {
-            resolve_and_add_prerequisites(&pool, plan_id, *skill_id, *level).await?;
+            resolve_and_add_prerequisites(&pool, plan_id, *skill_id).await?;
         }
+
+        sort_order += 1;
+    }
+
+    // Verify prerequisites for all Planned entries to ensure completeness
+    let planned_entries: Vec<(i64, i64)> = sqlx::query_as::<_, (i64, i64)>(
+        "SELECT skill_type_id, planned_level
+         FROM skill_plan_entries
+         WHERE plan_id = ? AND entry_type = 'Planned'",
+    )
+    .bind(plan_id)
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| format!("Failed to get planned entries: {}", e))?;
+
+    for (skill_type_id, _planned_level) in planned_entries {
+        resolve_and_add_prerequisites(&pool, plan_id, skill_type_id).await?;
     }
 
     get_skill_plan_with_entries(pool, plan_id)
