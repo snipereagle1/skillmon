@@ -19,6 +19,7 @@ tauri-build = { version = "2", features = [] }
 tauri-typegen = "0.3.4"
 [dependencies]
 tauri = { version = "2", features = ["tray-icon", "image-png"] }
+tauri-plugin-clipboard-manager = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-fs = "2"
 tauri-plugin-notification = "2"

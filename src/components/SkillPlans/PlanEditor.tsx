@@ -1,3 +1,4 @@
+import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { Copy } from 'lucide-react';
@@ -114,10 +115,12 @@ export function PlanEditor({ planId }: PlanEditorProps) {
     setIsCopyingText(true);
     try {
       const text = await exportSkillPlanText({ planId });
-      await navigator.clipboard.writeText(text);
+      await writeText(text);
     } catch (err) {
       console.error('Failed to copy to clipboard:', err);
-      alert('Failed to copy to clipboard');
+      const errorMessage =
+        err instanceof Error ? err.message : 'Unknown error occurred';
+      alert(`Failed to copy to clipboard: ${errorMessage}`);
     } finally {
       setIsCopyingText(false);
     }
