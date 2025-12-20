@@ -285,7 +285,8 @@ pub fn run() {
             commands::skill_plans::import_skill_plan_xml,
             commands::skill_plans::export_skill_plan_text,
             commands::skill_plans::export_skill_plan_xml,
-            commands::skill_plans::search_skills
+            commands::skill_plans::search_skills,
+            commands::skill_plans::compare_skill_plan_with_character
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

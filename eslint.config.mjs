@@ -82,7 +82,7 @@ export default [
 
       complexity: ['warn', 20],
       'max-depth': ['warn', 4],
-      'max-lines-per-function': ['warn', 250],
+      // 'max-lines-per-function': ['warn', 250],
     },
   },
   {

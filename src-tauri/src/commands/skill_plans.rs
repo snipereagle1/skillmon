@@ -57,6 +57,30 @@ pub struct SkillSearchResult {
     pub name: String,
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct PlanComparisonResponse {
+    pub plan: SkillPlanResponse,
+    pub character_id: i64,
+    pub entries: Vec<PlanComparisonEntry>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PlanComparisonEntry {
+    pub entry_id: i64,
+    pub skill_type_id: i64,
+    pub skill_name: String,
+    pub planned_level: i64,
+    pub trained_level: i64,
+    pub active_level: i64,
+    pub entry_type: String,
+    pub sort_order: i64,
+    pub rank: Option<i64>,
+    pub skillpoints_for_planned_level: i64,
+    pub current_skillpoints: i64,
+    pub missing_skillpoints: i64,
+    pub status: String,
+}
+
 #[tauri::command]
 pub async fn create_skill_plan(
     pool: State<'_, db::Pool>,
@@ -739,4 +763,95 @@ pub async fn search_skills(
         .collect();
 
     Ok(results)
+}
+
+#[tauri::command]
+pub async fn compare_skill_plan_with_character(
+    pool: State<'_, db::Pool>,
+    plan_id: i64,
+    character_id: i64,
+) -> Result<PlanComparisonResponse, String> {
+    let plan = db::skill_plans::get_skill_plan(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to get skill plan: {}", e))?
+        .ok_or_else(|| "Plan not found".to_string())?;
+
+    let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to get plan entries: {}", e))?;
+
+    let character_skills = db::get_character_skills(&pool, character_id)
+        .await
+        .map_err(|e| format!("Failed to get character skills: {}", e))?;
+
+    let character_skills_map: std::collections::HashMap<i64, db::CharacterSkill> = character_skills
+        .into_iter()
+        .map(|s| (s.skill_id, s))
+        .collect();
+
+    let skill_type_ids: Vec<i64> = entries.iter().map(|e| e.skill_type_id).collect();
+    let skill_attributes = utils::get_skill_attributes(&pool, &skill_type_ids)
+        .await
+        .map_err(|e| format!("Failed to get skill attributes: {}", e))?;
+
+    let mut comparison_entries = Vec::new();
+    for entry in entries {
+        let skill_name =
+            sqlx::query_scalar::<_, String>("SELECT name FROM sde_types WHERE type_id = ?")
+                .bind(entry.skill_type_id)
+                .fetch_optional(&*pool)
+                .await
+                .map_err(|e| format!("Failed to get skill name: {}", e))?
+                .unwrap_or_else(|| format!("Unknown Skill ({})", entry.skill_type_id));
+
+        let char_skill = character_skills_map.get(&entry.skill_type_id);
+        let trained_level = char_skill.map(|s| s.trained_skill_level).unwrap_or(0);
+        let active_level = char_skill.map(|s| s.active_skill_level).unwrap_or(0);
+        let current_skillpoints = char_skill.map(|s| s.skillpoints_in_skill).unwrap_or(0);
+
+        let skill_attr = skill_attributes.get(&entry.skill_type_id);
+        let rank = skill_attr.and_then(|attr| attr.rank);
+
+        let skillpoints_for_planned_level = if let Some(rank_val) = rank {
+            utils::calculate_sp_for_level(rank_val, entry.planned_level as i32)
+        } else {
+            0
+        };
+
+        let missing_skillpoints = if trained_level >= entry.planned_level {
+            0
+        } else {
+            (skillpoints_for_planned_level - current_skillpoints).max(0)
+        };
+
+        let status = if trained_level >= entry.planned_level {
+            "complete"
+        } else if trained_level > 0 {
+            "in_progress"
+        } else {
+            "not_started"
+        };
+
+        comparison_entries.push(PlanComparisonEntry {
+            entry_id: entry.entry_id,
+            skill_type_id: entry.skill_type_id,
+            skill_name,
+            planned_level: entry.planned_level,
+            trained_level,
+            active_level,
+            entry_type: entry.entry_type,
+            sort_order: entry.sort_order,
+            rank,
+            skillpoints_for_planned_level,
+            current_skillpoints,
+            missing_skillpoints,
+            status: status.to_string(),
+        });
+    }
+
+    Ok(PlanComparisonResponse {
+        plan: SkillPlanResponse::from(plan),
+        character_id,
+        entries: comparison_entries,
+    })
 }
