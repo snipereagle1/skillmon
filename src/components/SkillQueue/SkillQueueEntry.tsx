@@ -42,7 +42,7 @@ export function SkillQueueEntry({
   const skillHours = calculateTrainingHours(skill);
   const timePercentage =
     totalQueueHours > 0 ? (skillHours / totalQueueHours) * 100 : 0;
-  const MIN_WIDTH_PERCENTAGE = 1;
+  const MIN_WIDTH_PERCENTAGE = 0.2;
   const displayWidth = Math.max(timePercentage, MIN_WIDTH_PERCENTAGE);
 
   const useYellow = isPaused === true && isTraining;

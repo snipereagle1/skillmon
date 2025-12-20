@@ -220,6 +220,9 @@ pub fn run() {
                 let _ = window.set_focus();
             }
         }))
+        .plugin(tauri_plugin_clipboard_manager::init())
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_fs::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_deep_link::init())
@@ -267,7 +270,23 @@ pub fn run() {
             commands::notifications::get_notifications,
             commands::notifications::dismiss_notification,
             commands::notifications::get_notification_settings,
-            commands::notifications::upsert_notification_setting
+            commands::notifications::upsert_notification_setting,
+            commands::skill_plans::create_skill_plan,
+            commands::skill_plans::get_all_skill_plans,
+            commands::skill_plans::get_skill_plan,
+            commands::skill_plans::get_skill_plan_with_entries,
+            commands::skill_plans::update_skill_plan,
+            commands::skill_plans::delete_skill_plan,
+            commands::skill_plans::add_plan_entry,
+            commands::skill_plans::update_plan_entry,
+            commands::skill_plans::delete_plan_entry,
+            commands::skill_plans::reorder_plan_entries,
+            commands::skill_plans::import_skill_plan_text,
+            commands::skill_plans::import_skill_plan_xml,
+            commands::skill_plans::export_skill_plan_text,
+            commands::skill_plans::export_skill_plan_xml,
+            commands::skill_plans::search_skills,
+            commands::skill_plans::compare_skill_plan_with_character
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

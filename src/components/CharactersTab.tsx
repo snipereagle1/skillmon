@@ -7,6 +7,7 @@ import { useSkillQueue } from '@/hooks/tauri/useSkillQueue';
 
 import { AccountSidebar } from './Accounts/AccountSidebar';
 import { Attributes } from './Attributes';
+import { CharacterPlanComparison } from './CharacterPlanComparison';
 import { Clones } from './Clones';
 import { NotificationSettings } from './NotificationSettings';
 import { SkillQueue } from './SkillQueue';
@@ -106,6 +107,7 @@ export function CharactersTab() {
                 <TabsTrigger value="skills">Skills</TabsTrigger>
                 <TabsTrigger value="clones">Clones</TabsTrigger>
                 <TabsTrigger value="attributes">Attributes</TabsTrigger>
+                <TabsTrigger value="plans">Plans</TabsTrigger>
                 <TabsTrigger value="settings">Settings</TabsTrigger>
               </TabsList>
               {totalSkillpoints !== null && (
@@ -131,6 +133,9 @@ export function CharactersTab() {
               className="flex-1 overflow-hidden m-0"
             >
               <Attributes characterId={selectedCharacterId} />
+            </TabsContent>
+            <TabsContent value="plans" className="flex-1 overflow-hidden m-0">
+              <CharacterPlanComparison characterId={selectedCharacterId} />
             </TabsContent>
             <TabsContent value="settings" className="flex-1 overflow-auto m-0">
               <NotificationSettings characterId={selectedCharacterId} />

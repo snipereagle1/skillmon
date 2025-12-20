@@ -7,6 +7,7 @@ import { AddCharacterDialog } from './AddCharacterDialog';
 import { CharactersTab } from './CharactersTab';
 import { NotificationBell } from './NotificationBell';
 import { NotificationDrawer } from './NotificationDrawer';
+import { SkillPlans } from './SkillPlans';
 
 export function TabLayout() {
   const [addCharacterOpen, setAddCharacterOpen] = useState(false);
@@ -22,6 +23,7 @@ export function TabLayout() {
           <TabsList>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="characters">Characters</TabsTrigger>
+            <TabsTrigger value="plans">Plans</TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
             <NotificationBell onOpen={() => setNotificationDrawerOpen(true)} />
@@ -39,6 +41,9 @@ export function TabLayout() {
         </TabsContent>
         <TabsContent value="characters" className="flex-1 overflow-hidden p-4">
           <CharactersTab />
+        </TabsContent>
+        <TabsContent value="plans" className="flex-1 overflow-hidden">
+          <SkillPlans />
         </TabsContent>
       </Tabs>
       <AddCharacterDialog

@@ -1,5 +1,12 @@
 {
   "rust-analyzer.check.command": "clippy",
   "rust-analyzer.check.allTargets": true,
-  "rust-analyzer.cargo.features": "all"
+  "rust-analyzer.cargo.features": "all",
+  "eslint.useFlatConfig": true,
+  "eslint.validate": [
+    "javascript",
+    "javascriptreact",
+    "typescript",
+    "typescriptreact"
+  ]
 }
