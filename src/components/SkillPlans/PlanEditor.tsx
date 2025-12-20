@@ -1,3 +1,6 @@
+import { save } from '@tauri-apps/plugin-dialog';
+import { writeTextFile } from '@tauri-apps/plugin-fs';
+import { Copy } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -26,38 +29,97 @@ export function PlanEditor({ planId }: PlanEditorProps) {
   const [editDescription, setEditDescription] = useState('');
   const [addSkillDialogOpen, setAddSkillDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [isExportingText, setIsExportingText] = useState(false);
+  const [isExportingXml, setIsExportingXml] = useState(false);
+  const [isCopyingText, setIsCopyingText] = useState(false);
 
   const handleExportText = async () => {
-    if (!data) return;
+    if (!data) {
+      console.log('No data available for export');
+      return;
+    }
+    console.log('Starting text export...');
+    setIsExportingText(true);
     try {
+      console.log('Fetching plan text...');
       const text = await exportSkillPlanText({ planId });
-      const blob = new Blob([text], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${data.plan.name}.txt`;
-      a.click();
-      URL.revokeObjectURL(url);
+      console.log('Plan text fetched, opening save dialog...');
+      const filePath = await save({
+        title: 'Save Skill Plan',
+        defaultPath: `${data.plan.name}.txt`,
+        filters: [
+          { name: 'Text Files', extensions: ['txt'] },
+          { name: 'All Files', extensions: ['*'] },
+        ],
+      });
+      console.log('Save dialog result:', filePath);
+
+      if (filePath) {
+        console.log('Writing file to:', filePath);
+        await writeTextFile(filePath, text);
+        console.log('File written successfully');
+      } else {
+        console.log('Save dialog cancelled by user');
+      }
     } catch (err) {
       console.error('Failed to export plan:', err);
-      alert('Failed to export plan');
+      const errorMessage =
+        err instanceof Error ? err.message : 'Unknown error occurred';
+      alert(`Failed to export plan: ${errorMessage}`);
+    } finally {
+      setIsExportingText(false);
     }
   };
 
   const handleExportXml = async () => {
-    if (!data) return;
+    if (!data) {
+      console.log('No data available for export');
+      return;
+    }
+    console.log('Starting XML export...');
+    setIsExportingXml(true);
     try {
+      console.log('Fetching plan XML...');
       const xml = await exportSkillPlanXml({ planId });
-      const blob = new Blob([xml], { type: 'application/xml' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${data.plan.name}.xml`;
-      a.click();
-      URL.revokeObjectURL(url);
+      console.log('Plan XML fetched, opening save dialog...');
+      const filePath = await save({
+        title: 'Save Skill Plan',
+        defaultPath: `${data.plan.name}.xml`,
+        filters: [
+          { name: 'XML Files', extensions: ['xml'] },
+          { name: 'All Files', extensions: ['*'] },
+        ],
+      });
+      console.log('Save dialog result:', filePath);
+
+      if (filePath) {
+        console.log('Writing file to:', filePath);
+        await writeTextFile(filePath, xml);
+        console.log('File written successfully');
+      } else {
+        console.log('Save dialog cancelled by user');
+      }
     } catch (err) {
       console.error('Failed to export plan:', err);
-      alert('Failed to export plan');
+      const errorMessage =
+        err instanceof Error ? err.message : 'Unknown error occurred';
+      alert(`Failed to export plan: ${errorMessage}`);
+    } finally {
+      setIsExportingXml(false);
+    }
+  };
+
+  const handleCopyTextToClipboard = async () => {
+    if (!data) return;
+    setIsCopyingText(true);
+    try {
+      const text = await exportSkillPlanText({ planId });
+      await navigator.clipboard.writeText(text);
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+      alert('Failed to copy to clipboard');
+    } finally {
+      setIsCopyingText(false);
     }
   };
 
@@ -222,10 +284,29 @@ export function PlanEditor({ planId }: PlanEditorProps) {
           >
             Import
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExportText}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportText}
+            disabled={isExportingText}
+          >
             Export Text
           </Button>
-          <Button variant="outline" size="sm" onClick={handleExportXml}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleCopyTextToClipboard}
+            disabled={isCopyingText}
+          >
+            <Copy className="mr-2 h-4 w-4" />
+            Copy Text
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleExportXml}
+            disabled={isExportingXml}
+          >
             Export XML
           </Button>
         </div>
