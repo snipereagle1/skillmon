@@ -117,7 +117,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
   }
 
   const sortedEntries = [...data.entries].sort(
-    (a, b) => b.sort_order - a.sort_order
+    (a, b) => a.sort_order - b.sort_order
   );
 
   const totalSP = sortedEntries.reduce(
