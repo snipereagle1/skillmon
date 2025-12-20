@@ -128,7 +128,7 @@ export function ImportPlanDialog({
                   : 'Paste XML content here'
               }
               rows={12}
-              className="font-mono text-sm"
+              className="font-mono text-sm max-h-[400px] overflow-y-auto"
             />
           </div>
           {error && (

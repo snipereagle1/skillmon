@@ -342,6 +342,89 @@ pub async fn update_plan_entry(
         }
     }
 
+    // If updating planned_level, check if we need to handle level increase specially
+    if let Some(new_level) = planned_level {
+        // Fetch current entry details
+        let current_entry: Option<(i64, i64, i64, String)> =
+            sqlx::query_as::<_, (i64, i64, i64, String)>(
+                "SELECT plan_id, skill_type_id, planned_level, entry_type
+                 FROM skill_plan_entries
+                 WHERE entry_id = ?",
+            )
+            .bind(entry_id)
+            .fetch_optional(&*pool)
+            .await
+            .map_err(|e| format!("Failed to get current entry: {}", e))?;
+
+        if let Some((plan_id, skill_type_id, old_level, old_entry_type)) = current_entry {
+            // If it's a "Planned" entry and we're increasing the level, preserve the old level
+            if old_entry_type == "Planned" && new_level > old_level {
+                // Delete the old planned entry
+                db::skill_plans::delete_plan_entry(&pool, entry_id)
+                    .await
+                    .map_err(|e| format!("Failed to delete old entry: {}", e))?;
+
+                // Add the new planned entry using the same logic as add_plan_entry
+                let planned_entries = vec![(skill_type_id, new_level)];
+
+                let graph_result =
+                    skill_plans_utils::build_dependency_graph_for_entries(&pool, planned_entries)
+                        .await?;
+
+                let sorted_skill_ids = skill_plans_utils::topological_sort_skills(
+                    &graph_result.dependency_graph,
+                    &graph_result.all_skill_ids,
+                    &[(skill_type_id, new_level)],
+                );
+
+                let sorted_entries = skill_plans_utils::build_sorted_entry_list(
+                    &sorted_skill_ids,
+                    &graph_result.all_entries,
+                    &[(skill_type_id, new_level)],
+                );
+
+                let start_sort_order: i64 = {
+                    let max: Option<i64> = sqlx::query_scalar(
+                        "SELECT MAX(sort_order) FROM skill_plan_entries WHERE plan_id = ?",
+                    )
+                    .bind(plan_id)
+                    .fetch_optional(&*pool)
+                    .await
+                    .map_err(|e| format!("Failed to get max sort order: {}", e))?;
+                    max.unwrap_or(-1) + 1
+                };
+
+                skill_plans_utils::insert_entries_with_sort_order(
+                    &pool,
+                    plan_id,
+                    &sorted_entries,
+                    start_sort_order,
+                )
+                .await?;
+
+                // Update notes if provided
+                if let Some(notes_val) = notes {
+                    if !notes_val.trim().is_empty() {
+                        sqlx::query(
+                            "UPDATE skill_plan_entries SET notes = ?
+                             WHERE plan_id = ? AND skill_type_id = ? AND planned_level = ? AND entry_type = 'Planned'",
+                        )
+                        .bind(notes_val.trim())
+                        .bind(plan_id)
+                        .bind(skill_type_id)
+                        .bind(new_level)
+                        .execute(&*pool)
+                        .await
+                        .map_err(|e| format!("Failed to update notes: {}", e))?;
+                    }
+                }
+
+                return Ok(());
+            }
+        }
+    }
+
+    // For other cases (decreasing level, same level, or not a Planned entry), use standard update
     db::skill_plans::update_plan_entry(
         &pool,
         entry_id,
