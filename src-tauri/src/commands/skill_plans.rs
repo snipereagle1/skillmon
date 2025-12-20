@@ -8,6 +8,8 @@ use tauri::State;
 use crate::db;
 use crate::utils;
 
+use super::skill_plans_utils;
+
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillPlanResponse {
     pub plan_id: i64,
@@ -240,18 +242,56 @@ pub async fn add_plan_entry(
         return Err("Planned level must be between 1 and 5".to_string());
     }
 
-    db::skill_plans::add_plan_entry(
+    let planned_entries = vec![(skill_type_id, planned_level)];
+
+    let graph_result =
+        skill_plans_utils::build_dependency_graph_for_entries(&pool, planned_entries).await?;
+
+    let sorted_skill_ids = skill_plans_utils::topological_sort_skills(
+        &graph_result.dependency_graph,
+        &graph_result.all_skill_ids,
+        &[(skill_type_id, planned_level)],
+    );
+
+    let sorted_entries = skill_plans_utils::build_sorted_entry_list(
+        &sorted_skill_ids,
+        &graph_result.all_entries,
+        &[(skill_type_id, planned_level)],
+    );
+
+    let start_sort_order: i64 = {
+        let max: Option<i64> =
+            sqlx::query_scalar("SELECT MAX(sort_order) FROM skill_plan_entries WHERE plan_id = ?")
+                .bind(plan_id)
+                .fetch_optional(&*pool)
+                .await
+                .map_err(|e| format!("Failed to get max sort order: {}", e))?;
+        max.unwrap_or(-1) + 1
+    };
+
+    skill_plans_utils::insert_entries_with_sort_order(
         &pool,
         plan_id,
-        skill_type_id,
-        planned_level,
-        "Planned",
-        notes.as_deref(),
+        &sorted_entries,
+        start_sort_order,
     )
-    .await
-    .map_err(|e| format!("Failed to add plan entry: {}", e))?;
+    .await?;
 
-    resolve_and_add_prerequisites(&pool, plan_id, skill_type_id).await?;
+    if let Some(notes_val) = notes {
+        if !notes_val.trim().is_empty() {
+            sqlx::query(
+                "UPDATE skill_plan_entries SET notes = ?
+                 WHERE plan_id = ? AND skill_type_id = ? AND planned_level = ? AND entry_type = 'Planned'",
+            )
+            .bind(notes_val.trim())
+            .bind(plan_id)
+            .bind(skill_type_id)
+            .bind(planned_level)
+            .execute(&*pool)
+            .await
+            .map_err(|e| format!("Failed to update notes: {}", e))?;
+        }
+    }
 
     get_skill_plan_with_entries(pool, plan_id)
         .await?
@@ -313,8 +353,6 @@ pub async fn import_skill_plan_text(
     plan_id: i64,
     text: String,
 ) -> Result<SkillPlanWithEntriesResponse, String> {
-    use std::collections::{HashMap, HashSet, VecDeque};
-
     let lines: Vec<&str> = text
         .lines()
         .map(|l| l.trim())
@@ -366,197 +404,22 @@ pub async fn import_skill_plan_text(
         return Err("No valid entries found in text".to_string());
     }
 
-    // Step 2: Build dependency graph - collect all entries (planned + prerequisites)
-    // Map: (skill_id, level) -> entry_type ("Planned" or "Prerequisite")
-    let mut all_entries: HashMap<(i64, i64), String> = HashMap::new();
-    // Track planned entries in their original order
-    let mut planned_entry_order: Vec<(i64, i64)> = Vec::new();
+    let graph_result =
+        skill_plans_utils::build_dependency_graph_for_entries(&pool, planned_entries).await?;
 
-    // Add all planned entries
-    for (skill_id, level) in &planned_entries {
-        all_entries.insert((*skill_id, *level), "Planned".to_string());
-        planned_entry_order.push((*skill_id, *level));
-    }
+    let sorted_skill_ids = skill_plans_utils::topological_sort_skills(
+        &graph_result.dependency_graph,
+        &graph_result.all_skill_ids,
+        &graph_result.planned_entry_order,
+    );
 
-    // Build dependency graph: prerequisite -> dependents
-    // Key: prerequisite skill_id, Value: list of skills that depend on it
-    let mut dependency_graph: HashMap<i64, Vec<i64>> = HashMap::new();
-    // Track all skills that appear in the plan (planned or prerequisite)
-    let mut all_skill_ids: HashSet<i64> = HashSet::new();
+    let sorted_entries = skill_plans_utils::build_sorted_entry_list(
+        &sorted_skill_ids,
+        &graph_result.all_entries,
+        &graph_result.planned_entry_order,
+    );
 
-    // Collect all skill IDs from planned entries
-    for (skill_id, _) in &planned_entries {
-        all_skill_ids.insert(*skill_id);
-    }
-
-    // For each planned entry, get all prerequisites recursively
-    for (skill_id, _) in &planned_entries {
-        let prerequisites = db::skill_plans::get_prerequisites_recursive(&pool, *skill_id)
-            .await
-            .map_err(|e| format!("Failed to get prerequisites: {}", e))?;
-
-        for prereq in prerequisites {
-            // Add prerequisite entries (all levels up to required_level)
-            for level in 1..=prereq.required_level {
-                let entry_key = (prereq.required_skill_id, level);
-                all_entries
-                    .entry(entry_key)
-                    .or_insert_with(|| "Prerequisite".to_string());
-            }
-
-            all_skill_ids.insert(prereq.required_skill_id);
-
-            // Build dependency: prereq -> skill (prerequisite comes before dependent)
-            dependency_graph
-                .entry(prereq.required_skill_id)
-                .or_default()
-                .push(*skill_id);
-        }
-    }
-
-    // Build dependencies between prerequisites themselves by querying direct prerequisites
-    // We need to query the database to get direct prerequisites for each prerequisite skill
-    let mut skills_to_process: VecDeque<i64> = all_skill_ids.iter().copied().collect();
-    let mut processed_skills: HashSet<i64> = HashSet::new();
-
-    while let Some(skill_id) = skills_to_process.pop_front() {
-        if processed_skills.contains(&skill_id) {
-            continue;
-        }
-        processed_skills.insert(skill_id);
-
-        // Get direct prerequisites (not recursive) to build the graph correctly
-        let direct_prereqs: Vec<(i64, i64)> = sqlx::query_as::<_, (i64, i64)>(
-            "SELECT required_skill_id, required_level
-             FROM sde_skill_requirements
-             WHERE skill_type_id = ?",
-        )
-        .bind(skill_id)
-        .fetch_all(&*pool)
-        .await
-        .map_err(|e| format!("Failed to get direct prerequisites: {}", e))?;
-
-        for (prereq_id, required_level) in direct_prereqs {
-            // Add prerequisite entries (all levels up to required_level)
-            for level in 1..=required_level {
-                let entry_key = (prereq_id, level);
-                all_entries
-                    .entry(entry_key)
-                    .or_insert_with(|| "Prerequisite".to_string());
-            }
-
-            all_skill_ids.insert(prereq_id);
-            if !processed_skills.contains(&prereq_id) {
-                skills_to_process.push_back(prereq_id);
-            }
-
-            // Build dependency: prereq -> skill (prerequisite comes before dependent)
-            dependency_graph
-                .entry(prereq_id)
-                .or_default()
-                .push(skill_id);
-        }
-    }
-
-    // Build in_degree map: skill_id -> number of prerequisites it has
-    let mut in_degree: HashMap<i64, usize> = HashMap::new();
-    for skill_id in &all_skill_ids {
-        in_degree.insert(*skill_id, 0);
-    }
-    for dependents in dependency_graph.values() {
-        for dependent_id in dependents {
-            *in_degree.entry(*dependent_id).or_insert(0) += 1;
-        }
-    }
-
-    // Step 3: Topological sort using Kahn's algorithm
-    // We want prerequisites before dependents, so we process nodes with in_degree 0 first
-    let mut queue: VecDeque<i64> = VecDeque::new();
-    let mut sorted_skill_ids: Vec<i64> = Vec::new();
-
-    // Track which skills are planned (to preserve their order when possible)
-    let planned_skill_ids: HashSet<i64> = planned_entries.iter().map(|(sid, _)| *sid).collect();
-
-    // Start with skills that have no prerequisites (in_degree = 0)
-    // Separate prerequisites from planned entries to prioritize prerequisites
-    let mut zero_degree_prereqs: Vec<i64> = Vec::new();
-    let mut zero_degree_planned: Vec<i64> = Vec::new();
-
-    for (skill_id, &degree) in &in_degree {
-        if degree == 0 {
-            if planned_skill_ids.contains(skill_id) {
-                zero_degree_planned.push(*skill_id);
-            } else {
-                zero_degree_prereqs.push(*skill_id);
-            }
-        }
-    }
-
-    // Sort planned entries by their original order in the import
-    zero_degree_planned.sort_by_key(|sid| {
-        planned_entries
-            .iter()
-            .position(|(sid2, _)| sid2 == sid)
-            .unwrap_or(usize::MAX)
-    });
-
-    // Add prerequisites first, then planned entries
-    queue.extend(zero_degree_prereqs);
-    queue.extend(zero_degree_planned);
-
-    // Process queue: prerequisites come first, then planned entries
-    while let Some(skill_id) = queue.pop_front() {
-        sorted_skill_ids.push(skill_id);
-
-        // Add dependents whose prerequisites are now satisfied
-        if let Some(dependents) = dependency_graph.get(&skill_id) {
-            for &dependent_id in dependents {
-                let degree = in_degree.get_mut(&dependent_id).unwrap();
-                *degree -= 1;
-                if *degree == 0 {
-                    // Add to back of queue - prerequisites will naturally come first
-                    // since they're processed earlier, and planned entries maintain relative order
-                    queue.push_back(dependent_id);
-                }
-            }
-        }
-    }
-
-    // Step 4: Build final sorted entry list
-    // For each skill in topological order, add its entries in level order (1, 2, 3, ...)
-    let mut sorted_entries: Vec<((i64, i64), String)> = Vec::new();
-    let mut processed_skills: HashSet<i64> = HashSet::new();
-
-    // Add entries in topological order
-    for &skill_id in &sorted_skill_ids {
-        if processed_skills.contains(&skill_id) {
-            continue;
-        }
-        processed_skills.insert(skill_id);
-
-        // Find all entries for this skill, sorted by level
-        let mut skill_entries: Vec<((i64, i64), String)> = all_entries
-            .iter()
-            .filter(|((sid, _), _)| *sid == skill_id)
-            .map(|(k, v)| (*k, v.clone()))
-            .collect();
-        skill_entries.sort_by_key(|((_, level), _)| *level);
-
-        sorted_entries.extend(skill_entries);
-    }
-
-    // Add any remaining entries that weren't in the topological sort
-    for (skill_id, level) in &planned_entry_order {
-        let entry_key = (*skill_id, *level);
-        if !sorted_entries.iter().any(|(k, _)| *k == entry_key) {
-            if let Some(entry_type) = all_entries.get(&entry_key) {
-                sorted_entries.push((entry_key, entry_type.clone()));
-            }
-        }
-    }
-
-    // Step 5: Assign sort_order and insert entries
-    let mut sort_order: i64 = {
+    let start_sort_order: i64 = {
         let max: Option<i64> =
             sqlx::query_scalar("SELECT MAX(sort_order) FROM skill_plan_entries WHERE plan_id = ?")
                 .bind(plan_id)
@@ -566,67 +429,13 @@ pub async fn import_skill_plan_text(
         max.unwrap_or(-1) + 1
     };
 
-    for ((skill_id, level), entry_type) in sorted_entries {
-        // Check if entry already exists
-        let existing_type: Option<String> = sqlx::query_scalar(
-            "SELECT entry_type FROM skill_plan_entries
-             WHERE plan_id = ? AND skill_type_id = ? AND planned_level = ?",
-        )
-        .bind(plan_id)
-        .bind(skill_id)
-        .bind(level)
-        .fetch_optional(&*pool)
-        .await
-        .map_err(|e| format!("Failed to check existing entry: {}", e))?;
-
-        // Skip if already exists as "Planned" (don't overwrite planned entries)
-        if let Some(ref etype) = existing_type {
-            if etype == "Planned" {
-                continue;
-            }
-        }
-
-        // Check if higher level exists
-        let higher_level_exists = sqlx::query_scalar::<_, Option<i64>>(
-            "SELECT planned_level FROM skill_plan_entries
-             WHERE plan_id = ? AND skill_type_id = ? AND planned_level > ?",
-        )
-        .bind(plan_id)
-        .bind(skill_id)
-        .bind(level)
-        .fetch_optional(&*pool)
-        .await
-        .map_err(|e| format!("Failed to check higher level entry: {}", e))?;
-
-        if higher_level_exists.is_some() {
-            continue;
-        }
-
-        // Insert entry with assigned sort_order
-        sqlx::query(
-            "INSERT INTO skill_plan_entries (plan_id, skill_type_id, planned_level, sort_order, entry_type, notes)
-             VALUES (?, ?, ?, ?, ?, ?)
-             ON CONFLICT(plan_id, skill_type_id, planned_level) DO UPDATE SET
-             entry_type = CASE
-                 WHEN excluded.entry_type = 'Planned' THEN excluded.entry_type
-                 WHEN skill_plan_entries.entry_type = 'Planned' THEN skill_plan_entries.entry_type
-                 ELSE excluded.entry_type
-             END,
-             notes = excluded.notes,
-             sort_order = excluded.sort_order",
-        )
-        .bind(plan_id)
-        .bind(skill_id)
-        .bind(level)
-        .bind(sort_order)
-        .bind(&entry_type)
-        .bind(None::<String>)
-        .execute(&*pool)
-        .await
-        .map_err(|e| format!("Failed to add entry: {}", e))?;
-
-        sort_order += 1;
-    }
+    skill_plans_utils::insert_entries_with_sort_order(
+        &pool,
+        plan_id,
+        &sorted_entries,
+        start_sort_order,
+    )
+    .await?;
 
     get_skill_plan_with_entries(pool, plan_id)
         .await?
