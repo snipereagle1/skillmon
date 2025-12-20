@@ -102,8 +102,18 @@ export function useDeleteSkillPlan() {
     mutationFn: async (params: DeleteSkillPlanParams) => {
       return await deleteSkillPlan(params);
     },
-    onSuccess: () => {
+    onSuccess: (_, params) => {
       queryClient.invalidateQueries({ queryKey: ['skillPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['skillPlan', params.planId] });
+      queryClient.invalidateQueries({
+        queryKey: ['skillPlanWithEntries', params.planId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['exportSkillPlanText', params.planId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['exportSkillPlanXml', params.planId],
+      });
     },
   });
 }
