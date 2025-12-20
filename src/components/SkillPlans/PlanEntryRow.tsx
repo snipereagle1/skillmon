@@ -75,7 +75,7 @@ export function PlanEntryRow({
 
   const spPercentage =
     totalPlanSP > 0 ? (entry.skillpoints_for_level / totalPlanSP) * 100 : 0;
-  const MIN_WIDTH_PERCENTAGE = 1;
+  const MIN_WIDTH_PERCENTAGE = 0.2;
   const displayWidth = Math.max(spPercentage, MIN_WIDTH_PERCENTAGE);
 
   return (
