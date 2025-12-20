@@ -209,8 +209,8 @@ pub async fn insert_entries_with_sort_order(
     let mut sort_order = start_sort_order;
 
     for ((skill_id, level), entry_type) in sorted_entries {
-        let existing_type: Option<String> = sqlx::query_scalar(
-            "SELECT entry_type FROM skill_plan_entries
+        let existing_entry: Option<(String, i64)> = sqlx::query_as::<_, (String, i64)>(
+            "SELECT entry_type, sort_order FROM skill_plan_entries
              WHERE plan_id = ? AND skill_type_id = ? AND planned_level = ?",
         )
         .bind(plan_id)
@@ -220,10 +220,8 @@ pub async fn insert_entries_with_sort_order(
         .await
         .map_err(|e| format!("Failed to check existing entry: {}", e))?;
 
-        if let Some(ref etype) = existing_type {
-            if etype == "Planned" {
-                continue;
-            }
+        if existing_entry.is_some() {
+            continue;
         }
 
         let higher_level_exists = sqlx::query_scalar::<_, Option<i64>>(
@@ -250,8 +248,7 @@ pub async fn insert_entries_with_sort_order(
                  WHEN skill_plan_entries.entry_type = 'Planned' THEN skill_plan_entries.entry_type
                  ELSE excluded.entry_type
              END,
-             notes = excluded.notes,
-             sort_order = excluded.sort_order",
+             notes = excluded.notes",
         )
         .bind(plan_id)
         .bind(skill_id)
