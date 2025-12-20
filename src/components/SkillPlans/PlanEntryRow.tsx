@@ -1,6 +1,6 @@
+import { Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -18,12 +18,21 @@ import {
   useDeletePlanEntry,
   useUpdatePlanEntry,
 } from '@/hooks/tauri/useSkillPlans';
+import { cn } from '@/lib/utils';
+
+import { LevelIndicator } from '../SkillQueue/LevelIndicator';
 
 interface PlanEntryRowProps {
   entry: SkillPlanEntryResponse;
+  totalPlanSP: number;
+  offsetPercentage: number;
 }
 
-export function PlanEntryRow({ entry }: PlanEntryRowProps) {
+export function PlanEntryRow({
+  entry,
+  totalPlanSP,
+  offsetPercentage,
+}: PlanEntryRowProps) {
   const deleteEntryMutation = useDeletePlanEntry();
   const updateEntryMutation = useUpdatePlanEntry();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -31,6 +40,9 @@ export function PlanEntryRow({ entry }: PlanEntryRowProps) {
   const [editNotes, setEditNotes] = useState(entry.notes || '');
 
   const isPrerequisite = entry.entry_type === 'Prerequisite';
+  const levelRoman =
+    ['I', 'II', 'III', 'IV', 'V'][entry.planned_level - 1] ||
+    entry.planned_level.toString();
 
   const handleDelete = async () => {
     if (
@@ -61,62 +73,47 @@ export function PlanEntryRow({ entry }: PlanEntryRowProps) {
     }
   };
 
-  const levelDots = Array.from({ length: 5 }, (_, i) => i + 1).map((level) => (
-    <span
-      key={level}
-      className={`inline-block w-2 h-2 rounded-full ${
-        level <= entry.planned_level
-          ? isPrerequisite
-            ? 'bg-muted-foreground'
-            : 'bg-primary'
-          : 'bg-muted'
-      }`}
-    />
-  ));
+  const spPercentage =
+    totalPlanSP > 0 ? (entry.skillpoints_for_level / totalPlanSP) * 100 : 0;
+  const MIN_WIDTH_PERCENTAGE = 1;
+  const displayWidth = Math.max(spPercentage, MIN_WIDTH_PERCENTAGE);
 
   return (
     <>
       <div
-        className={`
-          p-3 rounded-md border
-          ${
-            isPrerequisite
-              ? 'bg-muted/50 border-muted text-muted-foreground'
-              : 'bg-background border-border'
-          }
-        `}
+        className={cn(
+          'relative px-4 py-3 border-b last:border-b-0 border-border/50',
+          isPrerequisite && 'bg-muted/30'
+        )}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
+        <div className="flex items-center justify-between gap-4 relative z-10">
+          <div className="flex items-center gap-3 flex-1 min-w-0">
+            <LevelIndicator level={entry.planned_level} />
+            <div className="flex flex-col flex-1 min-w-0">
               <span
-                className={`font-medium ${
-                  isPrerequisite ? 'text-muted-foreground' : ''
-                }`}
+                className={cn(
+                  'text-foreground font-medium truncate',
+                  isPrerequisite && 'text-muted-foreground'
+                )}
               >
-                {entry.skill_name}
+                {entry.skill_name} {levelRoman}
               </span>
-              <Badge
-                variant={isPrerequisite ? 'outline' : 'default'}
-                className={isPrerequisite ? 'text-xs' : ''}
-              >
-                {entry.entry_type}
-              </Badge>
+              {entry.notes && (
+                <span className="text-xs text-muted-foreground truncate">
+                  {entry.notes}
+                </span>
+              )}
             </div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm text-muted-foreground">Level:</span>
-              <div className="flex items-center gap-1">{levelDots}</div>
-              <span className="text-sm text-muted-foreground">
-                {entry.planned_level}/5
-              </span>
-            </div>
-            {entry.notes && (
-              <p className="text-sm text-muted-foreground mt-1">
-                {entry.notes}
-              </p>
-            )}
           </div>
-          <div className="flex gap-1 shrink-0">
+          <div className="flex items-center gap-2">
+            <span
+              className={cn(
+                'text-sm whitespace-nowrap',
+                isPrerequisite ? 'text-muted-foreground' : 'text-foreground'
+              )}
+            >
+              {entry.skillpoints_for_level.toLocaleString('en-US')} SP
+            </span>
             <Button
               variant="ghost"
               size="sm"
@@ -125,18 +122,42 @@ export function PlanEntryRow({ entry }: PlanEntryRowProps) {
                 setEditNotes(entry.notes || '');
                 setEditDialogOpen(true);
               }}
+              className="h-8 w-8 p-0"
             >
-              Edit
+              <Pencil className="h-4 w-4" />
             </Button>
             <Button
               variant="ghost"
               size="sm"
               onClick={handleDelete}
               disabled={deleteEntryMutation.isPending}
+              className="h-8 w-8 p-0"
             >
-              Delete
+              <Trash2 className="h-4 w-4" />
             </Button>
           </div>
+        </div>
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 pointer-events-none">
+          {offsetPercentage > 0 && (
+            <div
+              className="absolute h-full bg-blue-400/20 dark:bg-blue-500/20"
+              style={{ left: '0%', width: `${offsetPercentage}%` }}
+            />
+          )}
+          {spPercentage > 0 && (
+            <div
+              className={cn(
+                'absolute h-full',
+                isPrerequisite
+                  ? 'bg-muted-foreground/50'
+                  : 'bg-blue-400 dark:bg-blue-500'
+              )}
+              style={{
+                left: `${offsetPercentage}%`,
+                width: `${displayWidth}%`,
+              }}
+            />
+          )}
         </div>
       </div>
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>

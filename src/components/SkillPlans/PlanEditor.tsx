@@ -117,7 +117,12 @@ export function PlanEditor({ planId }: PlanEditorProps) {
   }
 
   const sortedEntries = [...data.entries].sort(
-    (a, b) => a.sort_order - b.sort_order
+    (a, b) => b.sort_order - a.sort_order
+  );
+
+  const totalSP = sortedEntries.reduce(
+    (sum, entry) => sum + entry.skillpoints_for_level,
+    0
   );
 
   return (
@@ -196,6 +201,12 @@ export function PlanEditor({ planId }: PlanEditorProps) {
             </div>
           )}
         </div>
+        {sortedEntries.length > 0 && (
+          <div className="text-sm text-foreground">
+            <span className="font-medium">Total Skillpoints: </span>
+            <span>{totalSP.toLocaleString('en-US')}</span>
+          </div>
+        )}
         <div className="flex gap-2">
           <Button
             variant="outline"
@@ -219,19 +230,30 @@ export function PlanEditor({ planId }: PlanEditorProps) {
           </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto p-4">
+      <div className="flex-1 overflow-y-auto">
         {sortedEntries.length === 0 ? (
-          <div className="flex items-center justify-center h-full">
+          <div className="flex items-center justify-center h-full p-8">
             <p className="text-muted-foreground">
               No entries yet. Add skills to get started.
             </p>
           </div>
         ) : (
-          <div className="space-y-2">
-            {sortedEntries.map((entry) => (
-              <PlanEntryRow key={entry.entry_id} entry={entry} />
-            ))}
-          </div>
+          (() => {
+            let cumulativeSP = 0;
+            return sortedEntries.map((entry) => {
+              const offsetPercentage =
+                totalSP > 0 ? (cumulativeSP / totalSP) * 100 : 0;
+              cumulativeSP += entry.skillpoints_for_level;
+              return (
+                <PlanEntryRow
+                  key={entry.entry_id}
+                  entry={entry}
+                  totalPlanSP={totalSP}
+                  offsetPercentage={offsetPercentage}
+                />
+              );
+            });
+          })()
         )}
       </div>
       <AddSkillDialog

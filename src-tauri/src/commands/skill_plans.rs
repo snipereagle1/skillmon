@@ -6,6 +6,7 @@ use std::io::Cursor;
 use tauri::State;
 
 use crate::db;
+use crate::utils;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillPlanResponse {
@@ -38,6 +39,8 @@ pub struct SkillPlanEntryResponse {
     pub sort_order: i64,
     pub entry_type: String,
     pub notes: Option<String>,
+    pub rank: Option<i64>,
+    pub skillpoints_for_level: i64,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -104,6 +107,11 @@ pub async fn get_skill_plan_with_entries(
         .await
         .map_err(|e| format!("Failed to get plan entries: {}", e))?;
 
+    let skill_type_ids: Vec<i64> = entries.iter().map(|e| e.skill_type_id).collect();
+    let skill_attributes = utils::get_skill_attributes(&pool, &skill_type_ids)
+        .await
+        .map_err(|e| format!("Failed to get skill attributes: {}", e))?;
+
     let mut entry_responses = Vec::new();
     for entry in entries {
         let skill_name =
@@ -114,6 +122,14 @@ pub async fn get_skill_plan_with_entries(
                 .map_err(|e| format!("Failed to get skill name: {}", e))?
                 .unwrap_or_else(|| format!("Unknown Skill ({})", entry.skill_type_id));
 
+        let skill_attr = skill_attributes.get(&entry.skill_type_id);
+        let rank = skill_attr.and_then(|attr| attr.rank);
+        let skillpoints_for_level = if let Some(rank_val) = rank {
+            utils::calculate_sp_for_level(rank_val, entry.planned_level as i32)
+        } else {
+            0
+        };
+
         entry_responses.push(SkillPlanEntryResponse {
             entry_id: entry.entry_id,
             plan_id: entry.plan_id,
@@ -123,6 +139,8 @@ pub async fn get_skill_plan_with_entries(
             sort_order: entry.sort_order,
             entry_type: entry.entry_type,
             notes: entry.notes,
+            rank,
+            skillpoints_for_level,
         });
     }
 
