@@ -89,7 +89,7 @@ export function PlanList({ selectedPlanId, onSelectPlan }: PlanListProps) {
                   p-3 rounded-md cursor-pointer transition-colors
                   ${
                     selectedPlanId === plan.plan_id
-                      ? 'bg-primary text-primary-foreground'
+                      ? 'bg-muted text-white'
                       : 'hover:bg-muted'
                   }
                 `}
@@ -101,7 +101,7 @@ export function PlanList({ selectedPlanId, onSelectPlan }: PlanListProps) {
                       <p
                         className={`text-sm mt-1 line-clamp-2 ${
                           selectedPlanId === plan.plan_id
-                            ? 'text-primary-foreground/80'
+                            ? 'text-white/80'
                             : 'text-muted-foreground'
                         }`}
                       >
