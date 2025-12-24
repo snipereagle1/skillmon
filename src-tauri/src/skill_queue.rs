@@ -1,8 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
-use tauri::AppHandle;
-use tauri_plugin_notification::NotificationExt;
+use tauri::{AppHandle, Emitter};
 
 use crate::auth;
 use crate::cache;
@@ -14,9 +13,7 @@ use crate::utils;
 use crate::commands::attributes::CharacterAttributesResponse;
 use crate::commands::skill_queues::{CharacterSkillQueue, SkillQueueItem};
 
-pub const NOTIFICATION_TYPE_SKILL_QUEUE_LOW: &str = "skill_queue_low";
-
-fn calculate_total_queue_hours(skill_queue: &[SkillQueueItem]) -> f64 {
+pub fn calculate_total_queue_hours(skill_queue: &[SkillQueueItem]) -> f64 {
     let mut total_hours = 0.0;
     for skill in skill_queue {
         if let Some(sp_per_min) = skill.sp_per_minute {
@@ -35,102 +32,6 @@ fn calculate_total_queue_hours(skill_queue: &[SkillQueueItem]) -> f64 {
         }
     }
     total_hours
-}
-
-pub async fn check_skill_queue_notifications(
-    app: &AppHandle,
-    pool: &db::Pool,
-    character_id: i64,
-    skill_queue: &[SkillQueueItem],
-) -> Result<()> {
-    let setting =
-        db::get_notification_setting(pool, character_id, NOTIFICATION_TYPE_SKILL_QUEUE_LOW).await?;
-
-    if let Some(setting) = setting {
-        if !setting.enabled {
-            db::clear_notification(pool, character_id, NOTIFICATION_TYPE_SKILL_QUEUE_LOW)
-                .await
-                .ok();
-            return Ok(());
-        }
-
-        let threshold_hours: f64 = if let Some(config_str) = &setting.config {
-            if let Ok(config) = serde_json::from_str::<serde_json::Value>(config_str) {
-                config
-                    .get("threshold_hours")
-                    .and_then(|v| v.as_f64())
-                    .unwrap_or(24.0)
-            } else {
-                24.0
-            }
-        } else {
-            24.0
-        };
-
-        let total_hours = calculate_total_queue_hours(skill_queue);
-
-        let all_notifications = db::get_notifications(pool, Some(character_id), None)
-            .await
-            .ok();
-        let active_count = all_notifications
-            .as_ref()
-            .map(|n| {
-                n.iter()
-                    .filter(|notif| {
-                        notif.notification_type == NOTIFICATION_TYPE_SKILL_QUEUE_LOW
-                            && notif.status == "active"
-                    })
-                    .count()
-            })
-            .unwrap_or(0);
-        let has_active = active_count > 0;
-
-        if total_hours < threshold_hours {
-            if !has_active {
-                let hours_str = if total_hours < 1.0 {
-                    format!("{:.1} hours", total_hours)
-                } else {
-                    format!("{:.0} hours", total_hours)
-                };
-                let title = "Skill Queue Low";
-                let message = format!(
-                    "Skill queue has {} remaining (below {} hour threshold)",
-                    hours_str, threshold_hours
-                );
-
-                let character_name = db::get_character(pool, character_id)
-                    .await
-                    .ok()
-                    .flatten()
-                    .map(|c| c.character_name)
-                    .unwrap_or_else(|| format!("Character {}", character_id));
-
-                db::create_notification(
-                    pool,
-                    character_id,
-                    NOTIFICATION_TYPE_SKILL_QUEUE_LOW,
-                    title,
-                    &message,
-                )
-                .await?;
-
-                let notification_title = format!("{} - {}", character_name, title);
-                if let Err(e) = app
-                    .notification()
-                    .builder()
-                    .title(&notification_title)
-                    .body(&message)
-                    .show()
-                {
-                    eprintln!("Failed to send system notification: {}", e);
-                }
-            }
-        } else if has_active {
-            db::clear_notification(pool, character_id, NOTIFICATION_TYPE_SKILL_QUEUE_LOW).await?;
-        }
-    }
-
-    Ok(())
 }
 
 pub async fn refresh_all_skill_queues(
@@ -541,12 +442,13 @@ pub async fn build_character_skill_queue(
         is_paused,
     };
 
-    if let Err(e) = check_skill_queue_notifications(app, pool, character_id, &skill_queue).await {
-        eprintln!(
-            "Failed to check skill queue notifications for character {}: {}",
-            character_id, e
-        );
-    }
+    let _ = app.emit(
+        crate::notifications::EVENT_DATA_UPDATED,
+        crate::notifications::DataUpdatedPayload {
+            data_type: "skill_queue".to_string(),
+            character_id,
+        },
+    );
 
     Ok(Some(queue_result))
 }

@@ -1,4 +1,4 @@
-// Must match NOTIFICATION_TYPE_SKILL_QUEUE_LOW in src-tauri/src/lib.rs
+// Must match NOTIFICATION_TYPE_SKILL_QUEUE_LOW in src-tauri/src/notifications/checkers/skill_queue_low.rs
 export const NOTIFICATION_TYPES = {
   SKILL_QUEUE_LOW: 'skill_queue_low',
 } as const;

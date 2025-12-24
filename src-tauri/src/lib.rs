@@ -11,13 +11,14 @@ mod commands;
 mod db;
 mod esi;
 mod esi_helpers;
+mod notifications;
 mod sde;
 mod skill_queue;
 mod tray;
 mod utils;
 
 pub use commands::auth::AuthStateMap;
-pub use skill_queue::NOTIFICATION_TYPE_SKILL_QUEUE_LOW;
+pub use notifications::checkers::skill_queue_low::NOTIFICATION_TYPE_SKILL_QUEUE_LOW;
 
 type StartupState = Arc<AtomicU8>;
 
@@ -180,6 +181,30 @@ pub fn run() {
                             }
                         }
                     });
+
+                let app_handle = app.handle().clone();
+                let pool_for_notifications = app.state::<db::Pool>().inner().clone();
+                let rate_limits_for_notifications = app.state::<esi::RateLimitStore>().inner().clone();
+                let processor = std::sync::Arc::new(notifications::NotificationProcessor::new());
+                let processor_clone = processor.clone();
+                app_handle.clone().listen(notifications::EVENT_DATA_UPDATED, move |event| {
+                    let app_handle = app_handle.clone();
+                    let pool = pool_for_notifications.clone();
+                    let rate_limits = rate_limits_for_notifications.clone();
+                    let processor = processor_clone.clone();
+                    if let Ok(payload) = serde_json::from_str::<notifications::DataUpdatedPayload>(event.payload()) {
+                        tauri::async_runtime::spawn(async move {
+                            let ctx = notifications::NotificationContext {
+                                app: &app_handle,
+                                pool: &pool,
+                                rate_limits: &rate_limits,
+                            };
+                            if let Err(e) = processor.process_data_updated(&ctx, &payload.data_type, payload.character_id).await {
+                                eprintln!("Failed to process notification check: {}", e);
+                            }
+                        });
+                    }
+                });
 
                 Ok(())
             })
