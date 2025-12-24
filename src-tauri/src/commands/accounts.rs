@@ -8,7 +8,6 @@ pub struct Character {
     pub character_id: i64,
     pub character_name: String,
     pub unallocated_sp: i64,
-    #[serde(skip_serializing_if = "Option::is_none")]
     pub account_id: Option<i64>,
     pub sort_order: i64,
 }
