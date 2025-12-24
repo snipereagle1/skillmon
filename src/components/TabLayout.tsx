@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
+import { AboutTab } from './AboutTab';
 import { AddCharacterDialog } from './AddCharacterDialog';
 import { CharactersTab } from './CharactersTab';
 import { NotificationBell } from './NotificationBell';
@@ -24,6 +25,7 @@ export function TabLayout() {
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="characters">Characters</TabsTrigger>
             <TabsTrigger value="plans">Plans</TabsTrigger>
+            <TabsTrigger value="about">About</TabsTrigger>
           </TabsList>
           <div className="flex items-center gap-2">
             <NotificationBell onOpen={() => setNotificationDrawerOpen(true)} />
@@ -44,6 +46,9 @@ export function TabLayout() {
         </TabsContent>
         <TabsContent value="plans" className="flex-1 overflow-hidden">
           <SkillPlans />
+        </TabsContent>
+        <TabsContent value="about" className="flex-1 overflow-auto">
+          <AboutTab />
         </TabsContent>
       </Tabs>
       <AddCharacterDialog
