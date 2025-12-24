@@ -57,6 +57,17 @@ jobs:
         if: steps.cache-oas3-gen.outputs.cache-hit != 'true'
         run: cargo install oas3-gen --version 0.22.1
 
+      - name: Cache tauri-typegen
+        id: cache-tauri-typegen
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-tauri-typegen.exe
+          key: ${{ runner.os }}-tauri-typegen-0.3.4
+
+      - name: Install tauri-typegen
+        if: steps.cache-tauri-typegen.outputs.cache-hit != 'true'
+        run: cargo install tauri-typegen --version 0.3.4
+
       - name: Generate ESI client
         shell: bash
         run: bash scripts/generate-esi.sh
@@ -77,6 +88,9 @@ jobs:
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+
+      - name: Generate TypeScript bindings
+        run: pnpm typegen
 
       - name: Update version files
         shell: bash

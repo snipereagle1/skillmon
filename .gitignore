@@ -26,5 +26,8 @@ dist-ssr
 src-tauri/src/esi/client.rs
 src-tauri/src/esi/types.rs
 src-tauri/src/esi/openapi.json
+
+# Generated TypeScript bindings
+src/generated/
 sde/*.jsonl
 eve-online-static-data-*.zip
