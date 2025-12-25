@@ -1,0 +1,226 @@
+---
+globs: src-tauri/src/notifications/**
+alwaysApply: false
+---
+
+# Notifications System
+
+The notification system uses a plugin-based architecture where individual notification checkers are registered and automatically triggered when relevant data is updated.
+
+## Architecture Overview
+
+### Components
+
+1. **NotificationProcessor** (`src-tauri/src/notifications/mod.rs`): Manages all notification checkers and processes data update events
+2. **NotificationChecker** trait: Interface that all notification checkers must implement
+3. **NotificationContext**: Provides access to app handle, database pool, and rate limits
+4. **Event System**: Uses Tauri events to trigger notification checks when data is updated
+
+### Flow
+
+1. When data is updated (e.g., skill queue refreshed), emit `EVENT_DATA_UPDATED` event
+2. `NotificationProcessor` listens to this event and identifies which checkers should run
+3. Each relevant checker's `check()` method is called asynchronously
+4. Checkers perform their logic and create/clear notifications as needed
+
+## Creating a New Notification Checker
+
+### Step 1: Create the Checker File
+
+Create a new file in `src-tauri/src/notifications/checkers/` named after your notification type (e.g., `skill_queue_low.rs`).
+
+### Step 2: Implement the NotificationChecker Trait
+
+```rust
+use anyhow::Result;
+use tauri_plugin_notification::NotificationExt;
+
+use crate::db;
+use crate::notifications::{NotificationChecker, NotificationContext};
+
+pub const NOTIFICATION_TYPE_YOUR_TYPE: &str = "your_notification_type";
+
+pub struct YourNotificationChecker;
+
+#[async_trait::async_trait]
+impl NotificationChecker for YourNotificationChecker {
+    fn notification_type(&self) -> &'static str {
+        NOTIFICATION_TYPE_YOUR_TYPE
+    }
+
+    fn data_triggers(&self) -> &[&'static str] {
+        &["data_type_1", "data_type_2"] // List of data types that trigger this checker
+    }
+
+    async fn check(&self, ctx: &NotificationContext<'_>, character_id: i64) -> Result<()> {
+        // 1. Get notification setting
+        let setting = db::get_notification_setting(
+            ctx.pool,
+            character_id,
+            NOTIFICATION_TYPE_YOUR_TYPE
+        ).await?;
+
+        if let Some(setting) = setting {
+            if !setting.enabled {
+                // Clear any existing notification if disabled
+                db::clear_notification(ctx.pool, character_id, NOTIFICATION_TYPE_YOUR_TYPE)
+                    .await
+                    .ok();
+                return Ok(());
+            }
+
+            // 2. Parse configuration (if needed)
+            let config_value = if let Some(config_str) = &setting.config {
+                serde_json::from_str::<serde_json::Value>(config_str).ok()
+            } else {
+                None
+            };
+
+            // 3. Check if notification condition is met
+            // ... your logic here ...
+
+            // 4. Check if notification already exists
+            let all_notifications = db::get_notifications(ctx.pool, Some(character_id), None)
+                .await
+                .ok();
+            let has_active = all_notifications
+                .as_ref()
+                .map(|n| {
+                    n.iter()
+                        .any(|notif| {
+                            notif.notification_type == NOTIFICATION_TYPE_YOUR_TYPE
+                                && notif.status == "active"
+                        })
+                })
+                .unwrap_or(false);
+
+            // 5. Create or clear notification
+            if condition_met {
+                if !has_active {
+                    let title = "Your Notification Title";
+                    let message = "Your notification message";
+
+                    let character_name = db::get_character(ctx.pool, character_id)
+                        .await
+                        .ok()
+                        .flatten()
+                        .map(|c| c.character_name)
+                        .unwrap_or_else(|| format!("Character {}", character_id));
+
+                    // Create database notification
+                    db::create_notification(
+                        ctx.pool,
+                        character_id,
+                        NOTIFICATION_TYPE_YOUR_TYPE,
+                        title,
+                        &message,
+                    ).await?;
+
+                    // Send system notification
+                    let notification_title = format!("{} - {}", character_name, title);
+                    if let Err(e) = ctx
+                        .app
+                        .notification()
+                        .builder()
+                        .title(&notification_title)
+                        .body(&message)
+                        .show()
+                    {
+                        eprintln!("Failed to send system notification: {}", e);
+                    }
+                }
+            } else if has_active {
+                // Clear notification if condition no longer met
+                db::clear_notification(ctx.pool, character_id, NOTIFICATION_TYPE_YOUR_TYPE)
+                    .await?;
+            }
+        }
+
+        Ok(())
+    }
+}
+```
+
+### Step 3: Register the Checker
+
+Add your checker to `src-tauri/src/notifications/mod.rs`:
+
+1. Add the module declaration in `checkers/mod.rs`:
+
+```rust
+pub mod your_notification_type;
+pub use your_notification_type::YourNotificationChecker;
+```
+
+2. Register it in `NotificationProcessor::register_checkers()`:
+
+```rust
+fn register_checkers(&mut self) {
+    self.checkers.push(Arc::new(checkers::SkillQueueLowChecker));
+    self.checkers.push(Arc::new(checkers::YourNotificationChecker)); // Add this
+}
+```
+
+### Step 4: Export the Notification Type Constant
+
+If the notification type needs to be used in the frontend, export it from `src-tauri/src/lib.rs`:
+
+```rust
+pub use notifications::checkers::your_notification_type::NOTIFICATION_TYPE_YOUR_TYPE;
+```
+
+### Step 5: Add Frontend Type (if needed)
+
+Add the notification type to `src/lib/notificationTypes.ts`:
+
+```typescript
+// Must match NOTIFICATION_TYPE_YOUR_TYPE in src-tauri/src/notifications/checkers/your_notification_type.rs
+export const NOTIFICATION_TYPES = {
+  SKILL_QUEUE_LOW: 'skill_queue_low',
+  YOUR_TYPE: 'your_notification_type', // Add this
+} as const;
+```
+
+## Triggering Notification Checks
+
+When data is updated that should trigger notification checks, emit the `EVENT_DATA_UPDATED` event:
+
+```rust
+use crate::notifications::{EVENT_DATA_UPDATED, DataUpdatedPayload};
+
+// After updating data (e.g., skill queue, skills, etc.)
+let _ = app.emit(
+    EVENT_DATA_UPDATED,
+    DataUpdatedPayload {
+        data_type: "skill_queue".to_string(), // Must match a checker's data_triggers()
+        character_id,
+    },
+);
+```
+
+### Common Data Types
+
+- `"skill_queue"` - Triggered when skill queue is refreshed
+- `"skills"` - Triggered when character skills are updated
+- Add more as needed for other data types
+
+## Best Practices
+
+1. **Use cached data when possible**: Checkers should prefer reading from the ESI cache rather than making new API calls
+2. **Check notification settings first**: Always check if the notification is enabled before performing expensive operations
+3. **Handle paused/empty states**: Return early if data indicates the notification shouldn't apply (e.g., paused skill queue)
+4. **Avoid duplicate notifications**: Check for existing active notifications before creating new ones
+5. **Clear notifications when appropriate**: Clear notifications when conditions are no longer met
+6. **Use helper functions**: Extract complex logic into helper functions (see `get_cached_queue_hours` in `skill_queue_low.rs` as an example)
+7. **Error handling**: Use `Result` for error propagation, but log errors rather than failing silently
+8. **System notifications**: Always include character name in the system notification title for clarity
+
+## Example: Skill Queue Low Checker
+
+See `src-tauri/src/notifications/checkers/skill_queue_low.rs` for a complete example that:
+
+- Reads from ESI cache
+- Calculates queue hours from cached data
+- Handles paused queues
+- Creates/clears notifications based on threshold
+- Sends system notifications
