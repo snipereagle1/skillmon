@@ -14,7 +14,7 @@ Located in `src-tauri/src/`:
 - **main.rs**: Entry point (minimal, delegates to lib.rs)
 - **sde.rs**: Static Data Export import and management
 - **esi_helpers.rs**: ESI API helper utilities
-- **skill_queue.rs**: Skill queue refresh logic and notifications
+- **skill_queue.rs**: Skill queue refresh logic
 - **tray.rs**: System tray menu updates
 - **utils.rs**: General utility functions
 
@@ -50,6 +50,14 @@ Located in `src-tauri/src/`:
 
 - **mod.rs**: Cache key building, get/set cached responses, ETag extraction
 
+#### `notifications/` - Notification System
+
+- **mod.rs**: Notification processor, `NotificationChecker` trait, event handling
+- **checkers/**: Individual notification checker implementations
+  - **mod.rs**: Module exports for all checker modules
+  - Domain-specific files: Each file implements a `NotificationChecker` for a specific notification type (e.g., `skill_queue_low.rs`)
+  - See `.cursor/rules/notifications.mdc` for detailed documentation on creating new notification checkers
+
 ## Frontend (TypeScript/React)
 
 Located in `src/`:
@@ -75,6 +83,7 @@ Located in `src/`:
 #### `lib/`
 
 - **utils.ts**: Utility functions (e.g., `cn()` for className merging)
+- **notificationTypes.ts**: Notification type constants (must match backend notification type constants)
 
 #### `generated/`
 
@@ -126,6 +135,7 @@ use crate::db;
 use crate::esi;
 use crate::cache;
 use crate::commands;
+use crate::notifications;
 ```
 
 ### TypeScript
