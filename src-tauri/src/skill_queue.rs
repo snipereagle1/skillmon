@@ -13,27 +13,6 @@ use crate::utils;
 use crate::commands::attributes::CharacterAttributesResponse;
 use crate::commands::skill_queues::{CharacterSkillQueue, SkillQueueItem};
 
-pub fn calculate_total_queue_hours(skill_queue: &[SkillQueueItem]) -> f64 {
-    let mut total_hours = 0.0;
-    for skill in skill_queue {
-        if let Some(sp_per_min) = skill.sp_per_minute {
-            if sp_per_min > 0.0 {
-                if let (Some(level_start), Some(level_end)) =
-                    (skill.level_start_sp, skill.level_end_sp)
-                {
-                    let current_sp = skill.current_sp.unwrap_or(level_start);
-                    let remaining_sp = level_end - current_sp;
-                    if remaining_sp > 0 {
-                        let sp_per_hour = sp_per_min * 60.0;
-                        total_hours += remaining_sp as f64 / sp_per_hour;
-                    }
-                }
-            }
-        }
-    }
-    total_hours
-}
-
 pub async fn refresh_all_skill_queues(
     app: &AppHandle,
     pool: &db::Pool,

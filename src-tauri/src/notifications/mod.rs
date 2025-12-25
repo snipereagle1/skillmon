@@ -11,6 +11,7 @@ pub mod checkers;
 pub struct NotificationContext<'a> {
     pub app: &'a AppHandle,
     pub pool: &'a db::Pool,
+    #[allow(dead_code)] // May be used by future notification checkers
     pub rate_limits: &'a esi::RateLimitStore,
 }
 

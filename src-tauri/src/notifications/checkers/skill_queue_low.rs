@@ -1,10 +1,12 @@
+use std::collections::HashMap;
+
 use anyhow::Result;
 use tauri_plugin_notification::NotificationExt;
 
-use crate::commands::skill_queues::SkillQueueItem;
+use crate::cache;
 use crate::db;
 use crate::notifications::{NotificationChecker, NotificationContext};
-use crate::skill_queue::calculate_total_queue_hours;
+use crate::utils;
 
 pub const NOTIFICATION_TYPE_SKILL_QUEUE_LOW: &str = "skill_queue_low";
 
@@ -46,9 +48,10 @@ impl NotificationChecker for SkillQueueLowChecker {
                 24.0
             };
 
-            let skill_queue =
-                get_character_skill_queue(ctx.pool, ctx.rate_limits, character_id).await?;
-            let total_hours = calculate_total_queue_hours(&skill_queue);
+            let total_hours = match get_cached_queue_hours(ctx.pool, character_id).await? {
+                Some(hours) => hours,
+                None => return Ok(()), // Paused queue - skip this notification
+            };
 
             let all_notifications = db::get_notifications(ctx.pool, Some(character_id), None)
                 .await
@@ -117,215 +120,52 @@ impl NotificationChecker for SkillQueueLowChecker {
     }
 }
 
-async fn get_character_skill_queue(
-    pool: &db::Pool,
-    rate_limits: &crate::esi::RateLimitStore,
-    character_id: i64,
-) -> Result<Vec<SkillQueueItem>> {
-    let queue_data = crate::esi_helpers::get_cached_skill_queue(
-        pool,
-        &crate::esi_helpers::create_authenticated_client(
-            &crate::auth::ensure_valid_access_token(pool, character_id).await?,
-        )?,
-        character_id,
-        rate_limits,
-    )
-    .await?;
+fn calculate_hours_from_sp(
+    queue_data: &[serde_json::Value],
+    skill_sp_map: &HashMap<i64, i64>,
+    skill_attributes: &HashMap<i64, utils::SkillAttributes>,
+    char_attrs: Option<&db::CharacterAttributes>,
+) -> Option<f64> {
+    let mut total_hours = 0.0;
+    let mut has_skills = false;
+    let mut has_finish_dates = false;
 
-    let queue_data = match queue_data {
-        Some(data) => data,
-        None => return Ok(Vec::new()),
-    };
-
-    let mut skill_ids = Vec::new();
-    let now = chrono::Utc::now();
-    let mut skill_queue: Vec<SkillQueueItem> = queue_data
-        .into_iter()
-        .filter_map(|item: serde_json::Value| {
-            let obj = item.as_object()?;
-            let skill_id = obj.get("skill_id")?.as_i64()?;
-            let queue_pos = obj.get("queue_position")?.as_i64()? as i32;
-
-            if let Some(finish_str) = obj.get("finish_date").and_then(|v| v.as_str()) {
-                if let Ok(finish) = chrono::DateTime::parse_from_rfc3339(finish_str) {
-                    let finish_utc = finish.with_timezone(&chrono::Utc);
-                    if now >= finish_utc {
-                        return None;
-                    }
-                }
-            }
-
-            skill_ids.push(skill_id);
-            Some(SkillQueueItem {
-                skill_id,
-                skill_name: None,
-                queue_position: queue_pos,
-                finished_level: obj.get("finished_level")?.as_i64()? as i32,
-                start_date: obj
-                    .get("start_date")
-                    .and_then(|v| v.as_str())
-                    .map(String::from),
-                finish_date: obj
-                    .get("finish_date")
-                    .and_then(|v| v.as_str())
-                    .map(String::from),
-                training_start_sp: obj.get("training_start_sp").and_then(|v| v.as_i64()),
-                level_start_sp: obj.get("level_start_sp").and_then(|v| v.as_i64()),
-                level_end_sp: obj.get("level_end_sp").and_then(|v| v.as_i64()),
-                current_sp: None,
-                sp_per_minute: None,
-                primary_attribute: None,
-                secondary_attribute: None,
-                rank: None,
-            })
-        })
-        .collect();
-
-    let skill_names = crate::utils::get_skill_names(pool, &skill_ids)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to get skill names: {}", e))?;
-    let skill_attributes = crate::utils::get_skill_attributes(pool, &skill_ids)
-        .await
-        .map_err(|e| anyhow::anyhow!("Failed to get skill attributes: {}", e))?;
-
-    let character_attributes = db::get_character_attributes(pool, character_id)
-        .await
-        .ok()
-        .flatten();
-    let mut skill_sp_map: std::collections::HashMap<i64, i64> = std::collections::HashMap::new();
-    if let Ok(skills) = db::get_character_skills(pool, character_id).await {
-        for skill in skills {
-            skill_sp_map.insert(skill.skill_id, skill.skillpoints_in_skill);
-        }
-    }
-
-    for skill_item in &mut skill_queue {
-        if let Some(name) = skill_names.get(&skill_item.skill_id) {
-            skill_item.skill_name = Some(name.clone());
+    for item in queue_data {
+        has_skills = true;
+        if item.get("finish_date").and_then(|v| v.as_str()).is_some() {
+            has_finish_dates = true;
         }
 
-        let known_sp = skill_sp_map.get(&skill_item.skill_id).copied();
-        let current_tracker = None;
+        let skill_id = item.get("skill_id")?.as_i64()?;
+        let level_start_sp = item.get("level_start_sp")?.as_i64()?;
+        let level_end_sp = item.get("level_end_sp")?.as_i64()?;
 
-        let is_currently_training = skill_item.queue_position == 0 || {
-            let now = chrono::Utc::now();
-            if let (Some(start_str), Some(finish_str)) =
-                (&skill_item.start_date, &skill_item.finish_date)
+        // Get current SP (use training_start_sp if available, otherwise use current skill SP)
+        let current_sp = item
+            .get("training_start_sp")
+            .and_then(|v| v.as_i64())
+            .or_else(|| skill_sp_map.get(&skill_id).copied())
+            .unwrap_or(level_start_sp);
+        let current_sp = current_sp.max(level_start_sp);
+        let remaining_sp = level_end_sp - current_sp;
+
+        if remaining_sp <= 0 {
+            continue;
+        }
+
+        // Calculate SP per minute
+        if let Some(skill_attr) = skill_attributes.get(&skill_id) {
+            if let (Some(primary_attr_id), Some(secondary_attr_id)) =
+                (skill_attr.primary_attribute, skill_attr.secondary_attribute)
             {
-                if let (Ok(start), Ok(finish)) = (
-                    chrono::DateTime::parse_from_rfc3339(start_str),
-                    chrono::DateTime::parse_from_rfc3339(finish_str),
-                ) {
-                    let start_utc = start.with_timezone(&chrono::Utc);
-                    let finish_utc = finish.with_timezone(&chrono::Utc);
-                    now >= start_utc && now < finish_utc
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        };
-
-        let mut progress_sp = if is_currently_training {
-            let base_sp = known_sp
-                .or(skill_item.training_start_sp)
-                .or(skill_item.level_start_sp)
-                .unwrap_or(0);
-
-            if let (Some(start_str), Some(finish_str)) =
-                (&skill_item.start_date, &skill_item.finish_date)
-            {
-                if let (Ok(start), Ok(finish)) = (
-                    chrono::DateTime::parse_from_rfc3339(start_str),
-                    chrono::DateTime::parse_from_rfc3339(finish_str),
-                ) {
-                    let start_utc = start.with_timezone(&chrono::Utc);
-                    let finish_utc = finish.with_timezone(&chrono::Utc);
-                    let now = chrono::Utc::now();
-
-                    if now >= start_utc && now < finish_utc {
-                        let total_duration = (finish_utc - start_utc).num_seconds() as f64;
-                        let elapsed_duration = (now - start_utc).num_seconds() as f64;
-
-                        if total_duration > 0.0 && elapsed_duration > 0.0 {
-                            let total_sp_needed = skill_item.level_end_sp.unwrap_or(0) - base_sp;
-                            let progress_ratio = elapsed_duration / total_duration;
-                            let sp_gained = (total_sp_needed as f64 * progress_ratio) as i64;
-                            let calculated_sp = base_sp + sp_gained;
-
-                            if let Some(level_end) = skill_item.level_end_sp {
-                                if calculated_sp > level_end {
-                                    level_end
-                                } else {
-                                    calculated_sp
-                                }
-                            } else {
-                                calculated_sp
-                            }
-                        } else {
-                            base_sp
-                        }
-                    } else {
-                        base_sp
-                    }
-                } else {
-                    base_sp
-                }
-            } else {
-                base_sp
-            }
-        } else {
-            current_tracker
-                .or(known_sp)
-                .or(skill_item.training_start_sp)
-                .or(skill_item.level_start_sp)
-                .unwrap_or(0)
-        };
-
-        if is_currently_training {
-            if let Some(level_end) = skill_item.level_end_sp {
-                if progress_sp > level_end {
-                    progress_sp = level_end;
-                }
-            }
-        } else {
-            if let Some(level_start) = skill_item.level_start_sp {
-                if progress_sp < level_start {
-                    progress_sp = level_start;
-                }
-            }
-            if let Some(level_end) = skill_item.level_end_sp {
-                if progress_sp > level_end {
-                    progress_sp = level_end;
-                }
-            }
-        }
-
-        skill_item.current_sp = Some(progress_sp);
-
-        if let Some(skill_attr) = skill_attributes.get(&skill_item.skill_id) {
-            skill_item.primary_attribute = skill_attr.primary_attribute;
-            skill_item.secondary_attribute = skill_attr.secondary_attribute;
-            skill_item.rank = skill_attr.rank;
-
-            if let Some(attrs) = &character_attributes {
-                if let (Some(primary_attr_id), Some(secondary_attr_id)) =
-                    (skill_attr.primary_attribute, skill_attr.secondary_attribute)
-                {
+                if let Some(attrs) = char_attrs {
                     let primary_value = match primary_attr_id {
                         164 => attrs.charisma,
                         165 => attrs.intelligence,
                         166 => attrs.memory,
                         167 => attrs.perception,
                         168 => attrs.willpower,
-                        _ => {
-                            eprintln!(
-                                "Unknown primary attribute ID: {} for skill {}",
-                                primary_attr_id, skill_item.skill_id
-                            );
-                            0
-                        }
+                        _ => continue,
                     };
                     let secondary_value = match secondary_attr_id {
                         164 => attrs.charisma,
@@ -333,21 +173,64 @@ async fn get_character_skill_queue(
                         166 => attrs.memory,
                         167 => attrs.perception,
                         168 => attrs.willpower,
-                        _ => {
-                            eprintln!(
-                                "Unknown secondary attribute ID: {} for skill {}",
-                                secondary_attr_id, skill_item.skill_id
-                            );
-                            0
-                        }
+                        _ => continue,
                     };
-                    let sp_per_min =
-                        crate::utils::calculate_sp_per_minute(primary_value, secondary_value);
-                    skill_item.sp_per_minute = Some(sp_per_min);
+                    let sp_per_min = utils::calculate_sp_per_minute(primary_value, secondary_value);
+                    if sp_per_min > 0.0 {
+                        let sp_per_hour = sp_per_min * 60.0;
+                        total_hours += remaining_sp as f64 / sp_per_hour;
+                    }
                 }
             }
         }
     }
 
-    Ok(skill_queue)
+    // Paused queue (skills exist but no finish dates) - return None to skip
+    if has_skills && !has_finish_dates {
+        return None;
+    }
+
+    Some(total_hours)
+}
+
+async fn get_cached_queue_hours(pool: &db::Pool, character_id: i64) -> Result<Option<f64>> {
+    let endpoint_path = format!("characters/{}/skillqueue", character_id);
+    let cache_key = cache::build_cache_key(&endpoint_path, character_id);
+
+    let queue_data = match cache::get_cached_response(pool, &cache_key).await? {
+        Some((body, _etag)) => serde_json::from_str::<Vec<serde_json::Value>>(&body)?,
+        None => return Ok(Some(0.0)), // No cache = treat as empty queue
+    };
+
+    // Get character attributes
+    let char_attrs = db::get_character_attributes(pool, character_id)
+        .await
+        .ok()
+        .flatten();
+
+    // Get skill SP map
+    let mut skill_sp_map = HashMap::new();
+    if let Ok(skills) = db::get_character_skills(pool, character_id).await {
+        for skill in skills {
+            skill_sp_map.insert(skill.skill_id, skill.skillpoints_in_skill);
+        }
+    }
+
+    // Get skill IDs from queue
+    let skill_ids: Vec<i64> = queue_data
+        .iter()
+        .filter_map(|item| item.get("skill_id")?.as_i64())
+        .collect();
+
+    // Get skill attributes
+    let skill_attributes = utils::get_skill_attributes(pool, &skill_ids)
+        .await
+        .unwrap_or_default();
+
+    Ok(calculate_hours_from_sp(
+        &queue_data,
+        &skill_sp_map,
+        &skill_attributes,
+        char_attrs.as_ref(),
+    ))
 }
