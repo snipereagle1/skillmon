@@ -1,7 +1,6 @@
 use std::collections::HashMap;
 
 use serde::Serialize;
-use sqlx::Row;
 use tauri::State;
 
 use crate::auth;
@@ -232,6 +231,7 @@ pub struct SkillDetailsResponse {
 }
 
 type SkillInfoRow = (i64, String, Option<String>, i64, i64, Option<f64>);
+type ReverseReqRow = (i64, i64, Option<i64>, Option<String>, Option<String>, i64); // (type_id, required_level, category_id, category_name, group_name, group_id)
 
 #[tauri::command]
 pub async fn get_skill_details(
@@ -387,17 +387,24 @@ pub async fn get_skill_details(
     }
 
     // Get reverse requirements (what requires this skill)
-    let reverse_req_rows: Vec<(i64, i64, i64, i64)> = sqlx::query_as(
+    // Use LEFT JOINs to get both category and group names
+    // If type.category_id is NULL, use group.category_id to get the category
+    let reverse_req_rows: Vec<ReverseReqRow> = sqlx::query_as(
         r#"
-        SELECT
-            sr.skill_type_id,
-            sr.required_level,
-            t.category_id,
-            t.group_id
-        FROM sde_skill_requirements sr
-        JOIN sde_types t ON sr.skill_type_id = t.type_id
-        WHERE sr.required_skill_id = ? AND t.published = 1
-        "#,
+            SELECT
+                sr.skill_type_id,
+                sr.required_level,
+                COALESCE(t.category_id, g.category_id) AS category_id,
+                COALESCE(c.name, cg.name) AS category_name,
+                g.name AS group_name,
+                t.group_id
+            FROM sde_skill_requirements sr
+            JOIN sde_types t ON sr.skill_type_id = t.type_id
+            LEFT JOIN sde_groups g ON t.group_id = g.group_id
+            LEFT JOIN sde_categories c ON t.category_id = c.category_id
+            LEFT JOIN sde_categories cg ON g.category_id = cg.category_id
+            WHERE sr.required_skill_id = ? AND t.published = 1
+            "#,
     )
     .bind(skill_id)
     .fetch_all(&*pool)
@@ -406,7 +413,7 @@ pub async fn get_skill_details(
 
     let mut required_for_type_ids: Vec<i64> = reverse_req_rows
         .iter()
-        .map(|(type_id, _, _, _)| *type_id)
+        .map(|(type_id, _, _, _, _, _)| *type_id)
         .collect();
     required_for_type_ids.sort();
     required_for_type_ids.dedup();
@@ -415,88 +422,37 @@ pub async fn get_skill_details(
         .await
         .map_err(|e| format!("Failed to get type names: {}", e))?;
 
-    // Get group names
-    let mut group_ids: Vec<i64> = reverse_req_rows
-        .iter()
-        .map(|(_, _, _, group_id)| *group_id)
-        .collect();
-    group_ids.sort();
-    group_ids.dedup();
-
-    let mut group_names_map: HashMap<i64, String> = HashMap::new();
-    if !group_ids.is_empty() {
-        for chunk in group_ids.chunks(100) {
-            let mut query_builder: sqlx::QueryBuilder<sqlx::Sqlite> = sqlx::QueryBuilder::new(
-                "SELECT group_id, name FROM sde_groups WHERE group_id IN (",
-            );
-            let mut separated = query_builder.separated(", ");
-            for gid in chunk {
-                separated.push_bind(gid);
-            }
-            separated.push_unseparated(")");
-            let query = query_builder.build();
-            let rows = query
-                .fetch_all(&*pool)
-                .await
-                .map_err(|e| format!("Failed to get group names: {}", e))?;
-            for row in rows {
-                let gid: i64 = Row::get(&row, 0);
-                let name: String = Row::get(&row, 1);
-                group_names_map.insert(gid, name);
-            }
-        }
-    }
-
-    // Get category names
-    let mut category_ids: Vec<i64> = reverse_req_rows
-        .iter()
-        .map(|(_, _, category_id, _)| *category_id)
-        .collect();
-    category_ids.sort();
-    category_ids.dedup();
-
-    let mut category_names_map: HashMap<i64, String> = HashMap::new();
-    if !category_ids.is_empty() {
-        for chunk in category_ids.chunks(100) {
-            let mut query_builder: sqlx::QueryBuilder<sqlx::Sqlite> = sqlx::QueryBuilder::new(
-                "SELECT category_id, name FROM sde_categories WHERE category_id IN (",
-            );
-            let mut separated = query_builder.separated(", ");
-            for cid in chunk {
-                separated.push_bind(cid);
-            }
-            separated.push_unseparated(")");
-            let query = query_builder.build();
-            let rows = query
-                .fetch_all(&*pool)
-                .await
-                .map_err(|e| format!("Failed to get category names: {}", e))?;
-            for row in rows {
-                let cid: i64 = Row::get(&row, 0);
-                let name: String = Row::get(&row, 1);
-                category_names_map.insert(cid, name);
-            }
-        }
-    }
-
     let mut required_for: Vec<RequiredForItem> = Vec::new();
-    for (type_id, required_level, category_id_val, group_id_val) in reverse_req_rows {
+    for (
+        type_id,
+        required_level,
+        category_id_val,
+        category_name_from_query,
+        group_name_from_query,
+        group_id_val,
+    ) in reverse_req_rows
+    {
         let type_name = type_names
             .get(&type_id)
             .cloned()
             .unwrap_or_else(|| format!("Unknown Type {}", type_id));
-        let group_name_val = group_names_map
-            .get(&group_id_val)
-            .cloned()
-            .unwrap_or_else(|| "Unknown Group".to_string());
-        let category_name = category_names_map.get(&category_id_val).cloned();
-        let is_skill = category_id_val == SKILL_CATEGORY_ID;
+
+        // Get category name from query, or use "Other" if missing
+        // Don't fallback to group_name - categories and groups are different levels
+        let category_name = category_name_from_query.or_else(|| Some("Other".to_string()));
+
+        // Get group name from query, or use fallback if missing
+        let group_name_val = group_name_from_query.unwrap_or_else(|| "Unknown Group".to_string());
+
+        // Handle NULL category_id - use 0 as placeholder for serialization
+        let category_id_final = category_id_val.unwrap_or(0);
+        let is_skill = category_id_val == Some(SKILL_CATEGORY_ID);
 
         required_for.push(RequiredForItem {
             type_id,
             type_name,
             required_level,
-            category_id: category_id_val,
+            category_id: category_id_final,
             category_name,
             group_id: group_id_val,
             group_name: group_name_val,

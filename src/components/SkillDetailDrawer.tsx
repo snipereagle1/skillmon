@@ -2,6 +2,12 @@ import { Check } from 'lucide-react';
 import { useState } from 'react';
 import { match, P } from 'ts-pattern';
 
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from '@/components/ui/accordion';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useSkillDetails } from '@/hooks/tauri/useSkillDetails';
 import { cn } from '@/lib/utils';
@@ -53,43 +59,26 @@ export function SkillDetailDrawer({
             ))
             .with({ isLoading: false, data: P.not(P.nullish) }, ({ data }) => (
               <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
-                <SheetHeader className="border-b shrink-0">
+                <SheetHeader className="shrink-0 pb-2">
                   <SheetTitle className="text-xl">{data.skill_name}</SheetTitle>
                   <p className="text-sm text-muted-foreground">
                     {data.group_name}
                     {data.category_id === 16 && ' > Skills'}
                   </p>
-                  {/* Skill level indicators */}
-                  <div className="flex gap-1 mt-2">
-                    {[1, 2, 3, 4, 5].map((level) => (
-                      <div
-                        key={level}
-                        className="w-6 h-6 border border-border rounded-sm bg-muted flex items-center justify-center text-xs"
-                      >
-                        {level}
-                      </div>
-                    ))}
-                  </div>
                 </SheetHeader>
 
                 <Tabs
                   defaultValue="description"
                   className="flex flex-col flex-1 overflow-hidden"
                 >
-                  <div className="border-b px-4 shrink-0">
-                    <TabsList>
-                      <TabsTrigger value="description">Description</TabsTrigger>
-                      <TabsTrigger value="attributes">Attributes</TabsTrigger>
-                      <TabsTrigger value="requirements">
-                        Requirements
-                      </TabsTrigger>
-                      <TabsTrigger value="required-for">
-                        Required For
-                      </TabsTrigger>
-                    </TabsList>
-                  </div>
+                  <TabsList className="w-full px-4 rounded-none">
+                    <TabsTrigger value="description">Description</TabsTrigger>
+                    <TabsTrigger value="attributes">Attributes</TabsTrigger>
+                    <TabsTrigger value="requirements">Requirements</TabsTrigger>
+                    <TabsTrigger value="required-for">Required For</TabsTrigger>
+                  </TabsList>
 
-                  <div className="flex-1 overflow-y-auto p-4">
+                  <div className="flex-1 overflow-y-auto px-4">
                     <TabsContent value="description" className="m-0">
                       <div className="space-y-4">
                         <p className="text-sm text-muted-foreground">
@@ -219,7 +208,7 @@ export function SkillDetailDrawer({
                     <TabsContent value="required-for" className="m-0">
                       <div className="space-y-4">
                         {/* Level tabs */}
-                        <div className="flex gap-2 border-b pb-2">
+                        <div className="flex gap-2 mb-0">
                           {[1, 2, 3, 4, 5].map((level) => {
                             const hasItems = data.required_for.some(
                               (item) => item.required_level === level
@@ -280,7 +269,8 @@ export function SkillDetailDrawer({
                             );
                           }
 
-                          // Group by category
+                          // Group by category name (categories are more generic than groups)
+                          // Groups belong to categories (e.g., "Armor Coating" group is in "Module" category)
                           const groupedByCategory = filteredItems.reduce(
                             (acc, item) => {
                               const categoryName =
@@ -295,34 +285,50 @@ export function SkillDetailDrawer({
                           );
 
                           return (
-                            <div className="space-y-4">
+                            <Accordion type="multiple" className="w-full">
                               {Object.entries(groupedByCategory)
                                 .sort(([a], [b]) => a.localeCompare(b))
                                 .map(([categoryName, items]) => (
-                                  <div key={categoryName} className="space-y-2">
-                                    <h3 className="text-sm font-semibold">
+                                  <AccordionItem
+                                    key={categoryName}
+                                    value={categoryName}
+                                  >
+                                    <AccordionTrigger className="text-sm font-semibold">
                                       {categoryName}
-                                    </h3>
-                                    <div className="space-y-1 pl-4">
-                                      {items
-                                        .sort((a, b) =>
-                                          a.type_name.localeCompare(b.type_name)
-                                        )
-                                        .map((item) => (
-                                          <div
-                                            key={item.type_id}
-                                            className="flex items-center justify-between py-1 text-sm"
-                                          >
-                                            <span>{item.type_name}</span>
-                                            <span className="text-muted-foreground">
-                                              {item.group_name}
-                                            </span>
-                                          </div>
-                                        ))}
-                                    </div>
-                                  </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent>
+                                      <div className="space-y-1">
+                                        {items
+                                          .sort((a, b) => {
+                                            // First sort by group name
+                                            const groupCompare =
+                                              a.group_name.localeCompare(
+                                                b.group_name
+                                              );
+                                            if (groupCompare !== 0) {
+                                              return groupCompare;
+                                            }
+                                            // Then sort alphabetically by type name
+                                            return a.type_name.localeCompare(
+                                              b.type_name
+                                            );
+                                          })
+                                          .map((item) => (
+                                            <div
+                                              key={item.type_id}
+                                              className="flex items-center justify-between py-1 text-sm"
+                                            >
+                                              <span>{item.type_name}</span>
+                                              <span className="text-muted-foreground">
+                                                {item.group_name}
+                                              </span>
+                                            </div>
+                                          ))}
+                                      </div>
+                                    </AccordionContent>
+                                  </AccordionItem>
                                 ))}
-                            </div>
+                            </Accordion>
                           );
                         })()}
                       </div>
