@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { useCharacterSkills } from '@/hooks/tauri/useCharacterSkills';
 
 import { SkillCategoryItem } from './SkillCategoryItem';
+import { SkillDetailDrawer } from './SkillDetailDrawer';
 import { SkillItem } from './SkillItem';
 
 interface SkillsProps {
@@ -16,6 +17,8 @@ export function Skills({ characterId }: SkillsProps) {
   const { data, isLoading, error } = useCharacterSkills(characterId);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedSkillId, setSelectedSkillId] = useState<number | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const hasInitializedRef = useRef(false);
 
   useEffect(() => {
@@ -87,6 +90,11 @@ export function Skills({ characterId }: SkillsProps) {
   const handleCategoryClick = (groupId: number) => {
     setSearchQuery('');
     setSelectedGroupId(groupId);
+  };
+
+  const handleSkillClick = (skillId: number) => {
+    setSelectedSkillId(skillId);
+    setDrawerOpen(true);
   };
 
   return (
@@ -164,12 +172,20 @@ export function Skills({ characterId }: SkillsProps) {
             <div className="grid grid-cols-2 gap-x-4 gap-y-2">
               <div className="space-y-2">
                 {skillsColumn1.map((skill) => (
-                  <SkillItem key={skill.skill_id} skill={skill} />
+                  <SkillItem
+                    key={skill.skill_id}
+                    skill={skill}
+                    onClick={() => handleSkillClick(skill.skill_id)}
+                  />
                 ))}
               </div>
               <div className="space-y-2">
                 {skillsColumn2.map((skill) => (
-                  <SkillItem key={skill.skill_id} skill={skill} />
+                  <SkillItem
+                    key={skill.skill_id}
+                    skill={skill}
+                    onClick={() => handleSkillClick(skill.skill_id)}
+                  />
                 ))}
               </div>
             </div>
@@ -183,12 +199,20 @@ export function Skills({ characterId }: SkillsProps) {
             <div className="grid grid-cols-2 gap-x-4 gap-y-2">
               <div className="space-y-2">
                 {skillsColumn1.map((skill) => (
-                  <SkillItem key={skill.skill_id} skill={skill} />
+                  <SkillItem
+                    key={skill.skill_id}
+                    skill={skill}
+                    onClick={() => handleSkillClick(skill.skill_id)}
+                  />
                 ))}
               </div>
               <div className="space-y-2">
                 {skillsColumn2.map((skill) => (
-                  <SkillItem key={skill.skill_id} skill={skill} />
+                  <SkillItem
+                    key={skill.skill_id}
+                    skill={skill}
+                    onClick={() => handleSkillClick(skill.skill_id)}
+                  />
                 ))}
               </div>
             </div>
@@ -199,6 +223,13 @@ export function Skills({ characterId }: SkillsProps) {
           </div>
         )}
       </div>
+
+      <SkillDetailDrawer
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        skillId={selectedSkillId}
+        characterId={characterId}
+      />
     </div>
   );
 }

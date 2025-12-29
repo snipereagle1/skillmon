@@ -1,12 +1,14 @@
 use std::collections::HashMap;
 
 use serde::Serialize;
+use sqlx::Row;
 use tauri::State;
 
 use crate::auth;
 use crate::db;
 use crate::esi;
 use crate::esi_helpers;
+use crate::utils;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct CharacterSkillResponse {
@@ -171,5 +173,352 @@ pub async fn get_character_skills_with_groups(
         character_id,
         skills: skills_response,
         groups: groups_response,
+    })
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct AttributeInfo {
+    pub attribute_id: i64,
+    pub name: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BonusAttribute {
+    pub attribute_id: i64,
+    pub attribute_name: String,
+    pub value: f64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SkillAttributesDetails {
+    pub primary_attribute: Option<AttributeInfo>,
+    pub secondary_attribute: Option<AttributeInfo>,
+    pub rank: Option<i64>,
+    pub volume: Option<f64>,
+    pub bonuses: Vec<BonusAttribute>,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SkillRequirement {
+    pub required_skill_id: i64,
+    pub required_skill_name: String,
+    pub required_level: i64,
+    pub is_met: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct RequiredForItem {
+    pub type_id: i64,
+    pub type_name: String,
+    pub required_level: i64,
+    pub category_id: i64,
+    pub category_name: Option<String>,
+    pub group_id: i64,
+    pub group_name: String,
+    pub is_skill: bool,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct SkillDetailsResponse {
+    pub skill_id: i64,
+    pub skill_name: String,
+    pub description: Option<String>,
+    pub group_id: i64,
+    pub group_name: String,
+    pub category_id: i64,
+    pub attributes: SkillAttributesDetails,
+    pub prerequisites: Vec<SkillRequirement>,
+    pub required_for: Vec<RequiredForItem>,
+}
+
+type SkillInfoRow = (i64, String, Option<String>, i64, i64, Option<f64>);
+
+#[tauri::command]
+pub async fn get_skill_details(
+    pool: State<'_, db::Pool>,
+    skill_id: i64,
+    character_id: Option<i64>,
+) -> Result<SkillDetailsResponse, String> {
+    const SKILL_CATEGORY_ID: i64 = 16;
+
+    // Get skill basic info
+    let skill_info: Option<SkillInfoRow> = sqlx::query_as(
+        "SELECT type_id, name, description, group_id, category_id, volume FROM sde_types WHERE type_id = ? AND published = 1",
+    )
+    .bind(skill_id)
+    .fetch_optional(&*pool)
+    .await
+    .map_err(|e| format!("Failed to get skill info: {}", e))?;
+
+    let (skill_id_val, skill_name, description, group_id, category_id, volume) =
+        skill_info.ok_or_else(|| format!("Skill {} not found", skill_id))?;
+
+    // Get group name
+    let group_name: String = sqlx::query_scalar("SELECT name FROM sde_groups WHERE group_id = ?")
+        .bind(group_id)
+        .fetch_one(&*pool)
+        .await
+        .map_err(|e| format!("Failed to get group name: {}", e))?;
+
+    // Get skill attributes
+    let attributes_rows: Vec<(i64, f64)> = sqlx::query_as(
+        "SELECT attribute_id, value FROM sde_type_dogma_attributes WHERE type_id = ?",
+    )
+    .bind(skill_id)
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| format!("Failed to get skill attributes: {}", e))?;
+
+    let mut primary_attribute_id: Option<i64> = None;
+    let mut secondary_attribute_id: Option<i64> = None;
+    let mut rank: Option<i64> = None;
+    let mut bonuses: Vec<BonusAttribute> = Vec::new();
+
+    // Get attribute names for character attributes
+    let char_attr_names: Vec<(i64, String)> = sqlx::query_as(
+        "SELECT attribute_id, name FROM sde_character_attributes WHERE attribute_id IN (164, 165, 166, 167, 168)",
+    )
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| format!("Failed to get character attribute names: {}", e))?;
+
+    let mut char_attr_map: HashMap<i64, String> = HashMap::new();
+    for (attr_id, name) in char_attr_names {
+        char_attr_map.insert(attr_id, name);
+    }
+
+    // Get dogma attribute names for bonuses
+    let dogma_attr_rows: Vec<(i64, Option<String>, String)> = sqlx::query_as(
+        "SELECT attribute_id, display_name, name FROM sde_dogma_attributes WHERE attribute_id IN (SELECT DISTINCT attribute_id FROM sde_type_dogma_attributes WHERE type_id = ?)",
+    )
+    .bind(skill_id)
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| format!("Failed to get dogma attribute names: {}", e))?;
+
+    let mut dogma_attr_map: HashMap<i64, String> = HashMap::new();
+    for (attr_id, display_name, name) in dogma_attr_rows {
+        let attr_name = display_name.unwrap_or(name);
+        dogma_attr_map.insert(attr_id, attr_name);
+    }
+
+    for (attr_id, value) in attributes_rows {
+        match attr_id {
+            180 => primary_attribute_id = Some(value as i64),
+            181 => secondary_attribute_id = Some(value as i64),
+            275 => rank = Some(value as i64),
+            161 => {
+                // Volume - already handled from sde_types
+            }
+            _ => {
+                // Check if it's a bonus attribute (not primary/secondary/rank/volume)
+                if let Some(attr_name) = dogma_attr_map.get(&attr_id) {
+                    bonuses.push(BonusAttribute {
+                        attribute_id: attr_id,
+                        attribute_name: attr_name.clone(),
+                        value,
+                    });
+                }
+            }
+        }
+    }
+
+    let primary_attribute = primary_attribute_id.and_then(|id| {
+        char_attr_map.get(&id).map(|name| AttributeInfo {
+            attribute_id: id,
+            name: name.clone(),
+        })
+    });
+
+    let secondary_attribute = secondary_attribute_id.and_then(|id| {
+        char_attr_map.get(&id).map(|name| AttributeInfo {
+            attribute_id: id,
+            name: name.clone(),
+        })
+    });
+
+    // Get prerequisites
+    let prerequisites_rows: Vec<(i64, i64)> = sqlx::query_as(
+        "SELECT required_skill_id, required_level FROM sde_skill_requirements WHERE skill_type_id = ?",
+    )
+    .bind(skill_id)
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| format!("Failed to get prerequisites: {}", e))?;
+
+    let mut prerequisite_skill_ids: Vec<i64> =
+        prerequisites_rows.iter().map(|(id, _)| *id).collect();
+    prerequisite_skill_ids.sort();
+    prerequisite_skill_ids.dedup();
+
+    let skill_names = utils::get_skill_names(&pool, &prerequisite_skill_ids)
+        .await
+        .map_err(|e| format!("Failed to get prerequisite skill names: {}", e))?;
+
+    // Get character's trained skill levels if character_id is provided
+    let mut character_skill_levels: HashMap<i64, i64> = HashMap::new();
+    if let Some(char_id) = character_id {
+        let char_skills = db::get_character_skills(&pool, char_id)
+            .await
+            .map_err(|e| format!("Failed to get character skills: {}", e))?;
+        for skill in char_skills {
+            character_skill_levels.insert(skill.skill_id, skill.trained_skill_level);
+        }
+    }
+
+    let mut prerequisites: Vec<SkillRequirement> = Vec::new();
+    for (required_skill_id, required_level) in prerequisites_rows {
+        let required_skill_name = skill_names
+            .get(&required_skill_id)
+            .cloned()
+            .unwrap_or_else(|| format!("Unknown Skill {}", required_skill_id));
+        let trained_level = character_skill_levels
+            .get(&required_skill_id)
+            .copied()
+            .unwrap_or(0);
+        let is_met = trained_level >= required_level;
+
+        prerequisites.push(SkillRequirement {
+            required_skill_id,
+            required_skill_name,
+            required_level,
+            is_met,
+        });
+    }
+
+    // Get reverse requirements (what requires this skill)
+    let reverse_req_rows: Vec<(i64, i64, i64, i64)> = sqlx::query_as(
+        r#"
+        SELECT
+            sr.skill_type_id,
+            sr.required_level,
+            t.category_id,
+            t.group_id
+        FROM sde_skill_requirements sr
+        JOIN sde_types t ON sr.skill_type_id = t.type_id
+        WHERE sr.required_skill_id = ? AND t.published = 1
+        "#,
+    )
+    .bind(skill_id)
+    .fetch_all(&*pool)
+    .await
+    .map_err(|e| format!("Failed to get reverse requirements: {}", e))?;
+
+    let mut required_for_type_ids: Vec<i64> = reverse_req_rows
+        .iter()
+        .map(|(type_id, _, _, _)| *type_id)
+        .collect();
+    required_for_type_ids.sort();
+    required_for_type_ids.dedup();
+
+    let type_names = utils::get_type_names_helper(&pool, &required_for_type_ids)
+        .await
+        .map_err(|e| format!("Failed to get type names: {}", e))?;
+
+    // Get group names
+    let mut group_ids: Vec<i64> = reverse_req_rows
+        .iter()
+        .map(|(_, _, _, group_id)| *group_id)
+        .collect();
+    group_ids.sort();
+    group_ids.dedup();
+
+    let mut group_names_map: HashMap<i64, String> = HashMap::new();
+    if !group_ids.is_empty() {
+        for chunk in group_ids.chunks(100) {
+            let mut query_builder: sqlx::QueryBuilder<sqlx::Sqlite> = sqlx::QueryBuilder::new(
+                "SELECT group_id, name FROM sde_groups WHERE group_id IN (",
+            );
+            let mut separated = query_builder.separated(", ");
+            for gid in chunk {
+                separated.push_bind(gid);
+            }
+            separated.push_unseparated(")");
+            let query = query_builder.build();
+            let rows = query
+                .fetch_all(&*pool)
+                .await
+                .map_err(|e| format!("Failed to get group names: {}", e))?;
+            for row in rows {
+                let gid: i64 = Row::get(&row, 0);
+                let name: String = Row::get(&row, 1);
+                group_names_map.insert(gid, name);
+            }
+        }
+    }
+
+    // Get category names
+    let mut category_ids: Vec<i64> = reverse_req_rows
+        .iter()
+        .map(|(_, _, category_id, _)| *category_id)
+        .collect();
+    category_ids.sort();
+    category_ids.dedup();
+
+    let mut category_names_map: HashMap<i64, String> = HashMap::new();
+    if !category_ids.is_empty() {
+        for chunk in category_ids.chunks(100) {
+            let mut query_builder: sqlx::QueryBuilder<sqlx::Sqlite> = sqlx::QueryBuilder::new(
+                "SELECT category_id, name FROM sde_categories WHERE category_id IN (",
+            );
+            let mut separated = query_builder.separated(", ");
+            for cid in chunk {
+                separated.push_bind(cid);
+            }
+            separated.push_unseparated(")");
+            let query = query_builder.build();
+            let rows = query
+                .fetch_all(&*pool)
+                .await
+                .map_err(|e| format!("Failed to get category names: {}", e))?;
+            for row in rows {
+                let cid: i64 = Row::get(&row, 0);
+                let name: String = Row::get(&row, 1);
+                category_names_map.insert(cid, name);
+            }
+        }
+    }
+
+    let mut required_for: Vec<RequiredForItem> = Vec::new();
+    for (type_id, required_level, category_id_val, group_id_val) in reverse_req_rows {
+        let type_name = type_names
+            .get(&type_id)
+            .cloned()
+            .unwrap_or_else(|| format!("Unknown Type {}", type_id));
+        let group_name_val = group_names_map
+            .get(&group_id_val)
+            .cloned()
+            .unwrap_or_else(|| "Unknown Group".to_string());
+        let category_name = category_names_map.get(&category_id_val).cloned();
+        let is_skill = category_id_val == SKILL_CATEGORY_ID;
+
+        required_for.push(RequiredForItem {
+            type_id,
+            type_name,
+            required_level,
+            category_id: category_id_val,
+            category_name,
+            group_id: group_id_val,
+            group_name: group_name_val,
+            is_skill,
+        });
+    }
+
+    Ok(SkillDetailsResponse {
+        skill_id: skill_id_val,
+        skill_name,
+        description,
+        group_id,
+        group_name,
+        category_id,
+        attributes: SkillAttributesDetails {
+            primary_attribute,
+            secondary_attribute,
+            rank,
+            volume,
+            bonuses,
+        },
+        prerequisites,
+        required_for,
     })
 }

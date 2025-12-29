@@ -4,9 +4,10 @@ import { cn } from '@/lib/utils';
 
 interface SkillItemProps {
   skill: CharacterSkillResponse;
+  onClick?: () => void;
 }
 
-export function SkillItem({ skill }: SkillItemProps) {
+export function SkillItem({ skill, onClick }: SkillItemProps) {
   const squareSize = skill.is_injected ? 'w-2 h-2' : 'w-1.5 h-1.5';
   const squareOpacity = skill.is_injected ? 'opacity-100' : 'opacity-50';
 
@@ -31,7 +32,12 @@ export function SkillItem({ skill }: SkillItemProps) {
   };
 
   return (
-    <Item variant="outline" size="sm" className="py-1.5">
+    <Item
+      variant="outline"
+      size="sm"
+      className={cn('py-1.5', onClick && 'cursor-pointer hover:bg-accent')}
+      onClick={onClick}
+    >
       <ItemContent>
         <div className="flex items-center gap-3">
           <ItemTitle className="flex-1 text-sm">{skill.skill_name}</ItemTitle>
