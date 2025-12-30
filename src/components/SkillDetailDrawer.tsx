@@ -1,4 +1,4 @@
-import { Check } from 'lucide-react';
+import { Check, OmegaIcon } from 'lucide-react';
 import { useState } from 'react';
 import { match, P } from 'ts-pattern';
 
@@ -60,7 +60,12 @@ export function SkillDetailDrawer({
             .with({ isLoading: false, data: P.not(P.nullish) }, ({ data }) => (
               <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
                 <SheetHeader className="shrink-0 pb-2">
-                  <SheetTitle className="text-xl">{data.skill_name}</SheetTitle>
+                  <SheetTitle className="text-xl flex items-center gap-2">
+                    {data.skill_name}
+                    {data.requires_omega && (
+                      <OmegaIcon className="w-4 h-4 text-yellow-500" />
+                    )}
+                  </SheetTitle>
                   <p className="text-sm text-muted-foreground">
                     {data.group_name}
                     {data.category_id === 16 && ' > Skills'}
@@ -109,47 +114,46 @@ export function SkillDetailDrawer({
                             </span>
                           </div>
                         )}
-                        {data.attributes.volume !== null &&
-                          data.attributes.volume !== undefined && (
-                            <div className="flex items-center justify-between py-2 border-b">
-                              <span className="text-sm font-medium">
-                                Volume
-                              </span>
-                              <span className="text-sm text-muted-foreground">
-                                {data.attributes.volume.toFixed(2)} m³
-                              </span>
-                            </div>
-                          )}
-                        {data.attributes.rank !== null &&
-                          data.attributes.rank !== undefined && (
-                            <div className="flex items-center justify-between py-2 border-b">
-                              <span className="text-sm font-medium">
-                                Training time multiplier
-                              </span>
-                              <span className="text-sm text-muted-foreground">
-                                {data.attributes.rank * 10} ×
-                              </span>
-                            </div>
-                          )}
-                        {data.attributes.bonuses.map((bonus) => (
-                          <div
-                            key={bonus.attribute_id}
-                            className="flex items-center justify-between py-2 border-b"
-                          >
-                            <span className="text-sm font-medium">
-                              {bonus.attribute_name}
-                            </span>
+                        {data.attributes.volume && (
+                          <div className="flex items-center justify-between py-2 border-b">
+                            <span className="text-sm font-medium">Volume</span>
                             <span className="text-sm text-muted-foreground">
-                              {bonus.value > 0 ? '+' : ''}
-                              {bonus.value.toFixed(1)}%
+                              {data.attributes.volume.toFixed(2)} m³
                             </span>
                           </div>
-                        ))}
+                        )}
+                        {data.attributes.rank !== null && (
+                          <div className="flex items-center justify-between py-2 border-b">
+                            <span className="text-sm font-medium">
+                              Training time multiplier
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              {data.attributes.rank}×
+                            </span>
+                          </div>
+                        )}
+                        {data.attributes.bonuses.map((bonus) => {
+                          const isPercentage = bonus.unit_id === 9;
+                          return (
+                            <div
+                              key={bonus.attribute_id}
+                              className="flex items-center justify-between py-2 border-b"
+                            >
+                              <span className="text-sm font-medium">
+                                {bonus.attribute_name}
+                              </span>
+                              <span className="text-sm text-muted-foreground">
+                                {bonus.value}
+                                {isPercentage ? '%' : ''}
+                              </span>
+                            </div>
+                          );
+                        })}
                       </div>
                     </TabsContent>
 
                     <TabsContent value="requirements" className="m-0">
-                      <div className="space-y-2">
+                      <div className="space-y-4">
                         {data.prerequisites.length === 0 ? (
                           <p className="text-sm text-muted-foreground">
                             No requirements
@@ -164,7 +168,7 @@ export function SkillDetailDrawer({
                                 {req.is_met && (
                                   <Check className="h-4 w-4 text-green-500" />
                                 )}
-                                <span className="text-sm">
+                                <span className="text-sm font-medium">
                                   {req.required_skill_name}
                                 </span>
                               </div>

@@ -186,6 +186,7 @@ pub struct BonusAttribute {
     pub attribute_id: i64,
     pub attribute_name: String,
     pub value: f64,
+    pub unit_id: Option<i64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -228,6 +229,7 @@ pub struct SkillDetailsResponse {
     pub attributes: SkillAttributesDetails,
     pub prerequisites: Vec<SkillRequirement>,
     pub required_for: Vec<RequiredForItem>,
+    pub requires_omega: bool,
 }
 
 type SkillInfoRow = (i64, String, Option<String>, i64, i64, Option<f64>);
@@ -272,51 +274,105 @@ pub async fn get_skill_details(
     let mut primary_attribute_id: Option<i64> = None;
     let mut secondary_attribute_id: Option<i64> = None;
     let mut rank: Option<i64> = None;
+    let mut requires_omega: bool = false;
     let mut bonuses: Vec<BonusAttribute> = Vec::new();
 
-    // Get attribute names for character attributes
-    let char_attr_names: Vec<(i64, String)> = sqlx::query_as(
-        "SELECT attribute_id, name FROM sde_character_attributes WHERE attribute_id IN (164, 165, 166, 167, 168)",
-    )
-    .fetch_all(&*pool)
-    .await
-    .map_err(|e| format!("Failed to get character attribute names: {}", e))?;
-
-    let mut char_attr_map: HashMap<i64, String> = HashMap::new();
-    for (attr_id, name) in char_attr_names {
-        char_attr_map.insert(attr_id, name);
+    // First pass: extract primary/secondary attribute IDs
+    for (attr_id, value) in &attributes_rows {
+        match *attr_id {
+            180 => {
+                primary_attribute_id = Some(*value as i64);
+            }
+            181 => {
+                secondary_attribute_id = Some(*value as i64);
+            }
+            275 => rank = Some(*value as i64),
+            _ => {}
+        }
     }
 
-    // Get dogma attribute names for bonuses
-    let dogma_attr_rows: Vec<(i64, Option<String>, String)> = sqlx::query_as(
-        "SELECT attribute_id, display_name, name FROM sde_dogma_attributes WHERE attribute_id IN (SELECT DISTINCT attribute_id FROM sde_type_dogma_attributes WHERE type_id = ?)",
-    )
-    .bind(skill_id)
-    .fetch_all(&*pool)
-    .await
-    .map_err(|e| format!("Failed to get dogma attribute names: {}", e))?;
+    // Get dogma attribute names and unit_id for bonuses and primary/secondary attributes
+    // First, collect all attribute IDs we need to look up
+    let mut dogma_attr_ids_to_query = Vec::new();
+    // Add all attribute IDs from the skill's dogma attributes
+    for (attr_id, _) in &attributes_rows {
+        dogma_attr_ids_to_query.push(*attr_id);
+    }
+    // Add primary and secondary attribute IDs (the values from attributes 180 and 181)
+    if let Some(id) = primary_attribute_id {
+        if !dogma_attr_ids_to_query.contains(&id) {
+            dogma_attr_ids_to_query.push(id);
+        }
+    }
+    if let Some(id) = secondary_attribute_id {
+        if !dogma_attr_ids_to_query.contains(&id) {
+            dogma_attr_ids_to_query.push(id);
+        }
+    }
 
-    let mut dogma_attr_map: HashMap<i64, String> = HashMap::new();
-    for (attr_id, display_name, name) in dogma_attr_rows {
-        let attr_name = display_name.unwrap_or(name);
-        dogma_attr_map.insert(attr_id, attr_name);
+    let mut dogma_attr_map: HashMap<i64, (String, Option<i64>)> = HashMap::new();
+    if !dogma_attr_ids_to_query.is_empty() {
+        let placeholders = dogma_attr_ids_to_query
+            .iter()
+            .map(|_| "?")
+            .collect::<Vec<_>>()
+            .join(", ");
+        let query = format!(
+            "SELECT attribute_id, display_name, name, unit_id FROM sde_dogma_attributes WHERE attribute_id IN ({})",
+            placeholders
+        );
+        let mut query_builder =
+            sqlx::query_as::<_, (i64, Option<String>, String, Option<i64>)>(&query);
+        for id in &dogma_attr_ids_to_query {
+            query_builder = query_builder.bind(id);
+        }
+        let dogma_attr_rows: Vec<(i64, Option<String>, String, Option<i64>)> = query_builder
+            .fetch_all(&*pool)
+            .await
+            .map_err(|e| format!("Failed to get dogma attribute names: {}", e))?;
+
+        for (attr_id, display_name, name, unit_id) in dogma_attr_rows {
+            let attr_name = display_name.unwrap_or(name);
+            dogma_attr_map.insert(attr_id, (attr_name, unit_id));
+        }
     }
 
     for (attr_id, value) in attributes_rows {
+        #[allow(clippy::manual_range_patterns)]
         match attr_id {
-            180 => primary_attribute_id = Some(value as i64),
-            181 => secondary_attribute_id = Some(value as i64),
-            275 => rank = Some(value as i64),
+            180 => {
+                // Already handled
+            }
+            181 => {
+                // Already handled
+            }
+            275 => {
+                // Already handled
+            }
             161 => {
                 // Volume - already handled from sde_types
             }
+            182 | 183 | 184 | 1285 | 1289 | 1290 => {
+                // Primary/Secondary/Tertiary/Quaternary/Quinary/Senary Skill required - covered by prerequisites
+            }
+            277 | 278 | 279 | 1286 | 1287 | 1288 => {
+                // requiredSkill1Level through requiredSkill6Level - covered by prerequisites
+            }
+            280 => {
+                // Level - not a bonus attribute
+            }
+            1047 => {
+                // canNotBeTrainedOnTrial - extract to requires_omega
+                requires_omega = value == 1.0;
+            }
             _ => {
                 // Check if it's a bonus attribute (not primary/secondary/rank/volume)
-                if let Some(attr_name) = dogma_attr_map.get(&attr_id) {
+                if let Some((attr_name, unit_id)) = dogma_attr_map.get(&attr_id) {
                     bonuses.push(BonusAttribute {
                         attribute_id: attr_id,
                         attribute_name: attr_name.clone(),
                         value,
+                        unit_id: *unit_id,
                     });
                 }
             }
@@ -324,14 +380,14 @@ pub async fn get_skill_details(
     }
 
     let primary_attribute = primary_attribute_id.and_then(|id| {
-        char_attr_map.get(&id).map(|name| AttributeInfo {
+        dogma_attr_map.get(&id).map(|(name, _)| AttributeInfo {
             attribute_id: id,
             name: name.clone(),
         })
     });
 
     let secondary_attribute = secondary_attribute_id.and_then(|id| {
-        char_attr_map.get(&id).map(|name| AttributeInfo {
+        dogma_attr_map.get(&id).map(|(name, _)| AttributeInfo {
             attribute_id: id,
             name: name.clone(),
         })
@@ -476,5 +532,6 @@ pub async fn get_skill_details(
         },
         prerequisites,
         required_for,
+        requires_omega,
     })
 }
