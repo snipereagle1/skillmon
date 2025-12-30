@@ -1,10 +1,6 @@
 @import 'tailwindcss';
 @import 'tw-animate-css';
 
-/* Safelist: Force inclusion of TabsTrigger data attribute variants in production builds */
-/* These classes are used by TabsTrigger but may not be detected by Tailwind v4's static analysis */
-@source inline("data-[state=active]:bg-background data-[state=active]:shadow-sm dark:data-[state=active]:bg-input/30 dark:data-[state=active]:text-foreground dark:data-[state=active]:border-input");
-
 @theme {
   --color-background: hsl(var(--background));
   --color-foreground: hsl(var(--foreground));
@@ -105,5 +101,18 @@
 
   *::-webkit-scrollbar-thumb:hover {
     background: hsl(var(--muted-foreground) / 0.5);
+  }
+}
+
+@layer components {
+  [data-slot='tabs-trigger'][data-state='active'] {
+    background-color: hsl(var(--background));
+    box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  }
+
+  .dark [data-slot='tabs-trigger'][data-state='active'] {
+    background-color: hsl(var(--input) / 0.3);
+    color: hsl(var(--foreground));
+    border-color: hsl(var(--input));
   }
 }
