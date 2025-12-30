@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
@@ -15,7 +16,6 @@ import { CharacterPortrait } from './CharacterPortrait';
 interface AccountCardProps {
   account: AccountWithCharacters;
   selectedCharacterId: number | null;
-  onSelectCharacter: (characterId: number) => void;
   unassignedCharacters: Character[];
   accounts: AccountWithCharacters[];
   characterSkillQueues: Map<
@@ -27,7 +27,6 @@ interface AccountCardProps {
 export function AccountCard({
   account,
   selectedCharacterId,
-  onSelectCharacter,
   unassignedCharacters,
   accounts,
   characterSkillQueues,
@@ -54,12 +53,16 @@ export function AccountCard({
                   character={character}
                   accounts={accounts}
                 >
-                  <div
+                  <Link
+                    to="/characters/$characterId/$tab"
+                    params={{
+                      characterId: character.character_id,
+                      tab: 'skill-queue',
+                    }}
                     className={cn(
                       'flex items-center gap-2 cursor-pointer rounded p-1 hover:bg-muted/50',
                       isSelected && 'bg-muted!'
                     )}
-                    onClick={() => onSelectCharacter(character.character_id)}
                   >
                     <CharacterPortrait
                       character={character}
@@ -70,7 +73,7 @@ export function AccountCard({
                     <span className="text-sm font-medium">
                       {character.character_name}
                     </span>
-                  </div>
+                  </Link>
                 </CharacterContextMenu>
               );
             })}
@@ -103,9 +106,13 @@ export function AccountCard({
                   character={character}
                   accounts={accounts}
                 >
-                  <div
+                  <Link
+                    to="/characters/$characterId/$tab"
+                    params={{
+                      characterId: character.character_id,
+                      tab: 'skill-queue',
+                    }}
                     className="cursor-pointer"
-                    onClick={() => onSelectCharacter(character.character_id)}
                   >
                     <CharacterPortrait
                       character={character}
@@ -113,7 +120,7 @@ export function AccountCard({
                       isPaused={queueData?.isPaused}
                       size={48}
                     />
-                  </div>
+                  </Link>
                 </CharacterContextMenu>
               );
             })}
