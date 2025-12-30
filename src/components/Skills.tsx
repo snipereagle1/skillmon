@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { useCharacterSkills } from '@/hooks/tauri/useCharacterSkills';
 
 import { SkillCategoryItem } from './SkillCategoryItem';
-import { SkillDetailDrawer } from './SkillDetailDrawer';
+import { SkillDetail } from './SkillDetail';
 import { SkillItem } from './SkillItem';
 
 interface SkillsProps {
@@ -224,7 +224,7 @@ export function Skills({ characterId }: SkillsProps) {
         )}
       </div>
 
-      <SkillDetailDrawer
+      <SkillDetail
         open={drawerOpen}
         onOpenChange={setDrawerOpen}
         skillId={selectedSkillId}

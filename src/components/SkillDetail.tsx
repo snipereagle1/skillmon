@@ -14,19 +14,19 @@ import { cn } from '@/lib/utils';
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from './ui/sheet';
 
-interface SkillDetailDrawerProps {
+interface SkillDetailProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   skillId: number | null;
   characterId: number | null;
 }
 
-export function SkillDetailDrawer({
+export function SkillDetail({
   open,
   onOpenChange,
   skillId,
   characterId,
-}: SkillDetailDrawerProps) {
+}: SkillDetailProps) {
   const { data, isLoading, error } = useSkillDetails(skillId, characterId);
   const [selectedLevel, setSelectedLevel] = useState<number>(1);
 
