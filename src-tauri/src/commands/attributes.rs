@@ -39,7 +39,6 @@ pub async fn get_character_attributes_breakdown(
     character_id: i64,
 ) -> Result<CharacterAttributesBreakdown, String> {
     const BASE_ATTRIBUTE: i64 = 17;
-    const REMAP_TOTAL: i64 = 0;
 
     const ATTRIBUTE_IDS: [(i64, &str); 5] = [
         (164, "charisma"),
@@ -148,12 +147,48 @@ pub async fn get_character_attributes_breakdown(
         remainders[idx] = attribute_totals[idx] - BASE_ATTRIBUTE - implant_bonus;
     }
 
-    let remainder_sum: i64 = remainders.iter().sum();
-    let accelerator = (remainder_sum - REMAP_TOTAL) / 5;
+    // Solve for accelerator and remaps with constraints:
+    // - remainder[i] = remap[i] + accelerator for all i
+    // - sum(remaps) = 14 (exactly)
+    // - remap[i] in [0, 10] for all i
+    // - accelerator >= 0
+    // Prefer remaps over accelerator (minimize accelerator, maximize remaps)
 
+    const MAX_REMAP_PER_ATTR: i64 = 10;
+    const MAX_REMAP_TOTAL: i64 = 14;
+
+    // Find valid range for accelerator
+    // Minimum: ensure no remap exceeds 10
+    let min_accelerator = remainders
+        .iter()
+        .map(|&r| (r - MAX_REMAP_PER_ATTR).max(0))
+        .max()
+        .unwrap_or(0);
+
+    // Maximum: ensure all remaps are >= 0
+    let max_accelerator = *remainders.iter().min().unwrap_or(&0);
+
+    // Try accelerator values from minimum to maximum (prefer lower accelerator = more remaps)
+    // Find the one that gives sum(remaps) = 14 exactly
+    let mut accelerator = min_accelerator;
     let mut remaps = [0i64; 5];
-    for (idx, remainder) in remainders.iter().enumerate() {
-        remaps[idx] = remainder - accelerator;
+
+    for test_accelerator in min_accelerator..=max_accelerator {
+        let mut test_remaps = [0i64; 5];
+        let mut remap_sum = 0i64;
+
+        for (idx, &remainder) in remainders.iter().enumerate() {
+            let remap = (remainder - test_accelerator).clamp(0, MAX_REMAP_PER_ATTR);
+            test_remaps[idx] = remap;
+            remap_sum += remap;
+        }
+
+        // Check if this gives us exactly 14
+        if remap_sum == MAX_REMAP_TOTAL {
+            accelerator = test_accelerator;
+            remaps = test_remaps;
+            break;
+        }
     }
 
     Ok(CharacterAttributesBreakdown {
