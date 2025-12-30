@@ -46,7 +46,7 @@ export function SkillQueue({ characterId }: SkillQueueProps) {
         </Button>
       </div>
       <div className="flex-1 min-h-0">
-        <CharacterQueue queue={queue} />
+        <CharacterQueue queue={queue} characterId={characterId} />
       </div>
     </div>
   );

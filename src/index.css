@@ -1,4 +1,5 @@
 @import 'tailwindcss';
+@import 'tw-animate-css';
 
 /* Safelist: Force inclusion of TabsTrigger data attribute variants in production builds */
 /* These classes are used by TabsTrigger but may not be detected by Tailwind v4's static analysis */

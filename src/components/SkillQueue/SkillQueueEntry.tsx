@@ -5,6 +5,7 @@ import {
 } from '@/components/ui/tooltip';
 import type { SkillQueueItem } from '@/generated/types';
 import { cn } from '@/lib/utils';
+import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
 import { LevelIndicator } from './LevelIndicator';
 import {
@@ -20,6 +21,7 @@ interface SkillQueueEntryProps {
   totalQueueHours: number;
   offsetPercentage: number;
   isPaused?: boolean;
+  characterId: number | null;
 }
 
 export function SkillQueueEntry({
@@ -27,7 +29,13 @@ export function SkillQueueEntry({
   totalQueueHours,
   offsetPercentage,
   isPaused,
+  characterId,
 }: SkillQueueEntryProps) {
+  const openSkillDetail = useSkillDetailStore(
+    (state: {
+      openSkillDetail: (skillId: number, characterId: number | null) => void;
+    }) => state.openSkillDetail
+  );
   const isTraining = isCurrentlyTraining(skill);
   const levelRoman =
     ['I', 'II', 'III', 'IV', 'V'][skill.finished_level - 1] ||
@@ -71,7 +79,10 @@ export function SkillQueueEntry({
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <LevelIndicator level={skill.finished_level} />
           <div className="flex flex-col flex-1 min-w-0">
-            <span className="text-foreground font-medium truncate">
+            <span
+              className="text-foreground font-medium truncate cursor-pointer hover:underline"
+              onClick={() => openSkillDetail(skill.skill_id, characterId)}
+            >
               {skill.skill_name || `Skill #${skill.skill_id}`} {levelRoman}
             </span>
             {spPerHour !== null && spPerHour > 0 && (

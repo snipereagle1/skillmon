@@ -2,17 +2,21 @@ import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
 import { AboutTab } from './AboutTab';
 import { AddCharacterDialog } from './AddCharacterDialog';
 import { CharactersTab } from './CharactersTab';
 import { NotificationBell } from './NotificationBell';
 import { NotificationDrawer } from './NotificationDrawer';
+import { SkillDetail } from './SkillDetail';
 import { SkillPlans } from './SkillPlans';
 
 export function TabLayout() {
   const [addCharacterOpen, setAddCharacterOpen] = useState(false);
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
+  const { open, skillId, characterId, closeSkillDetail } =
+    useSkillDetailStore();
 
   return (
     <div className="flex flex-col h-screen">
@@ -58,6 +62,16 @@ export function TabLayout() {
       <NotificationDrawer
         open={notificationDrawerOpen}
         onOpenChange={setNotificationDrawerOpen}
+      />
+      <SkillDetail
+        open={open}
+        onOpenChange={(isOpen) => {
+          if (!isOpen) {
+            closeSkillDetail();
+          }
+        }}
+        skillId={skillId}
+        characterId={characterId}
       />
     </div>
   );

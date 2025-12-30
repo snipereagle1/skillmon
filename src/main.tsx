@@ -6,8 +6,6 @@ import ReactDOM from 'react-dom/client';
 
 import App from './App';
 
-document.documentElement.classList.add('dark');
-
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {

@@ -4,6 +4,7 @@ import type { PlanComparisonEntry } from '@/generated/types';
 import { usePlanComparison } from '@/hooks/tauri/usePlanComparison';
 import { useSkillPlans } from '@/hooks/tauri/useSkillPlans';
 import { cn } from '@/lib/utils';
+import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
 import { LevelIndicator } from './SkillQueue/LevelIndicator';
 
@@ -21,11 +22,22 @@ function formatSkillpoints(sp: number): string {
   return `${sp.toLocaleString('en-US')} SP`;
 }
 
-function ComparisonEntryRow({ entry }: { entry: PlanComparisonEntry }) {
+function ComparisonEntryRow({
+  entry,
+  characterId,
+}: {
+  entry: PlanComparisonEntry;
+  characterId: number | null;
+}) {
   const levelRoman =
     ['I', 'II', 'III', 'IV', 'V'][entry.planned_level - 1] ||
     entry.planned_level.toString();
   const isPrerequisite = entry.entry_type === 'Prerequisite';
+  const openSkillDetail = useSkillDetailStore(
+    (state: {
+      openSkillDetail: (skillId: number, characterId: number | null) => void;
+    }) => state.openSkillDetail
+  );
 
   const statusBgColors = {
     complete: 'bg-green-400/20',
@@ -51,9 +63,10 @@ function ComparisonEntryRow({ entry }: { entry: PlanComparisonEntry }) {
           <div className="flex flex-col flex-1 min-w-0">
             <span
               className={cn(
-                'text-foreground font-medium truncate',
+                'text-foreground font-medium truncate cursor-pointer hover:underline',
                 isPrerequisite && 'text-muted-foreground'
               )}
+              onClick={() => openSkillDetail(entry.skill_type_id, characterId)}
             >
               {entry.skill_name} {levelRoman}
             </span>
@@ -250,7 +263,11 @@ export function CharacterPlanComparison({
               ) : (
                 <div>
                   {sortedEntries.map((entry) => (
-                    <ComparisonEntryRow key={entry.entry_id} entry={entry} />
+                    <ComparisonEntryRow
+                      key={entry.entry_id}
+                      entry={entry}
+                      characterId={characterId}
+                    />
                   ))}
                 </div>
               )}
