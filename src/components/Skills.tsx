@@ -4,9 +4,9 @@ import { startTransition, useEffect, useRef, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useCharacterSkills } from '@/hooks/tauri/useCharacterSkills';
+import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
 import { SkillCategoryItem } from './SkillCategoryItem';
-import { SkillDetail } from './SkillDetail';
 import { SkillItem } from './SkillItem';
 
 interface SkillsProps {
@@ -17,8 +17,11 @@ export function Skills({ characterId }: SkillsProps) {
   const { data, isLoading, error } = useCharacterSkills(characterId);
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedSkillId, setSelectedSkillId] = useState<number | null>(null);
-  const [drawerOpen, setDrawerOpen] = useState(false);
+  const openSkillDetail = useSkillDetailStore(
+    (state: {
+      openSkillDetail: (skillId: number, characterId: number | null) => void;
+    }) => state.openSkillDetail
+  );
   const hasInitializedRef = useRef(false);
 
   useEffect(() => {
@@ -93,8 +96,7 @@ export function Skills({ characterId }: SkillsProps) {
   };
 
   const handleSkillClick = (skillId: number) => {
-    setSelectedSkillId(skillId);
-    setDrawerOpen(true);
+    openSkillDetail(skillId, characterId);
   };
 
   return (
@@ -223,13 +225,6 @@ export function Skills({ characterId }: SkillsProps) {
           </div>
         )}
       </div>
-
-      <SkillDetail
-        open={drawerOpen}
-        onOpenChange={setDrawerOpen}
-        skillId={selectedSkillId}
-        characterId={characterId}
-      />
     </div>
   );
 }

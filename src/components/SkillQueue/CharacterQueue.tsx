@@ -7,9 +7,10 @@ import { calculateTrainingHours, formatDurationFromHours } from './utils';
 
 interface CharacterQueueProps {
   queue: CharacterSkillQueue;
+  characterId: number | null;
 }
 
-export function CharacterQueue({ queue }: CharacterQueueProps) {
+export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
   const MAX_QUEUE_SIZE = 150;
   const queueSize = queue.skill_queue.length;
 
@@ -96,6 +97,7 @@ export function CharacterQueue({ queue }: CharacterQueueProps) {
                     totalQueueHours={totalHours}
                     offsetPercentage={offsetPercentage}
                     isPaused={queue.is_paused ?? false}
+                    characterId={characterId}
                   />
                 );
               });

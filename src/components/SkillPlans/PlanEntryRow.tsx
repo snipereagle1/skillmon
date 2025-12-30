@@ -19,6 +19,7 @@ import {
   useUpdatePlanEntry,
 } from '@/hooks/tauri/useSkillPlans';
 import { cn } from '@/lib/utils';
+import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
 import { LevelIndicator } from '../SkillQueue/LevelIndicator';
 
@@ -38,6 +39,11 @@ export function PlanEntryRow({
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editLevel, setEditLevel] = useState(entry.planned_level);
   const [editNotes, setEditNotes] = useState(entry.notes || '');
+  const openSkillDetail = useSkillDetailStore(
+    (state: {
+      openSkillDetail: (skillId: number, characterId: number | null) => void;
+    }) => state.openSkillDetail
+  );
 
   const isPrerequisite = entry.entry_type === 'Prerequisite';
   const levelRoman =
@@ -92,9 +98,10 @@ export function PlanEntryRow({
             <div className="flex flex-col flex-1 min-w-0">
               <span
                 className={cn(
-                  'text-foreground font-medium truncate',
+                  'text-foreground font-medium truncate cursor-pointer hover:underline',
                   isPrerequisite && 'text-muted-foreground'
                 )}
+                onClick={() => openSkillDetail(entry.skill_type_id, null)}
               >
                 {entry.skill_name} {levelRoman}
               </span>
