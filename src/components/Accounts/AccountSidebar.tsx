@@ -91,7 +91,7 @@ export function AccountSidebar({
 
   return (
     <>
-      <div className="space-y-3 overflow-y-auto">
+      <div className="space-y-3 overflow-y-auto pr-4">
         {accountsData.accounts.map((account) => (
           <AccountCard
             key={account.id}

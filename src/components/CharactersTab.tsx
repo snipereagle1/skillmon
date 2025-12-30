@@ -82,7 +82,7 @@ export function CharactersTab() {
   }
 
   return (
-    <div className="flex h-full gap-4">
+    <div className="flex h-full gap-2">
       <div className="w-64 shrink-0 overflow-y-auto">
         {accountsData &&
         accountsData.accounts.length === 0 &&

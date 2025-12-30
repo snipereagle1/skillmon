@@ -57,7 +57,7 @@ export function AccountCard({
                   <div
                     className={cn(
                       'flex items-center gap-2 cursor-pointer rounded p-1 hover:bg-muted/50',
-                      isSelected && 'bg-muted/50'
+                      isSelected && 'bg-muted!'
                     )}
                     onClick={() => onSelectCharacter(character.character_id)}
                   >
