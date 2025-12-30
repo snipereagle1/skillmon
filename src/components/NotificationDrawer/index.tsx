@@ -77,7 +77,10 @@ export function NotificationDrawer({
               </TabsTrigger>
             </TabsList>
           </div>
-          <TabsContent value="active" className="flex-1 overflow-hidden m-0">
+          <TabsContent
+            value="active"
+            className="flex-1 overflow-hidden m-0 flex flex-col"
+          >
             {isLoadingActive ? (
               <div className="flex items-center justify-center h-32 text-muted-foreground">
                 <p>Loading...</p>
@@ -90,7 +93,10 @@ export function NotificationDrawer({
               />
             )}
           </TabsContent>
-          <TabsContent value="dismissed" className="flex-1 overflow-hidden m-0">
+          <TabsContent
+            value="dismissed"
+            className="flex-1 overflow-hidden m-0 flex flex-col"
+          >
             {isLoadingDismissed ? (
               <div className="flex items-center justify-center h-32 text-muted-foreground">
                 <p>Loading...</p>
