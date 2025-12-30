@@ -132,6 +132,16 @@ export function SkillDetailDrawer({
                             </span>
                           </div>
                         )}
+                        {data.attributes.training_speed_sp_per_hour && (
+                          <div className="flex items-center justify-between py-2 border-b">
+                            <span className="text-sm font-medium">
+                              Training speed
+                            </span>
+                            <span className="text-sm text-muted-foreground">
+                              {`${data.attributes.training_speed_sp_per_hour} SP/hr`}
+                            </span>
+                          </div>
+                        )}
                         {data.attributes.bonuses.map((bonus) => {
                           const isPercentage = bonus.unit_id === 9;
                           return (

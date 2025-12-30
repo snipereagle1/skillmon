@@ -196,6 +196,7 @@ pub struct SkillAttributesDetails {
     pub rank: Option<i64>,
     pub volume: Option<f64>,
     pub bonuses: Vec<BonusAttribute>,
+    pub training_speed_sp_per_hour: Option<f64>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -393,6 +394,40 @@ pub async fn get_skill_details(
         })
     });
 
+    // Calculate training speed if character_id is provided
+    let training_speed_sp_per_hour = if let Some(char_id) = character_id {
+        if let (Some(primary_attr_id), Some(secondary_attr_id)) =
+            (primary_attribute_id, secondary_attribute_id)
+        {
+            if let Ok(Some(char_attrs)) = db::get_character_attributes(&pool, char_id).await {
+                let primary_value = match primary_attr_id {
+                    164 => char_attrs.charisma,
+                    165 => char_attrs.intelligence,
+                    166 => char_attrs.memory,
+                    167 => char_attrs.perception,
+                    168 => char_attrs.willpower,
+                    _ => 0,
+                };
+                let secondary_value = match secondary_attr_id {
+                    164 => char_attrs.charisma,
+                    165 => char_attrs.intelligence,
+                    166 => char_attrs.memory,
+                    167 => char_attrs.perception,
+                    168 => char_attrs.willpower,
+                    _ => 0,
+                };
+                let sp_per_minute = utils::calculate_sp_per_minute(primary_value, secondary_value);
+                Some(sp_per_minute * 60.0)
+            } else {
+                None
+            }
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     // Get prerequisites
     let prerequisites_rows: Vec<(i64, i64)> = sqlx::query_as(
         "SELECT required_skill_id, required_level FROM sde_skill_requirements WHERE skill_type_id = ?",
@@ -529,6 +564,7 @@ pub async fn get_skill_details(
             rank,
             volume,
             bonuses,
+            training_speed_sp_per_hour,
         },
         prerequisites,
         required_for,
