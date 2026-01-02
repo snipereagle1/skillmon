@@ -50,7 +50,7 @@ impl NotificationChecker for SkillQueueLowChecker {
 
             let total_hours = match get_cached_queue_hours(ctx.pool, character_id).await? {
                 Some(hours) => hours,
-                None => return Ok(()), // Paused queue - skip this notification
+                None => return Ok(()), // Paused queue or missing cache - skip this notification
             };
 
             let all_notifications = db::get_notifications(ctx.pool, Some(character_id), None)
@@ -199,7 +199,7 @@ async fn get_cached_queue_hours(pool: &db::Pool, character_id: i64) -> Result<Op
 
     let queue_data = match cache::get_cached_response(pool, &cache_key).await? {
         Some((body, _etag)) => serde_json::from_str::<Vec<serde_json::Value>>(&body)?,
-        None => return Ok(Some(0.0)), // No cache = treat as empty queue
+        None => return Ok(None), // No cache = skip notification check (can't determine queue state reliably)
     };
 
     // Get character attributes
