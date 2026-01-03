@@ -1,4 +1,5 @@
 import { useQueries } from '@tanstack/react-query';
+import { Link, useParams } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -13,15 +14,11 @@ import { CharacterContextMenu } from './CharacterContextMenu';
 import { CharacterPortrait } from './CharacterPortrait';
 import { CreateAccountDialog } from './CreateAccountDialog';
 
-interface AccountSidebarProps {
-  selectedCharacterId: number | null;
-  onSelectCharacter: (characterId: number) => void;
-}
-
-export function AccountSidebar({
-  selectedCharacterId,
-  onSelectCharacter,
-}: AccountSidebarProps) {
+export function AccountSidebar() {
+  const params = useParams({ strict: false });
+  const selectedCharacterId = params.characterId
+    ? Number(params.characterId)
+    : null;
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const { data: accountsData, isLoading, error } = useAccountsAndCharacters();
 
@@ -97,7 +94,6 @@ export function AccountSidebar({
             key={account.id}
             account={account}
             selectedCharacterId={selectedCharacterId}
-            onSelectCharacter={onSelectCharacter}
             unassignedCharacters={accountsData.unassigned_characters}
             accounts={accountsData.accounts}
             characterSkillQueues={characterSkillQueues}
@@ -118,25 +114,29 @@ export function AccountSidebar({
                   character={character}
                   accounts={accountsData.accounts}
                 >
-                  <Card
-                    className={cn(
-                      'p-3 cursor-pointer transition-all hover:shadow-md',
-                      isSelected && 'bg-muted/50'
-                    )}
-                    onClick={() => onSelectCharacter(character.character_id)}
+                  <Link
+                    to="/characters/$characterId"
+                    params={{ characterId: String(character.character_id) }}
                   >
-                    <div className="flex items-center gap-2">
-                      <CharacterPortrait
-                        character={character}
-                        skillQueue={queueData?.skillQueue}
-                        isPaused={queueData?.isPaused}
-                        size={48}
-                      />
-                      <span className="text-sm font-medium">
-                        {character.character_name}
-                      </span>
-                    </div>
-                  </Card>
+                    <Card
+                      className={cn(
+                        'p-3 cursor-pointer transition-all hover:shadow-md',
+                        isSelected && 'bg-muted/50'
+                      )}
+                    >
+                      <div className="flex items-center gap-2">
+                        <CharacterPortrait
+                          character={character}
+                          skillQueue={queueData?.skillQueue}
+                          isPaused={queueData?.isPaused}
+                          size={48}
+                        />
+                        <span className="text-sm font-medium">
+                          {character.character_name}
+                        </span>
+                      </div>
+                    </Card>
+                  </Link>
                 </CharacterContextMenu>
               );
             })}
