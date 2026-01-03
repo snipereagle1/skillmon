@@ -1,0 +1,378 @@
+---
+description: front end routing overvew. useful for adding new pages, linking to other sections of the front end, etc
+alwaysApply: false
+---
+
+# Frontend Routing
+
+## Overview
+
+The application uses **TanStack Router** with **file-based routing** for all navigation. Routes are automatically discovered from the `src/routes/` directory structure and a route tree is generated at build time.
+
+## Route Structure
+
+### Directory Layout
+
+Routes are organized in `src/routes/` following TanStack Router's file-based routing conventions:
+
+```
+src/routes/
+├── __root.tsx                    # Root layout (required)
+├── index.tsx                     # Default route (/)
+├── overview.tsx                  # /overview
+├── about.tsx                     # /about
+├── characters/
+│   ├── index.tsx                 # /characters
+│   ├── $characterId.tsx          # /characters/$characterId (layout)
+│   ├── $characterId/
+│   │   ├── index.tsx             # /characters/$characterId (redirect)
+│   │   ├── skill-queue.tsx      # /characters/$characterId/skill-queue
+│   │   ├── skills.tsx           # /characters/$characterId/skills
+│   │   ├── clones.tsx           # /characters/$characterId/clones
+│   │   ├── attributes.tsx       # /characters/$characterId/attributes
+│   │   ├── plans.tsx            # /characters/$characterId/plans
+│   │   └── settings.tsx         # /characters/$characterId/settings
+└── plans/
+    ├── index.tsx                 # /plans
+    └── $planId.tsx               # /plans/$planId
+```
+
+### Route File Naming
+
+- **`__root.tsx`**: Root layout route (required, must export `createRootRoute`)
+- **`index.tsx`**: Index route for a directory (e.g., `/characters/` maps to `characters/index.tsx`)
+- **`$param.tsx`**: Dynamic route parameter (e.g., `$characterId.tsx` for `/characters/123`)
+- **`$param.child.tsx`**: Child route with dot notation (e.g., `$characterId.skill-queue.tsx`)
+
+## Creating Routes
+
+### Basic Route
+
+```typescript
+import { createFileRoute } from '@tanstack/react-router';
+
+function MyPage() {
+  return <div>My Page Content</div>;
+}
+
+export const Route = createFileRoute('/my-route')({
+  component: MyPage,
+});
+```
+
+### Route with Parameters
+
+```typescript
+import { createFileRoute } from '@tanstack/react-router';
+
+function CharacterPage() {
+  const { characterId } = Route.useParams();
+  return <div>Character {characterId}</div>;
+}
+
+export const Route = createFileRoute('/characters/$characterId')({
+  component: CharacterPage,
+});
+```
+
+### Layout Route with Child Routes
+
+```typescript
+import { createFileRoute, Outlet } from '@tanstack/react-router';
+
+function CharacterLayout() {
+  const { characterId } = Route.useParams();
+
+  return (
+    <div>
+      <h1>Character {characterId}</h1>
+      <Outlet /> {/* Child routes render here */}
+    </div>
+  );
+}
+
+export const Route = createFileRoute('/characters/$characterId')({
+  component: CharacterLayout,
+});
+```
+
+### Redirect Route
+
+```typescript
+import { createFileRoute, Navigate } from '@tanstack/react-router';
+
+function RedirectComponent() {
+  const { characterId } = Route.useParams();
+  return <Navigate to="/characters/$characterId/skill-queue" params={{ characterId }} />;
+}
+
+export const Route = createFileRoute('/characters/$characterId/')({
+  component: RedirectComponent,
+});
+```
+
+## Navigation
+
+### Using Link Component
+
+Always use TanStack Router's `Link` component for navigation instead of `onClick` handlers:
+
+```typescript
+import { Link } from '@tanstack/react-router';
+
+// Simple link
+<Link to="/characters">Characters</Link>
+
+// Link with parameters
+<Link to="/characters/$characterId" params={{ characterId: '123' }}>
+  Character 123
+</Link>
+
+// Link with active state
+<Link to="/characters">
+  {({ isActive }: { isActive: boolean }) => (
+    <button className={isActive ? 'active' : ''}>
+      Characters
+    </button>
+  )}
+</Link>
+```
+
+### Programmatic Navigation
+
+Use `useNavigate()` hook for programmatic navigation:
+
+```typescript
+import { useNavigate } from '@tanstack/react-router';
+
+function MyComponent() {
+  const navigate = useNavigate();
+
+  const handleClick = () => {
+    navigate({ to: '/characters/$characterId', params: { characterId: '123' } });
+  };
+
+  return <button onClick={handleClick}>Navigate</button>;
+}
+```
+
+### Getting Route Parameters
+
+Use `Route.useParams()` within route components, or `useParams()` hook elsewhere:
+
+```typescript
+// Within route component
+const { characterId } = Route.useParams();
+
+// Outside route component
+import { useParams } from '@tanstack/react-router';
+const params = useParams({ strict: false });
+const characterId = params.characterId ? Number(params.characterId) : null;
+```
+
+## Layout Patterns
+
+### Two-Column Layout with Persistent Sidebar
+
+For routes with persistent sidebars (characters, plans), use a two-column layout:
+
+```typescript
+function CharactersIndexPage() {
+  return (
+    <div className="flex h-full gap-2 p-4">
+      {/* Left sidebar - persistent across child routes */}
+      <div className="w-64 shrink-0 overflow-y-auto">
+        <AccountSidebar />
+      </div>
+      {/* Right content - changes with route */}
+      <div className="flex-1 border rounded-lg overflow-hidden">
+        <Outlet /> {/* or specific content */}
+      </div>
+    </div>
+  );
+}
+```
+
+### Nested Tabs in Layout Routes
+
+For routes with nested tabs (character detail views), use Link components styled as tabs:
+
+```typescript
+import { Link } from '@tanstack/react-router';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
+function CharacterDetailLayout() {
+  const { characterId } = Route.useParams();
+
+  return (
+    <Tabs value={undefined} className="flex flex-col flex-1 overflow-hidden">
+      <TabsList>
+        <Link to="/characters/$characterId/skill-queue" params={{ characterId }}>
+          {({ isActive }: { isActive: boolean }) => (
+            <TabsTrigger value="skill-queue" data-state={isActive ? 'active' : 'inactive'}>
+              Skill Queue
+            </TabsTrigger>
+          )}
+        </Link>
+        {/* More tab links... */}
+      </TabsList>
+      <Outlet /> {/* Child routes render here */}
+    </Tabs>
+  );
+}
+```
+
+## Root Route
+
+The root route (`__root.tsx`) should:
+
+1. Handle global application state (startup, auth events)
+2. Render top-level navigation
+3. Include global dialogs/modals (AddCharacterDialog, NotificationDrawer, SkillDetail)
+4. Render `<Outlet />` for child routes
+
+```typescript
+import { createRootRoute, Link, Outlet } from '@tanstack/react-router';
+
+function RootComponent() {
+  // Global hooks
+  useAuthEvents();
+  const { isStartingUp } = useStartupState();
+
+  // Global state
+  const [addCharacterOpen, setAddCharacterOpen] = useState(false);
+
+  if (isStartingUp) {
+    return <StartupScreen />;
+  }
+
+  return (
+    <div className="flex flex-col h-screen">
+      {/* Top navigation */}
+      <NavigationHeader />
+
+      {/* Route content */}
+      <div className="flex-1 overflow-hidden">
+        <Outlet />
+      </div>
+
+      {/* Global dialogs */}
+      <AddCharacterDialog open={addCharacterOpen} onOpenChange={setAddCharacterOpen} />
+    </div>
+  );
+}
+
+export const Route = createRootRoute({
+  component: RootComponent,
+});
+```
+
+## Route Parameters
+
+### Type Safety
+
+Route parameters are automatically typed based on the route path:
+
+```typescript
+// Route: /characters/$characterId
+const { characterId } = Route.useParams(); // characterId is string
+
+// Convert to number if needed
+const characterIdNum = Number(characterId);
+```
+
+### Optional Parameters
+
+Use `useParams({ strict: false })` when parameters might not exist:
+
+```typescript
+const params = useParams({ strict: false });
+const characterId = params.characterId ? Number(params.characterId) : null;
+```
+
+## Generated Files
+
+### routeTree.gen.ts
+
+The route tree is automatically generated by the TanStack Router Vite plugin. **Never edit this file manually**. It is:
+
+- Generated at build time
+- Excluded from version control (in `.gitignore`)
+- Required for router initialization in `main.tsx`
+
+### Router Initialization
+
+The router is initialized in `main.tsx`:
+
+```typescript
+import { createRouter, RouterProvider } from '@tanstack/react-router';
+import { routeTree } from './routeTree.gen';
+
+const router = createRouter({ routeTree });
+
+declare module '@tanstack/react-router' {
+  interface Register {
+    router: typeof router;
+  }
+}
+
+ReactDOM.createRoot(document.getElementById('root')!).render(
+  <RouterProvider router={router} />
+);
+```
+
+## Best Practices
+
+1. **Always use Link components** for navigation instead of `onClick` handlers
+2. **Use route parameters** from `Route.useParams()` within route components
+3. **Use `useParams({ strict: false })`** when parameters might not exist (e.g., in shared components)
+4. **Keep layouts in parent routes** - child routes should only render their specific content
+5. **Use Outlet** in layout routes to render child routes
+6. **Type route parameters** - convert string params to numbers when needed
+7. **Don't edit routeTree.gen.ts** - it's auto-generated
+8. **Match file structure to URL structure** - routes should mirror the URL hierarchy
+9. **Use redirect routes** for default child routes (e.g., `/characters/$characterId` → `/characters/$characterId/skill-queue`)
+10. **Persist sidebars in layout routes** - sidebars should be in parent routes, not child routes
+
+## Common Patterns
+
+### Character Selection Navigation
+
+```typescript
+// In AccountSidebar or AccountCard
+<Link
+  to="/characters/$characterId"
+  params={{ characterId: String(character.character_id) }}
+>
+  <Card>{character.character_name}</Card>
+</Link>
+```
+
+### Plan Selection Navigation
+
+```typescript
+// In PlanList
+<Link
+  to="/plans/$planId"
+  params={{ planId: String(plan.plan_id) }}
+>
+  <div>{plan.name}</div>
+</Link>
+```
+
+### Navigation After Mutation
+
+```typescript
+const navigate = useNavigate();
+
+const handleCreate = async () => {
+  const newPlan = await createPlan();
+  navigate({ to: '/plans/$planId', params: { planId: String(newPlan.id) } });
+};
+```
+
+## Migration Notes
+
+- Old tab-based navigation (`TabLayout`, `CharactersTab`) has been replaced with routes
+- Component props like `selectedCharacterId` and `onSelectCharacter` have been replaced with route parameters and Link components
+- State management for selected items is now handled by the router via URL parameters
