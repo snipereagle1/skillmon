@@ -1,8 +1,8 @@
-import { createFileRoute, Link, Outlet } from '@tanstack/react-router';
+import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { useMemo } from 'react';
 
 import { AccountSidebar } from '@/components/Accounts/AccountSidebar';
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { NavigationTabs } from '@/components/ui/navigation-tabs';
 import { useAccountsAndCharacters } from '@/hooks/tauri/useAccountsAndCharacters';
 import { useCharacterSkills } from '@/hooks/tauri/useCharacterSkills';
 import { useSkillQueue } from '@/hooks/tauri/useSkillQueue';
@@ -89,101 +89,50 @@ function CharacterDetailLayout() {
         <AccountSidebar />
       </div>
       <div className="flex-1 border rounded-lg overflow-hidden flex flex-col">
-        <Tabs
-          value={undefined}
-          className="flex flex-col flex-1 overflow-hidden"
-        >
-          <div className="border-b px-4 py-2 flex items-center justify-between">
-            <TabsList>
-              <Link
-                to="/characters/$characterId/skill-queue"
-                params={{ characterId }}
-              >
-                {({ isActive }) => (
-                  <TabsTrigger
-                    value="skill-queue"
-                    data-state={isActive ? 'active' : 'inactive'}
-                  >
-                    Skill Queue
-                  </TabsTrigger>
-                )}
-              </Link>
-              <Link
-                to="/characters/$characterId/skills"
-                params={{ characterId }}
-              >
-                {({ isActive }) => (
-                  <TabsTrigger
-                    value="skills"
-                    data-state={isActive ? 'active' : 'inactive'}
-                  >
-                    Skills
-                  </TabsTrigger>
-                )}
-              </Link>
-              <Link
-                to="/characters/$characterId/clones"
-                params={{ characterId }}
-              >
-                {({ isActive }) => (
-                  <TabsTrigger
-                    value="clones"
-                    data-state={isActive ? 'active' : 'inactive'}
-                  >
-                    Clones
-                  </TabsTrigger>
-                )}
-              </Link>
-              <Link
-                to="/characters/$characterId/attributes"
-                params={{ characterId }}
-              >
-                {({ isActive }) => (
-                  <TabsTrigger
-                    value="attributes"
-                    data-state={isActive ? 'active' : 'inactive'}
-                  >
-                    Attributes
-                  </TabsTrigger>
-                )}
-              </Link>
-              <Link
-                to="/characters/$characterId/plans"
-                params={{ characterId }}
-              >
-                {({ isActive }) => (
-                  <TabsTrigger
-                    value="plans"
-                    data-state={isActive ? 'active' : 'inactive'}
-                  >
-                    Plans
-                  </TabsTrigger>
-                )}
-              </Link>
-              <Link
-                to="/characters/$characterId/settings"
-                params={{ characterId }}
-              >
-                {({ isActive }) => (
-                  <TabsTrigger
-                    value="settings"
-                    data-state={isActive ? 'active' : 'inactive'}
-                  >
-                    Settings
-                  </TabsTrigger>
-                )}
-              </Link>
-            </TabsList>
-            {totalSkillpoints !== null && (
-              <span className="text-sm text-muted-foreground">
-                {totalSkillpoints.toLocaleString('en-US')} total skillpoints
-              </span>
-            )}
-          </div>
-          <div className="flex-1 overflow-hidden">
-            <Outlet />
-          </div>
-        </Tabs>
+        <div className="border-b px-4 py-2 flex items-center justify-between">
+          <NavigationTabs
+            items={[
+              {
+                to: '/characters/$characterId/skill-queue',
+                params: { characterId },
+                label: 'Skill Queue',
+              },
+              {
+                to: '/characters/$characterId/skills',
+                params: { characterId },
+                label: 'Skills',
+              },
+              {
+                to: '/characters/$characterId/clones',
+                params: { characterId },
+                label: 'Clones',
+              },
+              {
+                to: '/characters/$characterId/attributes',
+                params: { characterId },
+                label: 'Attributes',
+              },
+              {
+                to: '/characters/$characterId/plans',
+                params: { characterId },
+                label: 'Plans',
+              },
+              {
+                to: '/characters/$characterId/settings',
+                params: { characterId },
+                label: 'Settings',
+              },
+            ]}
+          />
+          {totalSkillpoints !== null && (
+            <span className="text-sm text-muted-foreground">
+              {totalSkillpoints.toLocaleString('en-US')} total skillpoints
+            </span>
+          )}
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <Outlet />
+        </div>
       </div>
     </div>
   );
