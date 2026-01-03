@@ -88,7 +88,7 @@ export function AccountSidebar() {
 
   return (
     <>
-      <div className="space-y-3 overflow-y-auto pr-4">
+      <div className="space-y-2 overflow-y-auto pr-4">
         {accountsData.accounts.map((account) => (
           <AccountCard
             key={account.id}
@@ -117,6 +117,7 @@ export function AccountSidebar() {
                   <Link
                     to="/characters/$characterId"
                     params={{ characterId: String(character.character_id) }}
+                    className="block"
                   >
                     <Card
                       className={cn(

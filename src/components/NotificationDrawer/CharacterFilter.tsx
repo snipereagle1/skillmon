@@ -28,7 +28,7 @@ export function CharacterFilter({
   const value = selectedCharacterId?.toString() ?? 'all';
 
   return (
-    <div className="px-4 pb-2">
+    <div className="px-4">
       <Select
         value={value}
         onValueChange={(newValue) =>

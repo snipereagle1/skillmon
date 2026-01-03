@@ -4,11 +4,7 @@ import { CharacterPlanComparison } from '@/components/CharacterPlanComparison';
 
 function CharacterPlansPage() {
   const { characterId } = Route.useParams();
-  return (
-    <div className="flex-1 overflow-hidden m-0">
-      <CharacterPlanComparison characterId={Number(characterId)} />
-    </div>
-  );
+  return <CharacterPlanComparison characterId={Number(characterId)} />;
 }
 
 export const Route = createFileRoute('/characters/$characterId/plans')({

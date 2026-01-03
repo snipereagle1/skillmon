@@ -67,8 +67,8 @@ export function NotificationDrawer({
           defaultValue="active"
           className="flex flex-col flex-1 overflow-hidden"
         >
-          <div className="px-4 pt-4 border-b">
-            <TabsList>
+          <div className="px-4 pb-4 border-b">
+            <TabsList className="w-full">
               <TabsTrigger value="active">
                 Active ({activeNotifications.length})
               </TabsTrigger>

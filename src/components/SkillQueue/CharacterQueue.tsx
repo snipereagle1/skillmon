@@ -1,6 +1,8 @@
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { CharacterSkillQueue } from '@/generated/types';
+import { useForceRefreshSkillQueue } from '@/hooks/tauri/useForceRefreshSkillQueue';
 
 import { SkillQueueEntry } from './SkillQueueEntry';
 import { calculateTrainingHours, formatDurationFromHours } from './utils';
@@ -13,6 +15,7 @@ interface CharacterQueueProps {
 export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
   const MAX_QUEUE_SIZE = 150;
   const queueSize = queue.skill_queue.length;
+  const forceRefresh = useForceRefreshSkillQueue();
 
   const calculateTotalTime = (): string => {
     if (queue.skill_queue.length === 0) return '0d 0h 0m';
@@ -59,24 +62,34 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
   console.table(queue.skill_queue);
   return (
     <TooltipProvider>
-      <div className="flex flex-col h-full bg-background">
-        <div className="px-4 py-3 border-b border-border">
-          <div className="flex items-center gap-2">
-            <h2 className="text-lg font-semibold text-foreground">
-              Training Queue {queueSize}/{MAX_QUEUE_SIZE}
-            </h2>
-            {queue.is_paused && (
-              <Badge
-                variant="outline"
-                className="border-yellow-500 text-yellow-500"
-              >
-                Paused
-              </Badge>
-            )}
+      <div className="flex flex-col h-full">
+        <div className="px-4 py-3 border-b border-border" id="top-bar">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-semibold text-foreground">
+                Training Queue {queueSize}/{MAX_QUEUE_SIZE}
+              </h2>
+              {queue.is_paused && (
+                <Badge
+                  variant="outline"
+                  className="border-yellow-500 text-yellow-500"
+                >
+                  Paused
+                </Badge>
+              )}
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => characterId && forceRefresh.mutate(characterId)}
+              disabled={forceRefresh.isPending || !characterId}
+            >
+              {forceRefresh.isPending ? 'Refreshing...' : 'Refresh'}
+            </Button>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto min-h-0" id="skill-queue">
           {queue.skill_queue.length === 0 ? (
             <div className="flex items-center justify-center h-full p-8">
               <p className="text-muted-foreground">No skills in queue</p>
@@ -105,7 +118,10 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
           )}
         </div>
 
-        <div className="border-t border-border bg-muted/30 px-4 py-3 space-y-3">
+        <div
+          className="border-t border-border bg-muted/30 px-4 py-3 space-y-3 shrink-0"
+          id="bottom-bar"
+        >
           <div className="text-sm text-green-400">
             {unallocatedSP.toLocaleString('en-US')} unallocated skill points
           </div>

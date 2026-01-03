@@ -4,11 +4,7 @@ import { NotificationSettings } from '@/components/NotificationSettings';
 
 function SettingsPage() {
   const { characterId } = Route.useParams();
-  return (
-    <div className="flex-1 overflow-auto m-0">
-      <NotificationSettings characterId={Number(characterId)} />
-    </div>
-  );
+  return <NotificationSettings characterId={Number(characterId)} />;
 }
 
 export const Route = createFileRoute('/characters/$characterId/settings')({
