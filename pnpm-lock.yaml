@@ -50,6 +50,9 @@ importers:
       '@tanstack/react-router':
         specifier: ^1.144.0
         version: 1.144.0(react-dom@19.2.1(react@19.2.1))(react@19.2.1)
+      '@tanstack/router-cli':
+        specifier: ^1.145.2
+        version: 1.145.2
       '@tanstack/router-plugin':
         specifier: ^1.145.2
         version: 1.145.2(@tanstack/react-router@1.144.0(react-dom@19.2.1(react@19.2.1))(react@19.2.1))(vite@7.2.6(@types/node@24.10.1)(jiti@2.6.1)(lightningcss@1.30.2)(tsx@4.21.0)(yaml@2.8.2))
@@ -1533,6 +1536,11 @@ packages:
     peerDependencies:
       react: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
       react-dom: ^16.8.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+
+  '@tanstack/router-cli@1.145.2':
+    resolution: {integrity: sha512-C3yhzXOjbzrfSJ0cvnYgIsEfqzVKlquqGJeRqA4RRQ8dnL/BLuVwPIBy9q1XCKfyYL7uoDPchaT5BoO5chLKGQ==}
+    engines: {node: '>=12'}
+    hasBin: true
 
   '@tanstack/router-core@1.144.0':
     resolution: {integrity: sha512-6oVERtK9XDHCP4XojgHsdHO56ZSj11YaWjF5g/zw39LhyA6Lx+/X86AEIHO4y0BUrMQaJfcjdAQMVSAs6Vjtdg==}
@@ -5379,6 +5387,14 @@ snapshots:
       react: 19.2.1
       react-dom: 19.2.1(react@19.2.1)
       use-sync-external-store: 1.6.0(react@19.2.1)
+
+  '@tanstack/router-cli@1.145.2':
+    dependencies:
+      '@tanstack/router-generator': 1.145.2
+      chokidar: 3.6.0
+      yargs: 17.7.2
+    transitivePeerDependencies:
+      - supports-color
 
   '@tanstack/router-core@1.144.0':
     dependencies:

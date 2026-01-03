@@ -94,6 +94,9 @@ jobs:
       - name: Generate TypeScript bindings
         run: pnpm typegen
 
+      - name: Generate route tree
+        run: pnpm generate-route-tree
+
       - name: Update version files
         shell: bash
         run: bash scripts/update-version.sh "${{ inputs.version }}"
