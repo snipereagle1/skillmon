@@ -1,3 +1,4 @@
+import { Link, useNavigate, useParams } from '@tanstack/react-router';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -6,12 +7,10 @@ import { useDeleteSkillPlan, useSkillPlans } from '@/hooks/tauri/useSkillPlans';
 import { CreatePlanDialog } from './CreatePlanDialog';
 import { DeletePlanDialog } from './DeletePlanDialog';
 
-interface PlanListProps {
-  selectedPlanId: number | null;
-  onSelectPlan: (planId: number | null) => void;
-}
-
-export function PlanList({ selectedPlanId, onSelectPlan }: PlanListProps) {
+export function PlanList() {
+  const params = useParams({ strict: false });
+  const navigate = useNavigate();
+  const selectedPlanId = params.planId ? Number(params.planId) : null;
   const { data: plans, isLoading, error } = useSkillPlans();
   const deletePlanMutation = useDeleteSkillPlan();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -37,7 +36,7 @@ export function PlanList({ selectedPlanId, onSelectPlan }: PlanListProps) {
     try {
       await deletePlanMutation.mutateAsync({ planId: planToDelete.id });
       if (selectedPlanId === planToDelete.id) {
-        onSelectPlan(null);
+        navigate({ to: '/plans' });
       }
       setDeleteDialogOpen(false);
       setPlanToDelete(null);
@@ -82,11 +81,12 @@ export function PlanList({ selectedPlanId, onSelectPlan }: PlanListProps) {
         ) : (
           <div className="p-2 space-y-1">
             {plans.map((plan) => (
-              <div
+              <Link
                 key={plan.plan_id}
-                onClick={() => onSelectPlan(plan.plan_id)}
+                to="/plans/$planId"
+                params={{ planId: String(plan.plan_id) }}
                 className={`
-                  p-3 rounded-md cursor-pointer transition-colors
+                  block p-3 rounded-md cursor-pointer transition-colors
                   ${
                     selectedPlanId === plan.plan_id
                       ? 'bg-muted text-white'
@@ -121,7 +121,7 @@ export function PlanList({ selectedPlanId, onSelectPlan }: PlanListProps) {
                     ×
                   </Button>
                 </div>
-              </div>
+              </Link>
             ))}
           </div>
         )}
@@ -131,7 +131,10 @@ export function PlanList({ selectedPlanId, onSelectPlan }: PlanListProps) {
         onOpenChange={setCreateDialogOpen}
         onSuccess={(planId) => {
           setCreateDialogOpen(false);
-          onSelectPlan(planId);
+          navigate({
+            to: '/plans/$planId',
+            params: { planId: String(planId) },
+          });
         }}
       />
       <DeletePlanDialog

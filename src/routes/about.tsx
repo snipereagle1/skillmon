@@ -1,7 +1,8 @@
+import { createFileRoute } from '@tanstack/react-router';
 import { getVersion } from '@tauri-apps/api/app';
 import { useEffect, useState } from 'react';
 
-export function AboutTab() {
+function AboutPage() {
   const [version, setVersion] = useState<string>('');
 
   useEffect(() => {
@@ -41,3 +42,7 @@ export function AboutTab() {
     </div>
   );
 }
+
+export const Route = createFileRoute('/about')({
+  component: AboutPage,
+});

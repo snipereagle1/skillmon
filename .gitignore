@@ -29,5 +29,6 @@ src-tauri/src/esi/openapi.json
 
 # Generated TypeScript bindings
 src/generated/
+src/routeTree.gen.ts
 sde/*.jsonl
 eve-online-static-data-*.zip
