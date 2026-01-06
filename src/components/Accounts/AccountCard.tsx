@@ -203,9 +203,7 @@ export function AccountCard({
               ) : null}
             </DragOverlay>
           </DndContext>
-          <p className="text-xs text-muted-foreground text-center">
-            {account.name}
-          </p>
+          <p className="text-xs text-muted-foreground">{account.name}</p>
         </div>
       )}
     </Card>
