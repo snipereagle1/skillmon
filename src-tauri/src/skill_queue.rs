@@ -13,6 +13,7 @@ use crate::utils;
 use crate::commands::attributes::CharacterAttributesResponse;
 use crate::commands::skill_queues::{CharacterSkillQueue, SkillQueueItem};
 
+#[allow(dead_code)]
 pub async fn refresh_all_skill_queues(
     app: &AppHandle,
     pool: &db::Pool,

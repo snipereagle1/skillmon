@@ -25,7 +25,7 @@ function RootComponent() {
         <div className="text-center">
           <p className="text-lg text-muted-foreground">Starting up...</p>
           <p className="text-sm text-muted-foreground mt-2">
-            Checking for updates and refreshing character data
+            Checking for updates
           </p>
         </div>
       </div>
