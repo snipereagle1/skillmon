@@ -102,7 +102,6 @@ pub fn run() {
                 });
 
                 let pool = app.state::<db::Pool>().inner().clone();
-                let rate_limits = app.state::<esi::RateLimitStore>().inner().clone();
                 let app_handle = app.handle().clone();
                 let startup_state_clone = startup_state.clone();
                 tauri::async_runtime::spawn(async move {
@@ -110,8 +109,6 @@ pub fn run() {
                         Ok(_) => eprintln!("SDE import completed successfully"),
                         Err(err) => eprintln!("SDE import failed: {:#}", err),
                     }
-
-                    skill_queue::refresh_all_skill_queues(&app_handle, &pool, &rate_limits).await;
 
                     startup_state_clone.store(0, Ordering::SeqCst);
                     let _ = app_handle.emit("startup-complete", ());

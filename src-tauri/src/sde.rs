@@ -342,6 +342,10 @@ async fn import_from_files(
 
     let mut tx = pool.begin().await?;
 
+    sqlx::query("PRAGMA defer_foreign_keys = ON")
+        .execute(&mut *tx)
+        .await?;
+
     clear_tables(&mut tx).await?;
     import_categories(&mut tx, categories)
         .await
@@ -715,19 +719,19 @@ async fn import_type_dogma(conn: &mut SqliteConnection, path: &Path) -> Result<(
         (1290, 1288), // requiredSkill6, requiredSkill6Level
     ];
 
+    // Fetch all published type IDs to ensure foreign key integrity
+    let published_types: std::collections::HashSet<i64> =
+        sqlx::query_scalar::<Sqlite, i64>("SELECT type_id FROM sde_types")
+            .fetch_all(&mut *conn)
+            .await?
+            .into_iter()
+            .collect();
+
     while let Some(line) = lines.next_line().await? {
         let row: TypeDogmaRow = serde_json::from_str(&line)?;
 
-        // Check if this type exists in sde_types (only published types are imported)
-        let type_exists: bool = sqlx::query_scalar::<_, bool>(
-            "SELECT EXISTS(SELECT 1 FROM sde_types WHERE type_id = ?)",
-        )
-        .bind(row.id)
-        .fetch_one(&mut *conn)
-        .await?;
-
         // Skip dogma data for types that don't exist (unpublished types)
-        if !type_exists {
+        if !published_types.contains(&row.id) {
             continue;
         }
 
@@ -744,9 +748,10 @@ async fn import_type_dogma(conn: &mut SqliteConnection, path: &Path) -> Result<(
 
         for (skill_attr, level_attr) in REQUIREMENTS {
             if let Some(skill_id_val) = attr_map.get(skill_attr) {
-                if *skill_id_val > 0.0 {
+                let required_skill_id = *skill_id_val as i64;
+                if required_skill_id > 0 && published_types.contains(&required_skill_id) {
                     let level = attr_map.get(level_attr).copied().unwrap_or(0.0);
-                    skill_batch.push((row.id, *skill_id_val as i64, level as i64, *skill_attr));
+                    skill_batch.push((row.id, required_skill_id, level as i64, *skill_attr));
                 }
             }
         }
