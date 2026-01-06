@@ -142,6 +142,24 @@ pub async fn reorder_characters_in_account(
     Ok(())
 }
 
+pub async fn reorder_unassigned_characters(pool: &Pool, character_ids: &[i64]) -> Result<()> {
+    let mut tx = pool.begin().await?;
+
+    for (index, character_id) in character_ids.iter().enumerate() {
+        sqlx::query(
+            "UPDATE characters SET sort_order = ? WHERE character_id = ? AND account_id IS NULL",
+        )
+        .bind(index as i64)
+        .bind(character_id)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    tx.commit().await?;
+
+    Ok(())
+}
+
 pub async fn get_characters_for_account(pool: &Pool, account_id: i64) -> Result<Vec<Character>> {
     let characters = sqlx::query_as::<_, Character>(
         "SELECT character_id, character_name, unallocated_sp, account_id, sort_order
@@ -161,7 +179,7 @@ pub async fn get_unassigned_characters(pool: &Pool) -> Result<Vec<Character>> {
         "SELECT character_id, character_name, unallocated_sp, account_id, sort_order
          FROM characters
          WHERE account_id IS NULL
-         ORDER BY character_name",
+         ORDER BY sort_order, character_name",
     )
     .fetch_all(pool)
     .await?;
