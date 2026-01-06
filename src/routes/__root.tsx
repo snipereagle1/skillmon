@@ -1,3 +1,4 @@
+import { useIsFetching } from '@tanstack/react-query';
 import { createRootRoute, Outlet } from '@tanstack/react-router';
 import { useState } from 'react';
 
@@ -7,13 +8,16 @@ import { NotificationDrawer } from '@/components/NotificationDrawer';
 import { SkillDetail } from '@/components/SkillDetail';
 import { Button } from '@/components/ui/button';
 import { NavigationTabs } from '@/components/ui/navigation-tabs';
+import { Spinner } from '@/components/ui/spinner';
 import { useAuthEvents } from '@/hooks/tauri/useAuthEvents';
 import { useStartupState } from '@/hooks/tauri/useStartupState';
+import { cn } from '@/lib/utils';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
 function RootComponent() {
   useAuthEvents();
   const { isStartingUp } = useStartupState();
+  const isFetching = useIsFetching();
   const [addCharacterOpen, setAddCharacterOpen] = useState(false);
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const { open, skillId, characterId, closeSkillDetail } =
@@ -44,6 +48,12 @@ function RootComponent() {
           ]}
         />
         <div className="flex items-center gap-2">
+          <Spinner
+            className={cn(
+              'transition-opacity duration-1000',
+              isFetching > 0 ? 'opacity-100' : 'opacity-0'
+            )}
+          />
           <NotificationBell onOpen={() => setNotificationDrawerOpen(true)} />
           <Button onClick={() => setAddCharacterOpen(true)}>
             Add Character
