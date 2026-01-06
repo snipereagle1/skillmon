@@ -6,6 +6,7 @@ import {
 } from '@dnd-kit/sortable';
 import { useQueries } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
+import { GripHorizontal, GripVertical } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -157,13 +158,28 @@ export function AccountSidebar() {
           </SortableContext>
           <DragOverlay dropAnimation={null}>
             {activeAccountId ? (
-              <AccountCard
-                account={localAccounts.find((a) => a.id === activeAccountId)!}
-                selectedCharacterId={selectedCharacterId}
-                unassignedCharacters={localUnassigned}
-                accounts={localAccounts}
-                characterSkillQueues={characterSkillQueues}
-              />
+              <div className="relative group/dragging">
+                {accountsData.accounts
+                  .find((a) => a.id === activeAccountId)
+                  ?.characters.some(
+                    (c) => c.character_id === selectedCharacterId
+                  ) ? (
+                  <div className="absolute left-1/2 bottom-1 -translate-x-1/2 p-1 text-muted-foreground z-10">
+                    <GripHorizontal className="size-5" />
+                  </div>
+                ) : (
+                  <div className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-muted-foreground transition-opacity z-10">
+                    <GripVertical className="size-5" />
+                  </div>
+                )}
+                <AccountCard
+                  account={localAccounts.find((a) => a.id === activeAccountId)!}
+                  selectedCharacterId={selectedCharacterId}
+                  unassignedCharacters={localUnassigned}
+                  accounts={localAccounts}
+                  characterSkillQueues={characterSkillQueues}
+                />
+              </div>
             ) : null}
           </DragOverlay>
         </DndContext>
@@ -207,11 +223,14 @@ export function AccountSidebar() {
                 {activeUnassignedCharacter ? (
                   <Card
                     className={cn(
-                      'p-3 transition-all',
+                      'p-3 transition-all relative',
                       activeUnassignedCharacter.character_id ===
                         selectedCharacterId && 'bg-muted/50'
                     )}
                   >
+                    <div className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-muted-foreground transition-opacity z-10">
+                      <GripVertical className="size-5" />
+                    </div>
                     <div className="flex items-center gap-2">
                       <CharacterPortrait
                         character={activeUnassignedCharacter}

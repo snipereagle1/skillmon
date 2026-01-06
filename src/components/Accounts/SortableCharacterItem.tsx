@@ -1,7 +1,7 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Link } from '@tanstack/react-router';
-import { GripHorizontal, GripVertical } from 'lucide-react';
+import { GripVertical } from 'lucide-react';
 
 import type {
   AccountWithCharacters,
@@ -50,9 +50,12 @@ export function SortableCharacterItem({
         <div
           {...attributes}
           {...listeners}
-          className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing p-1 text-muted-foreground/50 hover:text-muted-foreground transition-opacity z-10"
+          className={cn(
+            'absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing p-1 text-muted-foreground/50 hover:text-muted-foreground transition-opacity z-10',
+            isDragging && 'opacity-100'
+          )}
         >
-          <GripVertical className="size-3" />
+          <GripVertical className="size-4" />
         </div>
         <CharacterContextMenu character={character} accounts={accounts}>
           <Link
@@ -83,13 +86,6 @@ export function SortableCharacterItem({
 
   return (
     <div ref={setNodeRef} style={style} className="relative group">
-      <div
-        {...attributes}
-        {...listeners}
-        className="absolute left-1/2 top-0 -translate-x-1/2 -translate-y-2 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing px-1 text-muted-foreground/50 hover:text-muted-foreground transition-opacity z-10"
-      >
-        <GripHorizontal className="size-3" />
-      </div>
       <CharacterContextMenu character={character} accounts={accounts}>
         <Link
           to="/characters/$characterId"

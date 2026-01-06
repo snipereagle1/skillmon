@@ -4,7 +4,7 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { Plus } from 'lucide-react';
+import { GripVertical, Plus } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
 import type {
@@ -113,11 +113,14 @@ export function AccountCard({
               {activeCharacter ? (
                 <div
                   className={cn(
-                    'flex items-center gap-2 rounded p-1',
+                    'flex items-center gap-2 rounded p-1 relative',
                     activeCharacter.character_id === selectedCharacterId &&
                       'bg-muted'
                   )}
                 >
+                  <div className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-muted-foreground z-10">
+                    <GripVertical className="size-4" />
+                  </div>
                   <CharacterPortrait
                     character={activeCharacter}
                     skillQueue={
@@ -183,7 +186,7 @@ export function AccountCard({
             </div>
             <DragOverlay dropAnimation={null}>
               {activeCharacter ? (
-                <div className="rounded">
+                <div className="rounded relative">
                   <CharacterPortrait
                     character={activeCharacter}
                     skillQueue={

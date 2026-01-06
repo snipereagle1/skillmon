@@ -1,12 +1,13 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical } from 'lucide-react';
+import { GripHorizontal, GripVertical } from 'lucide-react';
 
 import type {
   AccountWithCharacters,
   Character,
   SkillQueueItem,
 } from '@/generated/types';
+import { cn } from '@/lib/utils';
 
 import { AccountCard } from './AccountCard';
 
@@ -38,15 +39,35 @@ export function SortableAccountCard(props: SortableAccountCardProps) {
     opacity: isDragging ? 0.3 : undefined,
   };
 
+  const isExpanded = props.account.characters.some(
+    (char) => char.character_id === props.selectedCharacterId
+  );
+
   return (
     <div ref={setNodeRef} style={style} className="relative group">
-      <div
-        {...attributes}
-        {...listeners}
-        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing p-1 text-muted-foreground/50 hover:text-muted-foreground transition-opacity"
-      >
-        <GripVertical className="size-4" />
-      </div>
+      {isExpanded ? (
+        <div
+          {...attributes}
+          {...listeners}
+          className={cn(
+            'absolute left-1/2 bottom-1 -translate-x-1/2 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing px-2 py-1 text-muted-foreground/50 hover:text-muted-foreground transition-opacity z-10',
+            isDragging && 'opacity-100'
+          )}
+        >
+          <GripHorizontal className="size-5" />
+        </div>
+      ) : (
+        <div
+          {...attributes}
+          {...listeners}
+          className={cn(
+            'absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing p-1 text-muted-foreground/50 hover:text-muted-foreground transition-opacity',
+            isDragging && 'opacity-100'
+          )}
+        >
+          <GripVertical className="size-5" />
+        </div>
+      )}
       <AccountCard {...props} />
     </div>
   );

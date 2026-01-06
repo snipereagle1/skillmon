@@ -48,9 +48,12 @@ export function SortableUnassignedCharacter({
       <div
         {...attributes}
         {...listeners}
-        className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-3 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing p-1 text-muted-foreground/50 hover:text-muted-foreground transition-opacity z-10"
+        className={cn(
+          'absolute right-1 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 cursor-grab active:cursor-grabbing p-1 text-muted-foreground/50 hover:text-muted-foreground transition-opacity z-10',
+          isDragging && 'opacity-100'
+        )}
       >
-        <GripVertical className="size-4" />
+        <GripVertical className="size-5" />
       </div>
       <CharacterContextMenu character={character} accounts={accounts}>
         <Link
