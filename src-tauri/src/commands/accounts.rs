@@ -140,3 +140,13 @@ pub async fn reorder_characters_in_account(
         .await
         .map_err(|e| format!("Failed to reorder characters in account: {}", e))
 }
+
+#[tauri::command]
+pub async fn reorder_unassigned_characters(
+    pool: State<'_, db::Pool>,
+    character_ids: Vec<i64>,
+) -> Result<(), String> {
+    db::reorder_unassigned_characters(&pool, &character_ids)
+        .await
+        .map_err(|e| format!("Failed to reorder unassigned characters: {}", e))
+}

@@ -281,6 +281,7 @@ pub fn run() {
             commands::accounts::remove_character_from_account,
             commands::accounts::reorder_accounts,
             commands::accounts::reorder_characters_in_account,
+            commands::accounts::reorder_unassigned_characters,
             commands::skill_queues::get_skill_queues,
             commands::skill_queues::get_training_characters_count,
             commands::skill_queues::get_skill_queue_for_character,
