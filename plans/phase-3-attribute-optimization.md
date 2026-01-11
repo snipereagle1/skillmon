@@ -13,7 +13,10 @@ Answers:
 
 - Canonical order preserved
 - Remap limits and cooldowns enforced
-- Implants/accelerators excluded from strategy
+- **Optimization Scope**:
+  - Implants and accelerators CAN be included in the simulation (Phase 2).
+  - Optimization will calculate training time WITH current implants.
+  - Optimization will NOT recommend implant changes or purchase decisions.
 
 ### Strategy
 

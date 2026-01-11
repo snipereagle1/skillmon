@@ -15,7 +15,10 @@ Evaluate a single plan across many characters simultaneously.
 
 - Overtrained skills count as complete
 - Partial levels count proportionally
-- Missing prerequisites allowed
+- **Prerequisite Handling in Comparison**:
+  - A plan may contain entries where the character lacks prerequisites. The UI should indicate this (warning state) but not prevent viewing or comparison.
+  - Prerequisites that the character has already trained are not counted as "remaining" in the plan.
+  - This is distinct from **editing** validation, which enforces prerequisite ordering and presence.
 
 ### Plan Policy UI
 

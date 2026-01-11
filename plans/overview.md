@@ -39,6 +39,7 @@ Phase 5: Undo & polish
 
 ## Non-Goals
 
+- EVEMon (.emp) file import (Skillmon JSON is the canonical format)
 - Implant optimization
 - Accelerator timing optimization
 - Multi-objective optimization

@@ -31,7 +31,10 @@ Outputs:
 UX:
 
 - Explicit advanced action
-- Preview required
+- **Preview Required**: A diff view of the changes is shown before any action is taken.
+- **Output Handling**: After preview, the user can:
+  - (a) Apply changes directly to the current plan.
+  - (b) Save the optimized version as a new plan.
 - Default: create new plan
 
 Success Criteria:

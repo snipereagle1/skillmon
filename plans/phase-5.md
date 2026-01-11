@@ -7,7 +7,8 @@ Add power-user safety and refinement.
 ### Undo / Redo
 
 - Frontend command log
-- Reversible operations
+- Reversible operations (additions, deletions, reorders, optimization applications)
+- **Session-only**: History is cleared on app restart.
 - No DB-level history
 
 ### Diagnostics

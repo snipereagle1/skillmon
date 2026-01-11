@@ -6,11 +6,11 @@ Enable what-if simulations using attributes, remaps, and accelerators.
 
 ### Simulation Profiles
 
-Profiles are ephemeral and include:
+Profiles are ephemeral (not saved) and include:
 
-- Base attributes
+- Base attributes (fetched from ESI: `/characters/{character_id}/attributes/`)
 - Implants
-- Remaps
+- Remaps (availability and cooldown tracked via ESI)
 - Accelerators
 
 Types:
