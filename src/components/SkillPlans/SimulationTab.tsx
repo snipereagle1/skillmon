@@ -1,5 +1,5 @@
 import { Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Label } from '@/components/ui/label';
 import {
@@ -10,6 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAccountsAndCharacters } from '@/hooks/tauri/useAccountsAndCharacters';
+import { useAttributes } from '@/hooks/tauri/useAttributes';
 import { useSimulation } from '@/hooks/tauri/useSimulation';
 
 import { SimulationPanel } from './SimulationPanel';
@@ -28,6 +29,55 @@ export function SimulationTab({ planId }: SimulationTabProps) {
     selectedCharacterId
   );
   const { data: accountsData } = useAccountsAndCharacters();
+  const { data: characterAttributes } = useAttributes(selectedCharacterId);
+
+  useEffect(() => {
+    if (selectedCharacterId && characterAttributes) {
+      setProfile({
+        implants: {
+          charisma: characterAttributes.charisma.implants,
+          intelligence: characterAttributes.intelligence.implants,
+          memory: characterAttributes.memory.implants,
+          perception: characterAttributes.perception.implants,
+          willpower: characterAttributes.willpower.implants,
+        },
+        remaps: [
+          {
+            entry_index: 0,
+            attributes: {
+              charisma: characterAttributes.charisma.remap,
+              intelligence: characterAttributes.intelligence.remap,
+              memory: characterAttributes.memory.remap,
+              perception: characterAttributes.perception.remap,
+              willpower: characterAttributes.willpower.remap,
+            },
+          },
+        ],
+        accelerators:
+          characterAttributes.intelligence.accelerator > 0
+            ? [
+                {
+                  entry_index: 0,
+                  bonus: characterAttributes.intelligence.accelerator,
+                  duration_seconds: 315360000, // 10 years
+                },
+              ]
+            : [],
+      });
+    } else if (!selectedCharacterId) {
+      setProfile({
+        implants: {
+          charisma: 0,
+          intelligence: 0,
+          memory: 0,
+          perception: 0,
+          willpower: 0,
+        },
+        remaps: [],
+        accelerators: [],
+      });
+    }
+  }, [selectedCharacterId, characterAttributes, setProfile]);
 
   const allCharacters =
     accountsData?.accounts
