@@ -13,6 +13,9 @@ import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { exportSkillPlanText, exportSkillPlanXml } from '@/generated/commands';
 import type { ValidationResponse } from '@/generated/types';
@@ -27,6 +30,7 @@ import { useSortableList } from '@/hooks/useSortableList';
 
 import { AddSkillDialog } from './AddSkillDialog';
 import { ImportPlanDialog } from './ImportPlanDialog';
+import { PlanComparisonTab } from './PlanComparisonTab';
 import { PlanEntryRow } from './PlanEntryRow';
 import { SkillPlanValidationDisplay } from './SkillPlanValidationDisplay';
 
@@ -242,6 +246,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
         planId,
         name: editName.trim(),
         description: data.plan.description,
+        autoPrerequisites: data.plan.auto_prerequisites,
       });
       setIsEditingName(false);
     } catch (err) {
@@ -256,10 +261,29 @@ export function PlanEditor({ planId }: PlanEditorProps) {
         planId,
         name: data.plan.name,
         description: editDescription.trim() || null,
+        autoPrerequisites: data.plan.auto_prerequisites,
       });
       setIsEditingDescription(false);
     } catch (err) {
       console.error('Failed to update plan description:', err);
+    }
+  };
+
+  const handleToggleAutoPrerequisites = async (checked: boolean) => {
+    if (!data) return;
+    try {
+      await updatePlanMutation.mutateAsync({
+        planId,
+        name: data.plan.name,
+        description: data.plan.description,
+        autoPrerequisites: checked,
+      });
+      toast.success(
+        checked ? 'Auto-prerequisites enabled' : 'Auto-prerequisites disabled'
+      );
+    } catch (err) {
+      console.error('Failed to update auto-prerequisites:', err);
+      toast.error('Failed to update setting');
     }
   };
 
@@ -298,78 +322,95 @@ export function PlanEditor({ planId }: PlanEditorProps) {
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="border-b border-border p-4 space-y-4 shrink-0">
-        <div className="space-y-2">
-          {isEditingName ? (
-            <div className="flex items-center gap-2">
-              <Input
-                value={editName}
-                onChange={(e) => setEditName(e.target.value)}
-                onBlur={handleSaveName}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSaveName();
-                  } else if (e.key === 'Escape') {
-                    setIsEditingName(false);
-                    setEditName(data.plan.name);
-                  }
-                }}
-                autoFocus
-                className="flex-1"
-              />
-            </div>
-          ) : (
-            <h2
-              className="text-2xl font-bold cursor-pointer hover:text-primary"
-              onClick={() => {
-                setEditName(data.plan.name);
-                setIsEditingName(true);
-              }}
-            >
-              {data.plan.name}
-            </h2>
-          )}
-          {isEditingDescription ? (
-            <div className="space-y-2">
-              <Textarea
-                value={editDescription}
-                onChange={(e) => setEditDescription(e.target.value)}
-                onBlur={handleSaveDescription}
-                placeholder="Enter plan description"
-                rows={3}
-              />
-              <div className="flex gap-2">
-                <Button
-                  size="sm"
-                  onClick={handleSaveDescription}
-                  disabled={updatePlanMutation.isPending}
-                >
-                  Save
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setIsEditingDescription(false);
-                    setEditDescription(data.plan.description || '');
+        <div className="flex justify-between items-start gap-4">
+          <div className="space-y-2 flex-1">
+            {isEditingName ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onBlur={handleSaveName}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      handleSaveName();
+                    } else if (e.key === 'Escape') {
+                      setIsEditingName(false);
+                      setEditName(data.plan.name);
+                    }
                   }}
-                >
-                  Cancel
-                </Button>
+                  autoFocus
+                  className="flex-1"
+                />
               </div>
+            ) : (
+              <h2
+                className="text-2xl font-bold cursor-pointer hover:text-primary"
+                onClick={() => {
+                  setEditName(data.plan.name);
+                  setIsEditingName(true);
+                }}
+              >
+                {data.plan.name}
+              </h2>
+            )}
+            {isEditingDescription ? (
+              <div className="space-y-2">
+                <Textarea
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  onBlur={handleSaveDescription}
+                  placeholder="Enter plan description"
+                  rows={3}
+                />
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={handleSaveDescription}
+                    disabled={updatePlanMutation.isPending}
+                  >
+                    Save
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setIsEditingDescription(false);
+                      setEditDescription(data.plan.description || '');
+                    }}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="text-muted-foreground cursor-pointer hover:text-foreground min-h-12"
+                onClick={() => {
+                  setEditDescription(data.plan.description || '');
+                  setIsEditingDescription(true);
+                }}
+              >
+                {data.plan.description || (
+                  <span className="italic">Click to add description</span>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex flex-col items-end gap-2 border rounded-md p-3 bg-muted/30">
+            <div className="flex items-center space-x-2">
+              <Switch
+                id="auto-prereqs"
+                checked={data.plan.auto_prerequisites}
+                onCheckedChange={handleToggleAutoPrerequisites}
+              />
+              <Label
+                htmlFor="auto-prereqs"
+                className="text-sm font-medium cursor-pointer"
+              >
+                Auto-Prerequisites
+              </Label>
             </div>
-          ) : (
-            <div
-              className="text-muted-foreground cursor-pointer hover:text-foreground min-h-12"
-              onClick={() => {
-                setEditDescription(data.plan.description || '');
-                setIsEditingDescription(true);
-              }}
-            >
-              {data.plan.description || (
-                <span className="italic">Click to add description</span>
-              )}
-            </div>
-          )}
+          </div>
         </div>
         {sortedEntries.length > 0 && (
           <div className="text-sm text-foreground">
@@ -427,58 +468,81 @@ export function PlanEditor({ planId }: PlanEditorProps) {
           </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto min-h-0">
-        {localItems.length === 0 ? (
-          <div className="flex items-center justify-center h-full p-8">
-            <p className="text-muted-foreground">
-              No entries yet. Add skills to get started.
-            </p>
+
+      <Tabs defaultValue="editor" className="flex-1 flex flex-col min-h-0">
+        <div className="px-4 border-b border-border bg-muted/20">
+          <TabsList className="h-10">
+            <TabsTrigger value="editor">Plan Editor</TabsTrigger>
+            <TabsTrigger value="comparison">Character Comparison</TabsTrigger>
+          </TabsList>
+        </div>
+
+        <TabsContent
+          value="editor"
+          className="flex-1 flex flex-col min-h-0 mt-0"
+        >
+          <div className="flex-1 overflow-y-auto min-h-0">
+            {localItems.length === 0 ? (
+              <div className="flex items-center justify-center h-full p-8">
+                <p className="text-muted-foreground">
+                  No entries yet. Add skills to get started.
+                </p>
+              </div>
+            ) : (
+              <DndContext
+                id={`plan-entries-dnd-${planId}`}
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragStart={handleDragStart}
+                onDragOver={handleDragOver}
+                onDragEnd={handleDragEnd}
+                modifiers={[restrictToVerticalAxis]}
+              >
+                <SortableContext
+                  items={localItems.map((e) => e.entry_id)}
+                  strategy={verticalListSortingStrategy}
+                >
+                  {(() => {
+                    let cumulativeSP = 0;
+                    return localItems.map((entry) => {
+                      const offsetPercentage =
+                        totalSP > 0 ? (cumulativeSP / totalSP) * 100 : 0;
+                      cumulativeSP += entry.skillpoints_for_level;
+                      const validationStatus = validationMap.get(
+                        `${entry.skill_type_id}-${entry.planned_level}`
+                      );
+                      return (
+                        <PlanEntryRow
+                          key={entry.entry_id}
+                          entry={entry}
+                          totalPlanSP={totalSP}
+                          offsetPercentage={offsetPercentage}
+                          validationStatus={validationStatus}
+                        />
+                      );
+                    });
+                  })()}
+                </SortableContext>
+              </DndContext>
+            )}
           </div>
-        ) : (
-          <DndContext
-            id={`plan-entries-dnd-${planId}`}
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragStart={handleDragStart}
-            onDragOver={handleDragOver}
-            onDragEnd={handleDragEnd}
-            modifiers={[restrictToVerticalAxis]}
-          >
-            <SortableContext
-              items={localItems.map((e) => e.entry_id)}
-              strategy={verticalListSortingStrategy}
-            >
-              {(() => {
-                let cumulativeSP = 0;
-                return localItems.map((entry) => {
-                  const offsetPercentage =
-                    totalSP > 0 ? (cumulativeSP / totalSP) * 100 : 0;
-                  cumulativeSP += entry.skillpoints_for_level;
-                  const validationStatus = validationMap.get(
-                    `${entry.skill_type_id}-${entry.planned_level}`
-                  );
-                  return (
-                    <PlanEntryRow
-                      key={entry.entry_id}
-                      entry={entry}
-                      totalPlanSP={totalSP}
-                      offsetPercentage={offsetPercentage}
-                      validationStatus={validationStatus}
-                    />
-                  );
-                });
-              })()}
-            </SortableContext>
-          </DndContext>
-        )}
-      </div>
-      <div className="shrink-0 bg-background border-t border-border shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.05)]">
-        <SkillPlanValidationDisplay
-          planId={planId}
-          validationOverride={proposedValidation}
-          isProposed={isDragging}
-        />
-      </div>
+          <div className="shrink-0 bg-background border-t border-border shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.05)]">
+            <SkillPlanValidationDisplay
+              planId={planId}
+              validationOverride={proposedValidation}
+              isProposed={isDragging}
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent
+          value="comparison"
+          className="flex-1 overflow-y-auto min-h-0 mt-0"
+        >
+          <PlanComparisonTab planId={planId} />
+        </TabsContent>
+      </Tabs>
+
       <AddSkillDialog
         open={addSkillDialogOpen}
         onOpenChange={setAddSkillDialogOpen}

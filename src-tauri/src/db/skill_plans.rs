@@ -9,6 +9,7 @@ pub struct SkillPlan {
     pub plan_id: i64,
     pub name: String,
     pub description: Option<String>,
+    pub auto_prerequisites: i64,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -24,13 +25,19 @@ pub struct SkillPlanEntry {
     pub notes: Option<String>,
 }
 
-pub async fn create_skill_plan(pool: &Pool, name: &str, description: Option<&str>) -> Result<i64> {
+pub async fn create_skill_plan(
+    pool: &Pool,
+    name: &str,
+    description: Option<&str>,
+    auto_prerequisites: bool,
+) -> Result<i64> {
     let now = chrono::Utc::now().timestamp();
     let result = sqlx::query(
-        "INSERT INTO skill_plans (name, description, created_at, updated_at) VALUES (?, ?, ?, ?)",
+        "INSERT INTO skill_plans (name, description, auto_prerequisites, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
     )
     .bind(name)
     .bind(description)
+    .bind(if auto_prerequisites { 1 } else { 0 })
     .bind(now)
     .bind(now)
     .execute(pool)
@@ -43,7 +50,7 @@ pub async fn create_skill_plan(pool: &Pool, name: &str, description: Option<&str
 
 pub async fn get_all_skill_plans(pool: &Pool) -> Result<Vec<SkillPlan>> {
     let plans = sqlx::query_as::<_, SkillPlan>(
-        "SELECT plan_id, name, description, created_at, updated_at FROM skill_plans ORDER BY created_at DESC",
+        "SELECT plan_id, name, description, auto_prerequisites, created_at, updated_at FROM skill_plans ORDER BY created_at DESC",
     )
     .fetch_all(pool)
     .await?;
@@ -53,7 +60,7 @@ pub async fn get_all_skill_plans(pool: &Pool) -> Result<Vec<SkillPlan>> {
 
 pub async fn get_skill_plan(pool: &Pool, plan_id: i64) -> Result<Option<SkillPlan>> {
     let plan = sqlx::query_as::<_, SkillPlan>(
-        "SELECT plan_id, name, description, created_at, updated_at FROM skill_plans WHERE plan_id = ?",
+        "SELECT plan_id, name, description, auto_prerequisites, created_at, updated_at FROM skill_plans WHERE plan_id = ?",
     )
     .bind(plan_id)
     .fetch_optional(pool)
@@ -67,13 +74,15 @@ pub async fn update_skill_plan(
     plan_id: i64,
     name: &str,
     description: Option<&str>,
+    auto_prerequisites: bool,
 ) -> Result<()> {
     let now = chrono::Utc::now().timestamp();
     sqlx::query(
-        "UPDATE skill_plans SET name = ?, description = ?, updated_at = ? WHERE plan_id = ?",
+        "UPDATE skill_plans SET name = ?, description = ?, auto_prerequisites = ?, updated_at = ? WHERE plan_id = ?",
     )
     .bind(name)
     .bind(description)
+    .bind(if auto_prerequisites { 1 } else { 0 })
     .bind(now)
     .bind(plan_id)
     .execute(pool)

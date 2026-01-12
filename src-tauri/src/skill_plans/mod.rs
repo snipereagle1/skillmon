@@ -15,6 +15,7 @@ pub struct SkillmonPlan {
     pub version: i32,
     pub name: String,
     pub description: Option<String>,
+    pub auto_prerequisites: bool,
     pub entries: Vec<SkillmonPlanEntry>,
 }
 

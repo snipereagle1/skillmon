@@ -39,6 +39,7 @@ pub async fn export_skill_plan_json(
         version: SkillmonPlan::CURRENT_VERSION,
         name: plan.name,
         description: plan.description,
+        auto_prerequisites: plan.auto_prerequisites != 0,
         entries: json_entries,
     })
 }
@@ -127,10 +128,14 @@ pub async fn import_skill_plan_json(
     }
 
     // 2. If valid, proceed with import
-    let plan_id =
-        db::skill_plans::create_skill_plan(&pool, &plan.name, plan.description.as_deref())
-            .await
-            .map_err(|e| format!("Failed to create plan: {}", e))?;
+    let plan_id = db::skill_plans::create_skill_plan(
+        &pool,
+        &plan.name,
+        plan.description.as_deref(),
+        plan.auto_prerequisites,
+    )
+    .await
+    .map_err(|e| format!("Failed to create plan: {}", e))?;
 
     let mut tx = pool
         .begin()
@@ -165,6 +170,7 @@ pub struct SkillPlanResponse {
     pub plan_id: i64,
     pub name: String,
     pub description: Option<String>,
+    pub auto_prerequisites: bool,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -175,6 +181,7 @@ impl From<db::skill_plans::SkillPlan> for SkillPlanResponse {
             plan_id: p.plan_id,
             name: p.name,
             description: p.description,
+            auto_prerequisites: p.auto_prerequisites != 0,
             created_at: p.created_at,
             updated_at: p.updated_at,
         }
@@ -237,7 +244,7 @@ pub async fn create_skill_plan(
     name: String,
     description: Option<String>,
 ) -> Result<i64, String> {
-    db::skill_plans::create_skill_plan(&pool, &name, description.as_deref())
+    db::skill_plans::create_skill_plan(&pool, &name, description.as_deref(), true)
         .await
         .map_err(|e| format!("Failed to create skill plan: {}", e))
 }
@@ -329,10 +336,17 @@ pub async fn update_skill_plan(
     plan_id: i64,
     name: String,
     description: Option<String>,
+    auto_prerequisites: bool,
 ) -> Result<(), String> {
-    db::skill_plans::update_skill_plan(&pool, plan_id, &name, description.as_deref())
-        .await
-        .map_err(|e| format!("Failed to update skill plan: {}", e))
+    db::skill_plans::update_skill_plan(
+        &pool,
+        plan_id,
+        &name,
+        description.as_deref(),
+        auto_prerequisites,
+    )
+    .await
+    .map_err(|e| format!("Failed to update skill plan: {}", e))
 }
 
 #[tauri::command]
@@ -359,14 +373,26 @@ pub async fn add_plan_entry(
         .await
         .map_err(|e| format!("Failed to build DAG: {}", e))?;
 
-    // 2. Add new node recursively
+    let plan = db::skill_plans::get_skill_plan(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to get plan: {}", e))?
+        .ok_or_else(|| "Plan not found".to_string())?;
+
+    // 2. Add new node (recursively if enabled)
     let new_node = PlanNode {
         skill_type_id,
         level: planned_level,
     };
-    dag.add_recursive(&pool, new_node)
-        .await
-        .map_err(|e| format!("Failed to add prerequisites: {}", e))?;
+
+    if plan.auto_prerequisites != 0 {
+        dag.add_recursive(&pool, new_node)
+            .await
+            .map_err(|e| format!("Failed to add prerequisites: {}", e))?;
+    } else {
+        dag.add_node(&pool, new_node)
+            .await
+            .map_err(|e| format!("Failed to add node: {}", e))?;
+    }
 
     // 3. Topological sort to get new order
     let sorted_nodes = dag.topological_sort(&current_nodes);
@@ -1202,6 +1228,23 @@ pub async fn search_skills(
     Ok(results)
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct PlanComparisonSummary {
+    pub character_id: i64,
+    pub character_name: String,
+    pub completed_sp: i64,
+    pub missing_sp: i64,
+    pub time_to_completion_seconds: i64,
+    pub has_prerequisites: bool,
+    pub status: String,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct MultiPlanComparisonResponse {
+    pub plan: SkillPlanResponse,
+    pub comparisons: Vec<PlanComparisonSummary>,
+}
+
 #[tauri::command]
 pub async fn compare_skill_plan_with_character(
     pool: State<'_, db::Pool>,
@@ -1287,5 +1330,165 @@ pub async fn compare_skill_plan_with_character(
         plan: SkillPlanResponse::from(plan),
         character_id,
         entries: comparison_entries,
+    })
+}
+
+#[tauri::command]
+pub async fn compare_skill_plan_with_all_characters(
+    pool: State<'_, db::Pool>,
+    plan_id: i64,
+) -> Result<MultiPlanComparisonResponse, String> {
+    let plan = db::skill_plans::get_skill_plan(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to get skill plan: {}", e))?
+        .ok_or_else(|| "Plan not found".to_string())?;
+
+    let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to get plan entries: {}", e))?;
+
+    let characters = db::get_all_characters(&pool)
+        .await
+        .map_err(|e| format!("Failed to get characters: {}", e))?;
+
+    let skill_type_ids: Vec<i64> = entries.iter().map(|e| e.skill_type_id).collect();
+    let skill_attributes = utils::get_skill_attributes(&pool, &skill_type_ids)
+        .await
+        .map_err(|e| format!("Failed to get skill attributes: {}", e))?;
+
+    let mut comparisons = Vec::new();
+
+    for character in characters {
+        let character_skills = db::get_character_skills(&pool, character.character_id)
+            .await
+            .map_err(|e| {
+                format!(
+                    "Failed to get skills for character {}: {}",
+                    character.character_name, e
+                )
+            })?;
+
+        let character_skills_map: std::collections::HashMap<i64, db::CharacterSkill> =
+            character_skills
+                .into_iter()
+                .map(|s| (s.skill_id, s))
+                .collect();
+
+        let attributes = db::get_character_attributes(&pool, character.character_id)
+            .await
+            .map_err(|e| {
+                format!(
+                    "Failed to get attributes for character {}: {}",
+                    character.character_name, e
+                )
+            })?;
+
+        let mut completed_sp = 0;
+        let mut missing_sp = 0;
+        let mut total_time_seconds = 0.0;
+        let mut has_prerequisites = true;
+
+        for entry in &entries {
+            let char_skill = character_skills_map.get(&entry.skill_type_id);
+            let trained_level = char_skill.map(|s| s.trained_skill_level).unwrap_or(0);
+            let current_skillpoints = char_skill.map(|s| s.skillpoints_in_skill).unwrap_or(0);
+
+            let skill_attr = skill_attributes.get(&entry.skill_type_id);
+            let rank = skill_attr.and_then(|attr| attr.rank);
+
+            if let Some(rank_val) = rank {
+                let sp_for_planned =
+                    utils::calculate_sp_for_level(rank_val, entry.planned_level as i32);
+
+                if trained_level >= entry.planned_level {
+                    completed_sp += sp_for_planned;
+                } else {
+                    completed_sp += current_skillpoints;
+                    let missing = (sp_for_planned - current_skillpoints).max(0);
+                    missing_sp += missing;
+
+                    if let Some(attr) = attributes.as_ref() {
+                        if let Some(s_attr) = skill_attr {
+                            if let (Some(primary), Some(secondary)) =
+                                (s_attr.primary_attribute, s_attr.secondary_attribute)
+                            {
+                                let p_val = match primary {
+                                    164 => attr.charisma,
+                                    165 => attr.intelligence,
+                                    166 => attr.memory,
+                                    167 => attr.perception,
+                                    168 => attr.willpower,
+                                    _ => 17, // default base
+                                };
+                                let s_val = match secondary {
+                                    164 => attr.charisma,
+                                    165 => attr.intelligence,
+                                    166 => attr.memory,
+                                    167 => attr.perception,
+                                    168 => attr.willpower,
+                                    _ => 17, // default base
+                                };
+                                let sp_per_min = utils::calculate_sp_per_minute(p_val, s_val);
+                                if sp_per_min > 0.0 {
+                                    total_time_seconds += (missing as f64 / sp_per_min) * 60.0;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Check SDE prerequisites if not already failed
+            if has_prerequisites {
+                let prereqs: Vec<(i64, i64)> = sqlx::query_as::<_, (i64, i64)>(
+                    "SELECT required_skill_id, required_level FROM sde_skill_requirements WHERE skill_type_id = ?"
+                )
+                .bind(entry.skill_type_id)
+                .fetch_all(&*pool)
+                .await
+                .map_err(|e| format!("Failed to fetch prereqs: {}", e))?;
+
+                for (req_id, req_level) in prereqs {
+                    let char_req_skill = character_skills_map.get(&req_id);
+                    let trained_req_level =
+                        char_req_skill.map(|s| s.trained_skill_level).unwrap_or(0);
+                    if trained_req_level < req_level {
+                        // Check if it's in the plan *before* this entry
+                        let in_plan = entries
+                            .iter()
+                            .take_while(|e| e.entry_id != entry.entry_id)
+                            .any(|e| e.skill_type_id == req_id && e.planned_level >= req_level);
+
+                        if !in_plan {
+                            has_prerequisites = false;
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+
+        let status = if missing_sp == 0 {
+            "complete"
+        } else if completed_sp > 0 {
+            "in_progress"
+        } else {
+            "not_started"
+        };
+
+        comparisons.push(PlanComparisonSummary {
+            character_id: character.character_id,
+            character_name: character.character_name,
+            completed_sp,
+            missing_sp,
+            time_to_completion_seconds: total_time_seconds as i64,
+            has_prerequisites,
+            status: status.to_string(),
+        });
+    }
+
+    Ok(MultiPlanComparisonResponse {
+        plan: SkillPlanResponse::from(plan),
+        comparisons,
     })
 }
