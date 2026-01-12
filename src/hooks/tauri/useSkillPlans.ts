@@ -5,22 +5,28 @@ import {
   createSkillPlan,
   deletePlanEntry,
   deleteSkillPlan,
+  exportSkillPlanJson,
   exportSkillPlanText,
   exportSkillPlanXml,
   getAllSkillPlans,
   getSkillPlan,
   getSkillPlanWithEntries,
+  importSkillPlanJson,
   importSkillPlanText,
   importSkillPlanXml,
   reorderPlanEntries,
   updatePlanEntry,
   updateSkillPlan,
+  validateReorder,
+  validateSkillPlan,
 } from '@/generated/commands';
 import type {
   AddPlanEntryParams,
   CreateSkillPlanParams,
   DeletePlanEntryParams,
   DeleteSkillPlanParams,
+  ExportSkillPlanJsonParams,
+  ImportSkillPlanJsonParams,
   ImportSkillPlanTextParams,
   ImportSkillPlanXmlParams,
   ReorderPlanEntriesParams,
@@ -28,6 +34,8 @@ import type {
   SkillPlanWithEntriesResponse,
   UpdatePlanEntryParams,
   UpdateSkillPlanParams,
+  ValidateReorderParams,
+  ValidationResponse,
 } from '@/generated/types';
 
 export function useSkillPlans() {
@@ -91,6 +99,9 @@ export function useUpdateSkillPlan() {
       queryClient.invalidateQueries({
         queryKey: ['skillPlanWithEntries', params.planId],
       });
+      queryClient.invalidateQueries({
+        queryKey: ['skillPlanValidation', params.planId],
+      });
     },
   });
 }
@@ -130,6 +141,9 @@ export function useAddPlanEntry() {
       queryClient.invalidateQueries({
         queryKey: ['skillPlanWithEntries', params.planId],
       });
+      queryClient.invalidateQueries({
+        queryKey: ['skillPlanValidation', params.planId],
+      });
     },
   });
 }
@@ -143,6 +157,7 @@ export function useUpdatePlanEntry() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['skillPlanWithEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['skillPlanValidation'] });
     },
   });
 }
@@ -156,6 +171,7 @@ export function useDeletePlanEntry() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['skillPlanWithEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['skillPlanValidation'] });
     },
   });
 }
@@ -170,6 +186,9 @@ export function useReorderPlanEntries() {
     onSuccess: (_, params) => {
       queryClient.invalidateQueries({
         queryKey: ['skillPlanWithEntries', params.planId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['skillPlanValidation', params.planId],
       });
     },
   });
@@ -187,6 +206,9 @@ export function useImportSkillPlanText() {
       queryClient.invalidateQueries({
         queryKey: ['skillPlanWithEntries', params.planId],
       });
+      queryClient.invalidateQueries({
+        queryKey: ['skillPlanValidation', params.planId],
+      });
     },
   });
 }
@@ -202,6 +224,9 @@ export function useImportSkillPlanXml() {
       queryClient.setQueryData(['skillPlanWithEntries', params.planId], data);
       queryClient.invalidateQueries({
         queryKey: ['skillPlanWithEntries', params.planId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['skillPlanValidation', params.planId],
       });
     },
   });
@@ -230,5 +255,49 @@ export function useExportSkillPlanXml(planId: number | null) {
       return await exportSkillPlanXml({ planId });
     },
     enabled: false,
+  });
+}
+
+export function useSkillPlanValidation(planId: number | null) {
+  return useQuery<ValidationResponse | null>({
+    queryKey: ['skillPlanValidation', planId],
+    queryFn: async () => {
+      if (planId === null) {
+        return null;
+      }
+      return await validateSkillPlan({ planId });
+    },
+    enabled: planId !== null,
+  });
+}
+
+export function useValidateReorder() {
+  return useMutation({
+    mutationFn: async (params: ValidateReorderParams) => {
+      return await validateReorder(params);
+    },
+  });
+}
+
+export function useExportSkillPlanJson() {
+  return useMutation({
+    mutationFn: async (params: ExportSkillPlanJsonParams) => {
+      return await exportSkillPlanJson(params);
+    },
+  });
+}
+
+export function useImportSkillPlanJson() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: ImportSkillPlanJsonParams) => {
+      return await importSkillPlanJson(params);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['skillPlans'] });
+      queryClient.invalidateQueries({ queryKey: ['skillPlanWithEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['skillPlanValidation'] });
+    },
   });
 }

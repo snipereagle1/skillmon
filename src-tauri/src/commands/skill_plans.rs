@@ -2,13 +2,163 @@ use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
 use serde::Serialize;
+use std::collections::HashSet;
 use std::io::Cursor;
 use tauri::State;
 
 use crate::db;
+use crate::skill_plans::graph::{PlanDag, PlanNode};
+use crate::skill_plans::{SkillmonPlan, SkillmonPlanEntry};
 use crate::utils;
 
-use super::skill_plans_utils;
+#[tauri::command]
+pub async fn export_skill_plan_json(
+    pool: State<'_, db::Pool>,
+    plan_id: i64,
+) -> Result<SkillmonPlan, String> {
+    let plan = db::skill_plans::get_skill_plan(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to get plan: {}", e))?
+        .ok_or_else(|| "Plan not found".to_string())?;
+
+    let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to get entries: {}", e))?;
+
+    let json_entries = entries
+        .into_iter()
+        .map(|e| SkillmonPlanEntry {
+            skill_type_id: e.skill_type_id,
+            level: e.planned_level,
+            entry_type: e.entry_type,
+            notes: e.notes,
+        })
+        .collect();
+
+    Ok(SkillmonPlan {
+        version: SkillmonPlan::CURRENT_VERSION,
+        name: plan.name,
+        description: plan.description,
+        entries: json_entries,
+    })
+}
+
+#[tauri::command]
+pub async fn import_skill_plan_json(
+    pool: State<'_, db::Pool>,
+    plan: SkillmonPlan,
+) -> Result<i64, String> {
+    // 1. Validate the plan first
+    let mut dag = PlanDag::new();
+    let mut proposed_nodes = Vec::new();
+    for entry in &plan.entries {
+        let node = PlanNode {
+            skill_type_id: entry.skill_type_id,
+            level: entry.level,
+        };
+        dag.add_node(&pool, node)
+            .await
+            .map_err(|e| format!("Failed to build DAG for validation: {}", e))?;
+        proposed_nodes.push(node);
+    }
+
+    let validation = dag.validate(&proposed_nodes);
+    if !validation.is_valid {
+        let mut all_type_ids = HashSet::new();
+        for err in &validation.errors {
+            match err {
+                crate::skill_plans::graph::ValidationEntry::Cycle(nodes) => {
+                    for n in nodes {
+                        all_type_ids.insert(n.skill_type_id);
+                    }
+                }
+                crate::skill_plans::graph::ValidationEntry::MissingPrerequisite {
+                    node,
+                    missing,
+                } => {
+                    all_type_ids.insert(node.skill_type_id);
+                    all_type_ids.insert(missing.skill_type_id);
+                }
+                crate::skill_plans::graph::ValidationEntry::OrderingViolation {
+                    node,
+                    prerequisite,
+                } => {
+                    all_type_ids.insert(node.skill_type_id);
+                    all_type_ids.insert(prerequisite.skill_type_id);
+                }
+            }
+        }
+
+        let type_names = if !all_type_ids.is_empty() {
+            utils::get_type_names_helper(&pool, &all_type_ids.into_iter().collect::<Vec<_>>())
+                .await?
+        } else {
+            std::collections::HashMap::new()
+        };
+
+        let error_msgs: Vec<String> = validation
+            .errors
+            .into_iter()
+            .map(|err| {
+                let mapped = map_validation_entry(err, &type_names);
+                if mapped.variant == "Cycle" {
+                    "Circular dependency detected".to_string()
+                } else if mapped.variant == "MissingPrerequisite" {
+                    format!(
+                        "{} {} is missing prerequisite {} {}",
+                        mapped.node_skill_name,
+                        mapped.node_level,
+                        mapped.other_skill_name,
+                        mapped.other_level
+                    )
+                } else {
+                    format!(
+                        "{} {} would be trained before its prerequisite {} {}",
+                        mapped.node_skill_name,
+                        mapped.node_level,
+                        mapped.other_skill_name,
+                        mapped.other_level
+                    )
+                }
+            })
+            .collect();
+
+        return Err(format!("Invalid plan: {}", error_msgs.join(", ")));
+    }
+
+    // 2. If valid, proceed with import
+    let plan_id =
+        db::skill_plans::create_skill_plan(&pool, &plan.name, plan.description.as_deref())
+            .await
+            .map_err(|e| format!("Failed to create plan: {}", e))?;
+
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| format!("Transaction failed: {}", e))?;
+
+    for (index, entry) in plan.entries.iter().enumerate() {
+        sqlx::query(
+            "INSERT INTO skill_plan_entries (plan_id, skill_type_id, planned_level, sort_order, entry_type, notes)
+             VALUES (?, ?, ?, ?, ?, ?)"
+        )
+        .bind(plan_id)
+        .bind(entry.skill_type_id)
+        .bind(entry.level)
+        .bind(index as i64)
+        .bind(&entry.entry_type)
+        .bind(&entry.notes)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Failed to insert entry: {}", e))?;
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| format!("Failed to commit: {}", e))?;
+
+    Ok(plan_id)
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillPlanResponse {
@@ -140,13 +290,10 @@ pub async fn get_skill_plan_with_entries(
 
     let mut entry_responses = Vec::new();
     for entry in entries {
-        let skill_name =
-            sqlx::query_scalar::<_, String>("SELECT name FROM sde_types WHERE type_id = ?")
-                .bind(entry.skill_type_id)
-                .fetch_optional(&*pool)
-                .await
-                .map_err(|e| format!("Failed to get skill name: {}", e))?
-                .unwrap_or_else(|| format!("Unknown Skill ({})", entry.skill_type_id));
+        let skill_name = db::skill_plans::get_skill_name(&pool, entry.skill_type_id)
+            .await
+            .map_err(|e| format!("Failed to get skill name: {}", e))?
+            .unwrap_or_else(|| format!("Unknown Skill ({})", entry.skill_type_id));
 
         let skill_attr = skill_attributes.get(&entry.skill_type_id);
         let rank = skill_attr.and_then(|attr| attr.rank);
@@ -195,65 +342,6 @@ pub async fn delete_skill_plan(pool: State<'_, db::Pool>, plan_id: i64) -> Resul
         .map_err(|e| format!("Failed to delete skill plan: {}", e))
 }
 
-async fn resolve_and_add_prerequisites(
-    pool: &db::Pool,
-    plan_id: i64,
-    skill_type_id: i64,
-) -> Result<(), String> {
-    let prerequisites = db::skill_plans::get_prerequisites_recursive(pool, skill_type_id)
-        .await
-        .map_err(|e| format!("Failed to get prerequisites: {}", e))?;
-
-    for prereq in prerequisites {
-        for level in 1..=prereq.required_level {
-            let existing_type: Option<String> = sqlx::query_scalar(
-                "SELECT entry_type FROM skill_plan_entries
-                 WHERE plan_id = ? AND skill_type_id = ? AND planned_level = ?",
-            )
-            .bind(plan_id)
-            .bind(prereq.required_skill_id)
-            .bind(level)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| format!("Failed to check existing entry: {}", e))?;
-
-            if let Some(entry_type) = existing_type {
-                if entry_type == "Planned" {
-                    continue;
-                }
-            }
-
-            let higher_level_exists = sqlx::query_scalar::<_, Option<i64>>(
-                "SELECT planned_level FROM skill_plan_entries
-                 WHERE plan_id = ? AND skill_type_id = ? AND planned_level > ?",
-            )
-            .bind(plan_id)
-            .bind(prereq.required_skill_id)
-            .bind(level)
-            .fetch_optional(pool)
-            .await
-            .map_err(|e| format!("Failed to check higher level entry: {}", e))?;
-
-            if higher_level_exists.is_some() {
-                continue;
-            }
-
-            db::skill_plans::add_plan_entry(
-                pool,
-                plan_id,
-                prereq.required_skill_id,
-                level,
-                "Prerequisite",
-                None,
-            )
-            .await
-            .map_err(|e| format!("Failed to add prerequisite entry: {}", e))?;
-        }
-    }
-
-    Ok(())
-}
-
 #[tauri::command]
 pub async fn add_plan_entry(
     pool: State<'_, db::Pool>,
@@ -266,56 +354,74 @@ pub async fn add_plan_entry(
         return Err("Planned level must be between 1 and 5".to_string());
     }
 
-    let planned_entries = vec![(skill_type_id, planned_level)];
+    // 1. Build DAG and get current nodes
+    let (mut dag, current_nodes) = PlanDag::build_from_plan(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to build DAG: {}", e))?;
 
-    let graph_result =
-        skill_plans_utils::build_dependency_graph_for_entries(&pool, planned_entries).await?;
-
-    let sorted_skill_ids = skill_plans_utils::topological_sort_skills(
-        &graph_result.dependency_graph,
-        &graph_result.all_skill_ids,
-        &[(skill_type_id, planned_level)],
-    );
-
-    let sorted_entries = skill_plans_utils::build_sorted_entry_list(
-        &sorted_skill_ids,
-        &graph_result.all_entries,
-        &[(skill_type_id, planned_level)],
-    );
-
-    let start_sort_order: i64 = {
-        let max: Option<i64> =
-            sqlx::query_scalar("SELECT MAX(sort_order) FROM skill_plan_entries WHERE plan_id = ?")
-                .bind(plan_id)
-                .fetch_optional(&*pool)
-                .await
-                .map_err(|e| format!("Failed to get max sort order: {}", e))?;
-        max.unwrap_or(-1) + 1
+    // 2. Add new node recursively
+    let new_node = PlanNode {
+        skill_type_id,
+        level: planned_level,
     };
+    dag.add_recursive(&pool, new_node)
+        .await
+        .map_err(|e| format!("Failed to add prerequisites: {}", e))?;
 
-    skill_plans_utils::insert_entries_with_sort_order(
-        &pool,
-        plan_id,
-        &sorted_entries,
-        start_sort_order,
-    )
-    .await?;
+    // 3. Topological sort to get new order
+    let sorted_nodes = dag.topological_sort(&current_nodes);
 
-    if let Some(notes_val) = notes {
-        if !notes_val.trim().is_empty() {
-            sqlx::query(
-                "UPDATE skill_plan_entries SET notes = ?
-                 WHERE plan_id = ? AND skill_type_id = ? AND planned_level = ? AND entry_type = 'Planned'",
-            )
-            .bind(notes_val.trim())
-            .bind(plan_id)
-            .bind(skill_type_id)
-            .bind(planned_level)
-            .execute(&*pool)
-            .await
-            .map_err(|e| format!("Failed to update notes: {}", e))?;
-        }
+    // 4. Update database
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| format!("Transaction failed: {}", e))?;
+
+    for (index, node) in sorted_nodes.iter().enumerate() {
+        let entry_type = if node.skill_type_id == skill_type_id && node.level == planned_level {
+            "Planned"
+        } else {
+            // Check if it already exists as Planned
+            let existing =
+                db::skill_plans::get_entry_type(&pool, plan_id, node.skill_type_id, node.level)
+                    .await
+                    .map_err(|e| format!("DB Error: {}", e))?;
+
+            if let Some(et) = existing {
+                if et == "Planned" {
+                    "Planned"
+                } else {
+                    "Prerequisite"
+                }
+            } else {
+                "Prerequisite"
+            }
+        };
+
+        sqlx::query(
+            "INSERT INTO skill_plan_entries (plan_id, skill_type_id, planned_level, sort_order, entry_type, notes)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(plan_id, skill_type_id, planned_level) DO UPDATE SET
+             sort_order = excluded.sort_order,
+             entry_type = CASE
+                WHEN excluded.entry_type = 'Planned' THEN 'Planned'
+                ELSE skill_plan_entries.entry_type
+             END"
+        )
+        .bind(plan_id)
+        .bind(node.skill_type_id)
+        .bind(node.level)
+        .bind(index as i64)
+        .bind(entry_type)
+        .bind(if node == &new_node { notes.as_deref() } else { None })
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Failed to insert entry: {}", e))?;
     }
+
+    tx.commit()
+        .await
+        .map_err(|e| format!("Failed to commit: {}", e))?;
 
     get_skill_plan_with_entries(pool, plan_id)
         .await?
@@ -345,14 +451,7 @@ pub async fn update_plan_entry(
     // If updating planned_level, check if we need to handle level increase specially
     if let Some(new_level) = planned_level {
         // Fetch current entry details
-        let current_entry: Option<(i64, i64, i64, String)> =
-            sqlx::query_as::<_, (i64, i64, i64, String)>(
-                "SELECT plan_id, skill_type_id, planned_level, entry_type
-                 FROM skill_plan_entries
-                 WHERE entry_id = ?",
-            )
-            .bind(entry_id)
-            .fetch_optional(&*pool)
+        let current_entry = db::skill_plans::get_entry_details_by_id(&pool, entry_id)
             .await
             .map_err(|e| format!("Failed to get current entry: {}", e))?;
 
@@ -365,59 +464,7 @@ pub async fn update_plan_entry(
                     .map_err(|e| format!("Failed to delete old entry: {}", e))?;
 
                 // Add the new planned entry using the same logic as add_plan_entry
-                let planned_entries = vec![(skill_type_id, new_level)];
-
-                let graph_result =
-                    skill_plans_utils::build_dependency_graph_for_entries(&pool, planned_entries)
-                        .await?;
-
-                let sorted_skill_ids = skill_plans_utils::topological_sort_skills(
-                    &graph_result.dependency_graph,
-                    &graph_result.all_skill_ids,
-                    &[(skill_type_id, new_level)],
-                );
-
-                let sorted_entries = skill_plans_utils::build_sorted_entry_list(
-                    &sorted_skill_ids,
-                    &graph_result.all_entries,
-                    &[(skill_type_id, new_level)],
-                );
-
-                let start_sort_order: i64 = {
-                    let max: Option<i64> = sqlx::query_scalar(
-                        "SELECT MAX(sort_order) FROM skill_plan_entries WHERE plan_id = ?",
-                    )
-                    .bind(plan_id)
-                    .fetch_optional(&*pool)
-                    .await
-                    .map_err(|e| format!("Failed to get max sort order: {}", e))?;
-                    max.unwrap_or(-1) + 1
-                };
-
-                skill_plans_utils::insert_entries_with_sort_order(
-                    &pool,
-                    plan_id,
-                    &sorted_entries,
-                    start_sort_order,
-                )
-                .await?;
-
-                // Update notes if provided
-                if let Some(notes_val) = notes {
-                    if !notes_val.trim().is_empty() {
-                        sqlx::query(
-                            "UPDATE skill_plan_entries SET notes = ?
-                             WHERE plan_id = ? AND skill_type_id = ? AND planned_level = ? AND entry_type = 'Planned'",
-                        )
-                        .bind(notes_val.trim())
-                        .bind(plan_id)
-                        .bind(skill_type_id)
-                        .bind(new_level)
-                        .execute(&*pool)
-                        .await
-                        .map_err(|e| format!("Failed to update notes: {}", e))?;
-                    }
-                }
+                add_plan_entry(pool, plan_id, skill_type_id, new_level, notes).await?;
 
                 return Ok(());
             }
@@ -443,12 +490,254 @@ pub async fn delete_plan_entry(pool: State<'_, db::Pool>, entry_id: i64) -> Resu
         .map_err(|e| format!("Failed to delete plan entry: {}", e))
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct ValidationEntryResponse {
+    pub variant: String,
+    pub node_skill_type_id: i64,
+    pub node_skill_name: String,
+    pub node_level: i64,
+    pub other_skill_type_id: i64,
+    pub other_skill_name: String,
+    pub other_level: i64,
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct ValidationResponse {
+    pub is_valid: bool,
+    pub errors: Vec<ValidationEntryResponse>,
+    pub warnings: Vec<ValidationEntryResponse>,
+}
+
+#[tauri::command]
+pub async fn validate_skill_plan(
+    pool: State<'_, db::Pool>,
+    plan_id: i64,
+) -> Result<ValidationResponse, String> {
+    let entries = db::skill_plans::get_plan_nodes_in_order(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to get plan nodes: {}", e))?;
+
+    let mut dag = PlanDag::new();
+    let mut nodes = Vec::new();
+    for (skill_type_id, planned_level) in entries {
+        let node = PlanNode {
+            skill_type_id,
+            level: planned_level,
+        };
+        dag.add_node(&pool, node)
+            .await
+            .map_err(|e| format!("Failed to build DAG: {}", e))?;
+        nodes.push(node);
+    }
+
+    let validation = dag.validate(&nodes);
+
+    let mut errors = Vec::new();
+    let mut warnings = Vec::new();
+
+    let mut type_names = std::collections::HashMap::new();
+    let all_type_ids: HashSet<i64> = validation
+        .errors
+        .iter()
+        .chain(validation.warnings.iter())
+        .flat_map(|e| match e {
+            crate::skill_plans::graph::ValidationEntry::Cycle(nodes) => {
+                nodes.iter().map(|n| n.skill_type_id).collect::<Vec<_>>()
+            }
+            crate::skill_plans::graph::ValidationEntry::MissingPrerequisite { node, missing } => {
+                vec![node.skill_type_id, missing.skill_type_id]
+            }
+            crate::skill_plans::graph::ValidationEntry::OrderingViolation {
+                node,
+                prerequisite,
+            } => vec![node.skill_type_id, prerequisite.skill_type_id],
+        })
+        .collect();
+
+    if !all_type_ids.is_empty() {
+        let names =
+            utils::get_type_names_helper(&pool, &all_type_ids.into_iter().collect::<Vec<_>>())
+                .await?;
+        type_names = names;
+    }
+
+    for err in validation.errors {
+        errors.push(map_validation_entry(err, &type_names));
+    }
+
+    for warn in validation.warnings {
+        warnings.push(map_validation_entry(warn, &type_names));
+    }
+
+    Ok(ValidationResponse {
+        is_valid: validation.is_valid,
+        errors,
+        warnings,
+    })
+}
+
+fn map_validation_entry(
+    entry: crate::skill_plans::graph::ValidationEntry,
+    names: &std::collections::HashMap<i64, String>,
+) -> ValidationEntryResponse {
+    match entry {
+        crate::skill_plans::graph::ValidationEntry::Cycle(_) => ValidationEntryResponse {
+            variant: "Cycle".to_string(),
+            node_skill_type_id: 0,
+            node_skill_name: "".to_string(),
+            node_level: 0,
+            other_skill_type_id: 0,
+            other_skill_name: "".to_string(),
+            other_level: 0,
+        },
+        crate::skill_plans::graph::ValidationEntry::MissingPrerequisite { node, missing } => {
+            ValidationEntryResponse {
+                variant: "MissingPrerequisite".to_string(),
+                node_skill_type_id: node.skill_type_id,
+                node_skill_name: names
+                    .get(&node.skill_type_id)
+                    .cloned()
+                    .unwrap_or_else(|| node.skill_type_id.to_string()),
+                node_level: node.level,
+                other_skill_type_id: missing.skill_type_id,
+                other_skill_name: names
+                    .get(&missing.skill_type_id)
+                    .cloned()
+                    .unwrap_or_else(|| missing.skill_type_id.to_string()),
+                other_level: missing.level,
+            }
+        }
+        crate::skill_plans::graph::ValidationEntry::OrderingViolation { node, prerequisite } => {
+            ValidationEntryResponse {
+                variant: "OrderingViolation".to_string(),
+                node_skill_type_id: node.skill_type_id,
+                node_skill_name: names
+                    .get(&node.skill_type_id)
+                    .cloned()
+                    .unwrap_or_else(|| node.skill_type_id.to_string()),
+                node_level: node.level,
+                other_skill_type_id: prerequisite.skill_type_id,
+                other_skill_name: names
+                    .get(&prerequisite.skill_type_id)
+                    .cloned()
+                    .unwrap_or_else(|| prerequisite.skill_type_id.to_string()),
+                other_level: prerequisite.level,
+            }
+        }
+    }
+}
+
+#[tauri::command]
+pub async fn validate_reorder(
+    pool: State<'_, db::Pool>,
+    plan_id: i64,
+    entry_ids: Vec<i64>,
+) -> Result<ValidationResponse, String> {
+    let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to get entries: {}", e))?;
+
+    let entry_map: std::collections::HashMap<i64, &db::skill_plans::SkillPlanEntry> =
+        entries.iter().map(|e| (e.entry_id, e)).collect();
+
+    let mut proposed_nodes = Vec::new();
+    for id in &entry_ids {
+        let entry = entry_map
+            .get(id)
+            .ok_or_else(|| format!("Entry {} not found", id))?;
+        proposed_nodes.push(PlanNode {
+            skill_type_id: entry.skill_type_id,
+            level: entry.planned_level,
+        });
+    }
+
+    let mut dag = PlanDag::new();
+    for &node in &proposed_nodes {
+        dag.add_node(&pool, node)
+            .await
+            .map_err(|e| format!("Failed to build DAG: {}", e))?;
+    }
+
+    let validation = dag.validate(&proposed_nodes);
+
+    let mut errors = Vec::new();
+    let mut warnings = Vec::new();
+
+    let mut type_names = std::collections::HashMap::new();
+    let all_type_ids: HashSet<i64> = validation
+        .errors
+        .iter()
+        .chain(validation.warnings.iter())
+        .flat_map(|e| match e {
+            crate::skill_plans::graph::ValidationEntry::Cycle(nodes) => {
+                nodes.iter().map(|n| n.skill_type_id).collect::<Vec<_>>()
+            }
+            crate::skill_plans::graph::ValidationEntry::MissingPrerequisite { node, missing } => {
+                vec![node.skill_type_id, missing.skill_type_id]
+            }
+            crate::skill_plans::graph::ValidationEntry::OrderingViolation {
+                node,
+                prerequisite,
+            } => vec![node.skill_type_id, prerequisite.skill_type_id],
+        })
+        .collect();
+
+    if !all_type_ids.is_empty() {
+        let names =
+            utils::get_type_names_helper(&pool, &all_type_ids.into_iter().collect::<Vec<_>>())
+                .await?;
+        type_names = names;
+    }
+
+    for err in validation.errors {
+        errors.push(map_validation_entry(err, &type_names));
+    }
+
+    for warn in validation.warnings {
+        warnings.push(map_validation_entry(warn, &type_names));
+    }
+
+    Ok(ValidationResponse {
+        is_valid: validation.is_valid,
+        errors,
+        warnings,
+    })
+}
+
 #[tauri::command]
 pub async fn reorder_plan_entries(
     pool: State<'_, db::Pool>,
     plan_id: i64,
     entry_ids: Vec<i64>,
 ) -> Result<(), String> {
+    // 1. Validate first
+    let validation = validate_reorder(pool.clone(), plan_id, entry_ids.clone()).await?;
+
+    if !validation.is_valid {
+        let error_msgs: Vec<String> = validation
+            .errors
+            .into_iter()
+            .map(|err| {
+                if err.variant == "Cycle" {
+                    "Circular dependency detected".to_string()
+                } else if err.variant == "MissingPrerequisite" {
+                    format!(
+                        "{} {} is missing prerequisite {} {}",
+                        err.node_skill_name, err.node_level, err.other_skill_name, err.other_level
+                    )
+                } else {
+                    format!(
+                        "{} {} would be trained before its prerequisite {} {}",
+                        err.node_skill_name, err.node_level, err.other_skill_name, err.other_level
+                    )
+                }
+            })
+            .collect();
+
+        return Err(format!("Invalid order: {}", error_msgs.join(", ")));
+    }
+
+    // 2. Persist
     db::skill_plans::reorder_plan_entries(&pool, plan_id, &entry_ids)
         .await
         .map_err(|e| format!("Failed to reorder plan entries: {}", e))
@@ -511,38 +800,84 @@ pub async fn import_skill_plan_text(
         return Err("No valid entries found in text".to_string());
     }
 
-    let graph_result =
-        skill_plans_utils::build_dependency_graph_for_entries(&pool, planned_entries).await?;
+    // 1. Build DAG and get current nodes
+    let (mut dag, current_nodes) = PlanDag::build_from_plan(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to build DAG: {}", e))?;
 
-    let sorted_skill_ids = skill_plans_utils::topological_sort_skills(
-        &graph_result.dependency_graph,
-        &graph_result.all_skill_ids,
-        &graph_result.planned_entry_order,
-    );
+    // 2. Add all imported entries recursively
+    for (skill_type_id, level) in &planned_entries {
+        dag.add_recursive(
+            &pool,
+            PlanNode {
+                skill_type_id: *skill_type_id,
+                level: *level,
+            },
+        )
+        .await
+        .map_err(|e| {
+            format!(
+                "Failed to add prerequisites for skill {}: {}",
+                skill_type_id, e
+            )
+        })?;
+    }
 
-    let sorted_entries = skill_plans_utils::build_sorted_entry_list(
-        &sorted_skill_ids,
-        &graph_result.all_entries,
-        &graph_result.planned_entry_order,
-    );
+    // 3. Topological sort to get new order
+    let sorted_nodes = dag.topological_sort(&current_nodes);
 
-    let start_sort_order: i64 = {
-        let max: Option<i64> =
-            sqlx::query_scalar("SELECT MAX(sort_order) FROM skill_plan_entries WHERE plan_id = ?")
-                .bind(plan_id)
-                .fetch_optional(&*pool)
-                .await
-                .map_err(|e| format!("Failed to get max sort order: {}", e))?;
-        max.unwrap_or(-1) + 1
-    };
+    // 4. Update database
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| format!("Transaction failed: {}", e))?;
 
-    skill_plans_utils::insert_entries_with_sort_order(
-        &pool,
-        plan_id,
-        &sorted_entries,
-        start_sort_order,
-    )
-    .await?;
+    for (index, node) in sorted_nodes.iter().enumerate() {
+        let is_originally_planned = planned_entries.contains(&(node.skill_type_id, node.level));
+
+        let entry_type = if is_originally_planned {
+            "Planned"
+        } else {
+            let existing =
+                db::skill_plans::get_entry_type(&pool, plan_id, node.skill_type_id, node.level)
+                    .await
+                    .map_err(|e| format!("DB Error: {}", e))?;
+
+            if let Some(et) = existing {
+                if et == "Planned" {
+                    "Planned"
+                } else {
+                    "Prerequisite"
+                }
+            } else {
+                "Prerequisite"
+            }
+        };
+
+        sqlx::query(
+            "INSERT INTO skill_plan_entries (plan_id, skill_type_id, planned_level, sort_order, entry_type, notes)
+             VALUES (?, ?, ?, ?, ?, ?)
+             ON CONFLICT(plan_id, skill_type_id, planned_level) DO UPDATE SET
+             sort_order = excluded.sort_order,
+             entry_type = CASE
+                WHEN excluded.entry_type = 'Planned' THEN 'Planned'
+                ELSE skill_plan_entries.entry_type
+             END"
+        )
+        .bind(plan_id)
+        .bind(node.skill_type_id)
+        .bind(node.level)
+        .bind(index as i64)
+        .bind(entry_type)
+        .bind(None::<String>)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Failed to insert entry: {}", e))?;
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| format!("Failed to commit: {}", e))?;
 
     get_skill_plan_with_entries(pool, plan_id)
         .await?
@@ -643,60 +978,95 @@ pub async fn import_skill_plan_xml(
         return Err("No entries found in XML".to_string());
     }
 
-    let mut sort_order: i64 = {
-        let max: Option<i64> =
-            sqlx::query_scalar("SELECT MAX(sort_order) FROM skill_plan_entries WHERE plan_id = ?")
-                .bind(plan_id)
-                .fetch_optional(&*pool)
-                .await
-                .map_err(|e| format!("Failed to get max sort order: {}", e))?;
-        max.unwrap_or(-1) + 1
-    };
+    // 1. Build DAG and get current nodes
+    let (mut dag, current_nodes) = PlanDag::build_from_plan(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to build DAG: {}", e))?;
 
-    for (skill_id, level, entry_type, notes) in entries.iter() {
+    // 2. Add all imported entries recursively
+    for (skill_id, level, _entry_type, _notes) in &entries {
+        dag.add_recursive(
+            &pool,
+            PlanNode {
+                skill_type_id: *skill_id,
+                level: *level,
+            },
+        )
+        .await
+        .map_err(|e| format!("Failed to add prerequisites for skill {}: {}", skill_id, e))?;
+    }
+
+    // 3. Topological sort to get new order
+    let sorted_nodes = dag.topological_sort(&current_nodes);
+
+    // 4. Update database
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| format!("Transaction failed: {}", e))?;
+
+    let imported_planned_nodes: HashSet<PlanNode> = entries
+        .iter()
+        .filter(|(_, _, et, _)| et == "Planned")
+        .map(|(sid, lvl, _, _)| PlanNode {
+            skill_type_id: *sid,
+            level: *lvl,
+        })
+        .collect();
+
+    for (index, node) in sorted_nodes.iter().enumerate() {
+        let is_originally_planned = imported_planned_nodes.contains(node);
+
+        let entry_type = if is_originally_planned {
+            "Planned"
+        } else {
+            let existing =
+                db::skill_plans::get_entry_type(&pool, plan_id, node.skill_type_id, node.level)
+                    .await
+                    .map_err(|e| format!("DB Error: {}", e))?;
+
+            if let Some(et) = existing {
+                if et == "Planned" {
+                    "Planned"
+                } else {
+                    "Prerequisite"
+                }
+            } else {
+                "Prerequisite"
+            }
+        };
+
+        // Find notes if available in imported entries
+        let notes = entries
+            .iter()
+            .find(|(sid, lvl, _, _)| *sid == node.skill_type_id && *lvl == node.level)
+            .and_then(|(_, _, _, n)| n.clone());
+
         sqlx::query(
             "INSERT INTO skill_plan_entries (plan_id, skill_type_id, planned_level, sort_order, entry_type, notes)
              VALUES (?, ?, ?, ?, ?, ?)
              ON CONFLICT(plan_id, skill_type_id, planned_level) DO UPDATE SET
+             sort_order = excluded.sort_order,
              entry_type = CASE
-                 WHEN excluded.entry_type = 'Planned' THEN excluded.entry_type
-                 WHEN skill_plan_entries.entry_type = 'Planned' THEN skill_plan_entries.entry_type
-                 ELSE excluded.entry_type
+                WHEN excluded.entry_type = 'Planned' THEN 'Planned'
+                ELSE skill_plan_entries.entry_type
              END,
-             notes = excluded.notes,
-             sort_order = excluded.sort_order",
+             notes = CASE WHEN excluded.notes IS NOT NULL THEN excluded.notes ELSE skill_plan_entries.notes END"
         )
         .bind(plan_id)
-        .bind(skill_id)
-        .bind(level)
-        .bind(sort_order)
+        .bind(node.skill_type_id)
+        .bind(node.level)
+        .bind(index as i64)
         .bind(entry_type)
-        .bind(notes.as_deref())
-        .execute(&*pool)
+        .bind(notes)
+        .execute(&mut *tx)
         .await
-        .map_err(|e| format!("Failed to add entry: {}", e))?;
-
-        if entry_type == "Planned" {
-            resolve_and_add_prerequisites(&pool, plan_id, *skill_id).await?;
-        }
-
-        sort_order += 1;
+        .map_err(|e| format!("Failed to insert entry: {}", e))?;
     }
 
-    // Verify prerequisites for all Planned entries to ensure completeness
-    let planned_entries: Vec<(i64, i64)> = sqlx::query_as::<_, (i64, i64)>(
-        "SELECT skill_type_id, planned_level
-         FROM skill_plan_entries
-         WHERE plan_id = ? AND entry_type = 'Planned'",
-    )
-    .bind(plan_id)
-    .fetch_all(&*pool)
-    .await
-    .map_err(|e| format!("Failed to get planned entries: {}", e))?;
-
-    for (skill_type_id, _planned_level) in planned_entries {
-        resolve_and_add_prerequisites(&pool, plan_id, skill_type_id).await?;
-    }
+    tx.commit()
+        .await
+        .map_err(|e| format!("Failed to commit: {}", e))?;
 
     get_skill_plan_with_entries(pool, plan_id)
         .await?
@@ -714,13 +1084,10 @@ pub async fn export_skill_plan_text(
 
     let mut lines = Vec::new();
     for entry in entries {
-        let skill_name =
-            sqlx::query_scalar::<_, String>("SELECT name FROM sde_types WHERE type_id = ?")
-                .bind(entry.skill_type_id)
-                .fetch_optional(&*pool)
-                .await
-                .map_err(|e| format!("Failed to get skill name: {}", e))?
-                .unwrap_or_else(|| format!("Unknown Skill ({})", entry.skill_type_id));
+        let skill_name = db::skill_plans::get_skill_name(&pool, entry.skill_type_id)
+            .await
+            .map_err(|e| format!("Failed to get skill name: {}", e))?
+            .unwrap_or_else(|| format!("Unknown Skill ({})", entry.skill_type_id));
 
         lines.push(format!("{} {}", skill_name, entry.planned_level));
     }
@@ -765,13 +1132,10 @@ pub async fn export_skill_plan_xml(
         .map_err(|e| format!("Failed to write sorting element: {}", e))?;
 
     for entry in entries {
-        let skill_name =
-            sqlx::query_scalar::<_, String>("SELECT name FROM sde_types WHERE type_id = ?")
-                .bind(entry.skill_type_id)
-                .fetch_optional(&*pool)
-                .await
-                .map_err(|e| format!("Failed to get skill name: {}", e))?
-                .unwrap_or_else(|| format!("Unknown Skill ({})", entry.skill_type_id));
+        let skill_name = db::skill_plans::get_skill_name(&pool, entry.skill_type_id)
+            .await
+            .map_err(|e| format!("Failed to get skill name: {}", e))?
+            .unwrap_or_else(|| format!("Unknown Skill ({})", entry.skill_type_id));
 
         let skill_id_str = entry.skill_type_id.to_string();
         let level_str = entry.planned_level.to_string();
@@ -823,19 +1187,9 @@ pub async fn search_skills(
     pool: State<'_, db::Pool>,
     query: String,
 ) -> Result<Vec<SkillSearchResult>, String> {
-    let search_pattern = format!("%{}%", query);
-    let skills: Vec<(i64, String)> = sqlx::query_as::<_, (i64, String)>(
-        "SELECT type_id, name FROM sde_types
-         WHERE group_id IN (SELECT group_id FROM sde_groups WHERE category_id = 16)
-         AND published = 1
-         AND name LIKE ?
-         ORDER BY name
-         LIMIT 100",
-    )
-    .bind(&search_pattern)
-    .fetch_all(&*pool)
-    .await
-    .map_err(|e| format!("Failed to search skills: {}", e))?;
+    let skills = db::skill_plans::search_skills(&pool, &query)
+        .await
+        .map_err(|e| format!("Failed to search skills: {}", e))?;
 
     let results: Vec<SkillSearchResult> = skills
         .into_iter()
@@ -879,13 +1233,10 @@ pub async fn compare_skill_plan_with_character(
 
     let mut comparison_entries = Vec::new();
     for entry in entries {
-        let skill_name =
-            sqlx::query_scalar::<_, String>("SELECT name FROM sde_types WHERE type_id = ?")
-                .bind(entry.skill_type_id)
-                .fetch_optional(&*pool)
-                .await
-                .map_err(|e| format!("Failed to get skill name: {}", e))?
-                .unwrap_or_else(|| format!("Unknown Skill ({})", entry.skill_type_id));
+        let skill_name = db::skill_plans::get_skill_name(&pool, entry.skill_type_id)
+            .await
+            .map_err(|e| format!("Failed to get skill name: {}", e))?
+            .unwrap_or_else(|| format!("Unknown Skill ({})", entry.skill_type_id));
 
         let char_skill = character_skills_map.get(&entry.skill_type_id);
         let trained_level = char_skill.map(|s| s.trained_skill_level).unwrap_or(0);

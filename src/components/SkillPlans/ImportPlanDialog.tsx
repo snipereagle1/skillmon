@@ -1,4 +1,6 @@
 import { useRef, useState } from 'react';
+import { toast } from 'sonner';
+import { match } from 'ts-pattern';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -13,6 +15,7 @@ import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
 import {
+  useImportSkillPlanJson,
   useImportSkillPlanText,
   useImportSkillPlanXml,
 } from '@/hooks/tauri/useSkillPlans';
@@ -28,11 +31,12 @@ export function ImportPlanDialog({
   onOpenChange,
   planId,
 }: ImportPlanDialogProps) {
-  const [format, setFormat] = useState<'text' | 'xml'>('text');
+  const [format, setFormat] = useState<'text' | 'xml' | 'json'>('text');
   const [text, setText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const importTextMutation = useImportSkillPlanText();
   const importXmlMutation = useImportSkillPlanXml();
+  const importJsonMutation = useImportSkillPlanJson();
 
   const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -43,7 +47,7 @@ export function ImportPlanDialog({
       setText(contents);
     } catch (err) {
       console.error('Failed to read file:', err);
-      alert('Failed to read file');
+      toast.error('Failed to read file');
     }
   };
 
@@ -51,22 +55,35 @@ export function ImportPlanDialog({
     if (!text.trim()) return;
 
     try {
-      if (format === 'text') {
-        await importTextMutation.mutateAsync({ planId, text });
-      } else {
-        await importXmlMutation.mutateAsync({ planId, xml: text });
-      }
+      await match(format)
+        .with('text', () => importTextMutation.mutateAsync({ planId, text }))
+        .with('xml', () => importXmlMutation.mutateAsync({ planId, xml: text }))
+        .with('json', () => {
+          const planJson = JSON.parse(text);
+          return importJsonMutation.mutateAsync({ plan: planJson });
+        })
+        .exhaustive();
+
       setText('');
       onOpenChange(false);
     } catch (err) {
       console.error('Failed to import plan:', err);
+      if (format === 'json') {
+        toast.error('Invalid JSON format');
+      }
     }
   };
 
   const error =
-    importTextMutation.isError || importXmlMutation.isError
-      ? importTextMutation.error || importXmlMutation.error
-      : null;
+    importTextMutation.error ||
+    importXmlMutation.error ||
+    importJsonMutation.error ||
+    null;
+
+  const isPending =
+    importTextMutation.isPending ||
+    importXmlMutation.isPending ||
+    importJsonMutation.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -83,12 +100,18 @@ export function ImportPlanDialog({
             <Label>Format</Label>
             <RadioGroup
               value={format}
-              onValueChange={(v) => setFormat(v as 'text' | 'xml')}
+              onValueChange={(v) => setFormat(v as 'text' | 'xml' | 'json')}
             >
               <div className="flex items-center space-x-2">
                 <RadioGroupItem value="text" id="text" />
                 <Label htmlFor="text" className="cursor-pointer">
                   Plain Text
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <RadioGroupItem value="json" id="json" />
+                <Label htmlFor="json" className="cursor-pointer">
+                  Skillmon JSON
                 </Label>
               </div>
               <div className="flex items-center space-x-2">
@@ -113,7 +136,11 @@ export function ImportPlanDialog({
               <input
                 ref={fileInputRef}
                 type="file"
-                accept={format === 'text' ? '.txt' : '.xml'}
+                accept={match(format)
+                  .with('text', () => '.txt')
+                  .with('json', () => '.json')
+                  .with('xml', () => '.xml')
+                  .exhaustive()}
                 onChange={handleFileSelect}
                 className="hidden"
               />
@@ -122,11 +149,14 @@ export function ImportPlanDialog({
               id="import-text"
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder={
-                format === 'text'
-                  ? 'Paste skill list here (one per line: Skill Name Level)'
-                  : 'Paste XML content here'
-              }
+              placeholder={match(format)
+                .with(
+                  'text',
+                  () => 'Paste skill list here (one per line: Skill Name Level)'
+                )
+                .with('json', () => 'Paste Skillmon JSON content here')
+                .with('xml', () => 'Paste XML content here')
+                .exhaustive()}
               rows={12}
               className="font-mono text-sm max-h-[400px] overflow-y-auto"
             />
@@ -141,17 +171,8 @@ export function ImportPlanDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button
-            onClick={handleImport}
-            disabled={
-              !text.trim() ||
-              importTextMutation.isPending ||
-              importXmlMutation.isPending
-            }
-          >
-            {importTextMutation.isPending || importXmlMutation.isPending
-              ? 'Importing...'
-              : 'Import'}
+          <Button onClick={handleImport} disabled={!text.trim() || isPending}>
+            {isPending ? 'Importing...' : 'Import'}
           </Button>
         </DialogFooter>
       </DialogContent>

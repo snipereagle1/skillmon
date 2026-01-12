@@ -1,4 +1,6 @@
-import { Pencil, Trash2 } from 'lucide-react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -27,13 +29,31 @@ interface PlanEntryRowProps {
   entry: SkillPlanEntryResponse;
   totalPlanSP: number;
   offsetPercentage: number;
+  validationStatus?: 'error' | 'warning';
 }
 
+// eslint-disable-next-line complexity
 export function PlanEntryRow({
   entry,
   totalPlanSP,
   offsetPercentage,
+  validationStatus,
 }: PlanEntryRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: entry.entry_id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
   const deleteEntryMutation = useDeletePlanEntry();
   const updateEntryMutation = useUpdatePlanEntry();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
@@ -87,19 +107,41 @@ export function PlanEntryRow({
   return (
     <>
       <div
+        ref={setNodeRef}
+        style={style}
         className={cn(
-          'relative px-4 py-3 border-b last:border-b-0 border-border/50',
-          isPrerequisite && 'bg-muted/30'
+          'relative px-4 py-3 border-b last:border-b-0 border-border/50 transition-colors',
+          isPrerequisite && 'bg-muted/30',
+          isDragging && 'bg-accent opacity-50',
+          validationStatus === 'error' &&
+            'bg-destructive/10 border-destructive/50',
+          validationStatus === 'warning' &&
+            'bg-yellow-500/10 border-yellow-500/50'
         )}
       >
         <div className="flex items-center justify-between gap-4 relative z-10">
           <div className="flex items-center gap-3 flex-1 min-w-0">
+            <div
+              {...attributes}
+              {...listeners}
+              className={cn(
+                'cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded',
+                validationStatus === 'error' && 'text-destructive',
+                validationStatus === 'warning' &&
+                  'text-yellow-600 dark:text-yellow-500'
+              )}
+            >
+              <GripVertical className="h-4 w-4" />
+            </div>
             <LevelIndicator level={entry.planned_level} />
             <div className="flex flex-col flex-1 min-w-0">
               <span
                 className={cn(
                   'text-foreground font-medium truncate cursor-pointer hover:underline',
-                  isPrerequisite && 'text-muted-foreground'
+                  isPrerequisite && 'text-muted-foreground',
+                  validationStatus === 'error' && 'text-destructive',
+                  validationStatus === 'warning' &&
+                    'text-yellow-600 dark:text-yellow-500'
                 )}
                 onClick={() => openSkillDetail(entry.skill_type_id, null)}
               >

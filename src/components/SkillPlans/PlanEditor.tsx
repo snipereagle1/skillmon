@@ -1,21 +1,34 @@
+import { closestCenter, DndContext } from '@dnd-kit/core';
+import { restrictToVerticalAxis } from '@dnd-kit/modifiers';
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
 import { Copy } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { exportSkillPlanText, exportSkillPlanXml } from '@/generated/commands';
+import type { ValidationResponse } from '@/generated/types';
 import {
+  useExportSkillPlanJson,
+  useReorderPlanEntries,
   useSkillPlanWithEntries,
   useUpdateSkillPlan,
+  useValidateReorder,
 } from '@/hooks/tauri/useSkillPlans';
+import { useSortableList } from '@/hooks/useSortableList';
 
 import { AddSkillDialog } from './AddSkillDialog';
 import { ImportPlanDialog } from './ImportPlanDialog';
 import { PlanEntryRow } from './PlanEntryRow';
+import { SkillPlanValidationDisplay } from './SkillPlanValidationDisplay';
 
 interface PlanEditorProps {
   planId: number;
@@ -23,6 +36,8 @@ interface PlanEditorProps {
 
 export function PlanEditor({ planId }: PlanEditorProps) {
   const { data, isLoading, error } = useSkillPlanWithEntries(planId);
+  const reorderMutation = useReorderPlanEntries();
+  const validateReorderMutation = useValidateReorder();
   const updatePlanMutation = useUpdateSkillPlan();
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
@@ -33,6 +48,100 @@ export function PlanEditor({ planId }: PlanEditorProps) {
   const [isExportingText, setIsExportingText] = useState(false);
   const [isExportingXml, setIsExportingXml] = useState(false);
   const [isCopyingText, setIsCopyingText] = useState(false);
+  const [isExportingJson, setIsExportingJson] = useState(false);
+  const [proposedValidation, setProposedValidation] =
+    useState<ValidationResponse | null>(null);
+  const exportJsonMutation = useExportSkillPlanJson();
+
+  const validationMap = useMemo(() => {
+    const map = new Map<string, 'error' | 'warning'>();
+    if (!proposedValidation) return map;
+
+    proposedValidation.errors.forEach((e) => {
+      const key = `${e.node_skill_type_id}-${e.node_level}`;
+      map.set(key, 'error');
+    });
+    proposedValidation.warnings.forEach((w) => {
+      const key = `${w.node_skill_type_id}-${w.node_level}`;
+      if (!map.has(key)) map.set(key, 'warning');
+    });
+    return map;
+  }, [proposedValidation]);
+
+  const sortedEntries = useMemo(
+    () =>
+      [...(data?.entries || [])].sort((a, b) => a.sort_order - b.sort_order),
+    [data?.entries]
+  );
+
+  const {
+    localItems,
+    sensors,
+    handleDragStart,
+    handleDragOver,
+    handleDragEnd,
+    isDragging,
+    reset,
+  } = useSortableList({
+    items: sortedEntries,
+    onReorder: async (newOrder) => {
+      try {
+        await reorderMutation.mutateAsync({
+          planId,
+          entryIds: newOrder.map((e) => e.entry_id),
+        });
+      } catch (err) {
+        console.error('Failed to reorder plan entries:', err);
+        reset();
+        const errorMessage =
+          err instanceof Error ? err.message : 'Unknown error';
+        toast.error('Failed to reorder', { description: errorMessage });
+      }
+    },
+    getId: (e) => e.entry_id,
+  });
+
+  // Effect to validate proposed order while dragging
+  useEffect(() => {
+    if (isDragging) {
+      const timeoutId = setTimeout(async () => {
+        try {
+          const result = await validateReorderMutation.mutateAsync({
+            planId,
+            entryIds: localItems.map((e) => e.entry_id),
+          });
+          setProposedValidation(result);
+        } catch (err) {
+          console.error('Failed to validate proposed order:', err);
+        }
+      }, 200);
+      return () => clearTimeout(timeoutId);
+    } else {
+      setProposedValidation(null);
+    }
+  }, [localItems, isDragging, planId, validateReorderMutation]);
+
+  const handleExportJson = async () => {
+    if (!data) return;
+    setIsExportingJson(true);
+    try {
+      const planJson = await exportJsonMutation.mutateAsync({ planId });
+      const filePath = await save({
+        title: 'Save Skill Plan (JSON)',
+        defaultPath: `${data.plan.name}.skillmon.json`,
+        filters: [{ name: 'Skillmon Plan', extensions: ['json'] }],
+      });
+
+      if (filePath) {
+        await writeTextFile(filePath, JSON.stringify(planJson, null, 2));
+      }
+    } catch (err) {
+      console.error('Failed to export JSON:', err);
+      toast.error('Failed to export JSON');
+    } finally {
+      setIsExportingJson(false);
+    }
+  };
 
   const handleExportText = async () => {
     if (!data) {
@@ -66,7 +175,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
       console.error('Failed to export plan:', err);
       const errorMessage =
         err instanceof Error ? err.message : 'Unknown error occurred';
-      alert(`Failed to export plan: ${errorMessage}`);
+      toast.error('Failed to export plan', { description: errorMessage });
     } finally {
       setIsExportingText(false);
     }
@@ -104,7 +213,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
       console.error('Failed to export plan:', err);
       const errorMessage =
         err instanceof Error ? err.message : 'Unknown error occurred';
-      alert(`Failed to export plan: ${errorMessage}`);
+      toast.error('Failed to export plan', { description: errorMessage });
     } finally {
       setIsExportingXml(false);
     }
@@ -120,7 +229,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
       console.error('Failed to copy to clipboard:', err);
       const errorMessage =
         err instanceof Error ? err.message : 'Unknown error occurred';
-      alert(`Failed to copy to clipboard: ${errorMessage}`);
+      toast.error('Failed to copy to clipboard', { description: errorMessage });
     } finally {
       setIsCopyingText(false);
     }
@@ -181,11 +290,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
     );
   }
 
-  const sortedEntries = [...data.entries].sort(
-    (a, b) => a.sort_order - b.sort_order
-  );
-
-  const totalSP = sortedEntries.reduce(
+  const totalSP = localItems.reduce(
     (sum, entry) => sum + entry.skillpoints_for_level,
     0
   );
@@ -290,6 +395,14 @@ export function PlanEditor({ planId }: PlanEditorProps) {
           <Button
             variant="outline"
             size="sm"
+            onClick={handleExportJson}
+            disabled={isExportingJson}
+          >
+            Export JSON
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleExportText}
             disabled={isExportingText}
           >
@@ -314,31 +427,57 @@ export function PlanEditor({ planId }: PlanEditorProps) {
           </Button>
         </div>
       </div>
-      <div className="flex-1 overflow-y-auto">
-        {sortedEntries.length === 0 ? (
+      <div className="flex-1 overflow-y-auto min-h-0">
+        {localItems.length === 0 ? (
           <div className="flex items-center justify-center h-full p-8">
             <p className="text-muted-foreground">
               No entries yet. Add skills to get started.
             </p>
           </div>
         ) : (
-          (() => {
-            let cumulativeSP = 0;
-            return sortedEntries.map((entry) => {
-              const offsetPercentage =
-                totalSP > 0 ? (cumulativeSP / totalSP) * 100 : 0;
-              cumulativeSP += entry.skillpoints_for_level;
-              return (
-                <PlanEntryRow
-                  key={entry.entry_id}
-                  entry={entry}
-                  totalPlanSP={totalSP}
-                  offsetPercentage={offsetPercentage}
-                />
-              );
-            });
-          })()
+          <DndContext
+            id={`plan-entries-dnd-${planId}`}
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={handleDragStart}
+            onDragOver={handleDragOver}
+            onDragEnd={handleDragEnd}
+            modifiers={[restrictToVerticalAxis]}
+          >
+            <SortableContext
+              items={localItems.map((e) => e.entry_id)}
+              strategy={verticalListSortingStrategy}
+            >
+              {(() => {
+                let cumulativeSP = 0;
+                return localItems.map((entry) => {
+                  const offsetPercentage =
+                    totalSP > 0 ? (cumulativeSP / totalSP) * 100 : 0;
+                  cumulativeSP += entry.skillpoints_for_level;
+                  const validationStatus = validationMap.get(
+                    `${entry.skill_type_id}-${entry.planned_level}`
+                  );
+                  return (
+                    <PlanEntryRow
+                      key={entry.entry_id}
+                      entry={entry}
+                      totalPlanSP={totalSP}
+                      offsetPercentage={offsetPercentage}
+                      validationStatus={validationStatus}
+                    />
+                  );
+                });
+              })()}
+            </SortableContext>
+          </DndContext>
         )}
+      </div>
+      <div className="shrink-0 bg-background border-t border-border shadow-[0_-4px_12px_-2px_rgba(0,0,0,0.05)]">
+        <SkillPlanValidationDisplay
+          planId={planId}
+          validationOverride={proposedValidation}
+          isProposed={isDragging}
+        />
       </div>
       <AddSkillDialog
         open={addSkillDialogOpen}
