@@ -32,6 +32,7 @@ import { AddSkillDialog } from './AddSkillDialog';
 import { ImportPlanDialog } from './ImportPlanDialog';
 import { PlanComparisonTab } from './PlanComparisonTab';
 import { PlanEntryRow } from './PlanEntryRow';
+import { SimulationTab } from './SimulationTab';
 import { SkillPlanValidationDisplay } from './SkillPlanValidationDisplay';
 
 interface PlanEditorProps {
@@ -474,6 +475,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
           <TabsList className="h-10">
             <TabsTrigger value="editor">Plan Editor</TabsTrigger>
             <TabsTrigger value="comparison">Character Comparison</TabsTrigger>
+            <TabsTrigger value="simulation">Simulation</TabsTrigger>
           </TabsList>
         </div>
 
@@ -540,6 +542,10 @@ export function PlanEditor({ planId }: PlanEditorProps) {
           className="flex-1 overflow-y-auto min-h-0 mt-0"
         >
           <PlanComparisonTab planId={planId} />
+        </TabsContent>
+
+        <TabsContent value="simulation" className="flex-1 min-h-0 mt-0">
+          <SimulationTab planId={planId} />
         </TabsContent>
       </Tabs>
 
