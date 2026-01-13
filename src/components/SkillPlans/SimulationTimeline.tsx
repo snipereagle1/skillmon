@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getTypeNames } from '@/generated/commands';
-import { SimulationResult } from '@/generated/types';
+import { SimulationProfile, SimulationResult } from '@/generated/types';
 import { formatDuration } from '@/lib/utils';
 
 import { LevelIndicator } from '../SkillQueue/LevelIndicator';
@@ -18,9 +19,13 @@ const ATTRIBUTE_NAME_MAP: Record<number, string> = {
 
 interface SimulationTimelineProps {
   result: SimulationResult;
+  profile: SimulationProfile;
 }
 
-export function SimulationTimeline({ result }: SimulationTimelineProps) {
+export function SimulationTimeline({
+  result,
+  profile,
+}: SimulationTimelineProps) {
   const [skillNames, setSkillNames] = useState<Record<number, string>>({});
 
   useEffect(() => {
@@ -61,11 +66,33 @@ export function SimulationTimeline({ result }: SimulationTimelineProps) {
                   ? (segment.sp_earned / result.total_sp) * 100
                   : 0;
 
+              // Check if this segment is the start of an entry and if that entry has a remap
+              const isFirstSegmentOfEntry =
+                i === 0 ||
+                result.segments[i - 1].entry_index !== segment.entry_index;
+              const remapAtThisEntry =
+                isFirstSegmentOfEntry &&
+                profile.remaps.find(
+                  (r) => r.entry_index === segment.entry_index
+                );
+
               return (
                 <div
                   key={i}
                   className="relative px-4 py-3 border-b last:border-b-0 border-border/50 transition-colors"
                 >
+                  {remapAtThisEntry && (
+                    <div className="mb-2">
+                      <Badge variant="secondary" className="gap-1.5 py-1">
+                        <div className="h-2 w-2 rounded-full bg-blue-500" />
+                        Remap: {remapAtThisEntry.attributes.intelligence}/
+                        {remapAtThisEntry.attributes.memory}/
+                        {remapAtThisEntry.attributes.perception}/
+                        {remapAtThisEntry.attributes.willpower}/
+                        {remapAtThisEntry.attributes.charisma}
+                      </Badge>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between gap-4 relative z-10">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <LevelIndicator level={segment.level} />

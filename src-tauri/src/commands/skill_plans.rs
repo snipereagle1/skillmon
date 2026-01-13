@@ -8,7 +8,8 @@ use tauri::State;
 
 use crate::db;
 use crate::skill_plans::graph::{PlanDag, PlanNode};
-use crate::skill_plans::simulation::{self, SimulationProfile, SimulationResult};
+use crate::skill_plans::optimization::{self, OptimizationResult};
+use crate::skill_plans::simulation::{self, Attributes, SimulationProfile, SimulationResult};
 use crate::skill_plans::{SkillmonPlan, SkillmonPlanEntry};
 use crate::utils;
 
@@ -1147,6 +1148,33 @@ pub async fn simulate_skill_plan(
     simulation::simulate(&pool, &entries, profile, Some(&current_sp_map))
         .await
         .map_err(|e| format!("Simulation failed: {}", e))
+}
+
+#[tauri::command]
+pub async fn optimize_plan_attributes(
+    pool: State<'_, db::Pool>,
+    plan_id: i64,
+    implants: Attributes,
+    character_id: Option<i64>,
+) -> Result<OptimizationResult, String> {
+    let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to get plan entries: {}", e))?;
+
+    let mut current_sp_map = HashMap::new();
+    if let Some(char_id) = character_id {
+        let character_skills = db::get_character_skills(&pool, char_id)
+            .await
+            .map_err(|e| format!("Failed to get character skills: {}", e))?;
+
+        for skill in character_skills {
+            current_sp_map.insert(skill.skill_id, skill.skillpoints_in_skill);
+        }
+    }
+
+    optimization::optimize_plan_attributes(&pool, &entries, &implants, &current_sp_map)
+        .await
+        .map_err(|e| format!("Optimization failed: {}", e))
 }
 
 #[tauri::command]

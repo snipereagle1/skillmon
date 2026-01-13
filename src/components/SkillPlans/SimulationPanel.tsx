@@ -5,12 +5,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import type { Attributes, SimulationProfile } from '@/generated/types';
 
+import { OptimizationDialog } from './OptimizationDialog';
+
 interface SimulationPanelProps {
+  planId: number;
+  characterId: number | null;
   profile: SimulationProfile;
   onProfileChange: (profile: SimulationProfile) => void;
 }
 
 export function SimulationPanel({
+  planId,
+  characterId,
   profile,
   onProfileChange,
 }: SimulationPanelProps) {
@@ -137,10 +143,27 @@ export function SimulationPanel({
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Remap</CardTitle>
-          <div className="text-xs text-muted-foreground font-mono">
-            {totalRemapPoints} / 14 points
+          <div className="space-y-1">
+            <CardTitle className="text-sm font-medium">Remap</CardTitle>
+            <div className="text-xs text-muted-foreground font-mono">
+              {totalRemapPoints} / 14 points
+            </div>
           </div>
+          <OptimizationDialog
+            planId={planId}
+            currentRemap={initialRemap}
+            implants={profile.implants}
+            characterId={characterId}
+            onApply={(remap) => {
+              const otherRemaps = profile.remaps.filter(
+                (r) => r.entry_index !== 0
+              );
+              onProfileChange({
+                ...profile,
+                remaps: [remap, ...otherRemaps],
+              });
+            }}
+          />
         </CardHeader>
         <CardContent className="grid gap-4">
           {attributes.map((attr) => (

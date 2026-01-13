@@ -1,4 +1,5 @@
 pub mod graph;
+pub mod optimization;
 pub mod simulation;
 
 use serde::{Deserialize, Serialize};

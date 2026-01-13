@@ -112,7 +112,12 @@ export function SimulationTab({ planId }: SimulationTabProps) {
           </Select>
         </div>
 
-        <SimulationPanel profile={profile} onProfileChange={setProfile} />
+        <SimulationPanel
+          planId={planId}
+          characterId={selectedCharacterId}
+          profile={profile}
+          onProfileChange={setProfile}
+        />
       </div>
 
       <div className="flex-1 min-w-0">
@@ -126,7 +131,7 @@ export function SimulationTab({ planId }: SimulationTabProps) {
             {error instanceof Error ? error.message : 'Simulation failed'}
           </div>
         ) : simulation ? (
-          <SimulationTimeline result={simulation} />
+          <SimulationTimeline result={simulation} profile={profile} />
         ) : (
           <div className="flex items-center justify-center h-full text-muted-foreground">
             No simulation data available.

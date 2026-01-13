@@ -43,6 +43,7 @@ pub struct SimulationResult {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimulationSegment {
+    pub entry_index: usize,
     pub skill_type_id: i64,
     pub level: i64,
     pub duration_seconds: i64,
@@ -174,6 +175,7 @@ pub async fn simulate(
             total_sp_earned += actual_sp_gained;
 
             segments.push(SimulationSegment {
+                entry_index: idx,
                 skill_type_id: entry.skill_type_id,
                 level: entry.planned_level,
                 duration_seconds: actual_duration,
