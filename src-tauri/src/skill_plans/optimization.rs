@@ -69,6 +69,7 @@ pub async fn optimize_plan_reordering(
         .collect();
 
     let mut current_cluster: Option<(Option<i64>, Option<i64>)> = None;
+    let mut current_sim_sp_map = current_sp_map.clone();
 
     while !available.is_empty() {
         // Try to pick from current cluster
@@ -93,7 +94,7 @@ pub async fn optimize_plan_reordering(
 
                 let rank = attr.rank.unwrap_or(1);
                 let total_sp = utils::calculate_sp_for_level(rank, n.level as i32);
-                let current_sp = *current_sp_map.get(&n.skill_type_id).unwrap_or(&0);
+                let current_sp = *current_sim_sp_map.get(&n.skill_type_id).unwrap_or(&0);
                 let sp_remaining = (total_sp - current_sp).max(0);
 
                 *cluster_demands.entry(key).or_insert(0) += sp_remaining;
@@ -133,6 +134,13 @@ pub async fn optimize_plan_reordering(
         });
 
         available.remove(&node);
+
+        // Update simulated SP map for future demand calculations in this sort
+        let attr = skill_attributes.get(&node.skill_type_id).unwrap();
+        let rank = attr.rank.unwrap_or(1);
+        let total_sp = utils::calculate_sp_for_level(rank, node.level as i32);
+        let entry_sp = current_sim_sp_map.entry(node.skill_type_id).or_insert(0);
+        *entry_sp = (*entry_sp).max(total_sp);
 
         // Find the original entry for this node
         let original_entry = entries
@@ -219,7 +227,9 @@ pub async fn optimize_plan_reordering(
                 let attr = skill_attributes.get(&entry.skill_type_id).unwrap();
                 let rank = attr.rank.unwrap_or(1);
                 let total_sp = utils::calculate_sp_for_level(rank, entry.planned_level as i32);
-                cur_sp_map.insert(entry.skill_type_id, total_sp);
+
+                let current_val = cur_sp_map.entry(entry.skill_type_id).or_insert(0);
+                *current_val = (*current_val).max(total_sp);
             }
             cluster_sp_maps.push(cur_sp_map.clone());
         }
@@ -281,75 +291,89 @@ pub async fn optimize_plan_reordering(
         }
 
         let m_limit = max_remaps.max(0) as usize;
-        let mut part_dp =
+
+        // dp_remap[m][i] = min time to train clusters i..num_clusters using up to m remaps.
+        // Each remap is an optimal remap for a segment.
+        let mut dp_remap =
             vec![vec![(f64::MAX, 0, Attributes::default()); num_clusters + 1]; m_limit + 1];
 
-        // Base case: m=0 means we don't use any NEW remaps, but we might still use baseline_remap.
-        // Wait, if m=0, we only have baseline_remap.
-        // Let's redefine m as the number of remaps including the possible immediate remap.
-        // Actually, let's stick to: m is number of NEW remaps.
-        // if m=0, we only use baseline_remap.
-
-        for i in 0..=num_clusters {
-            let time_baseline: f64 = baseline_cluster_times[i..num_clusters].iter().sum();
-            part_dp[0][i] = (time_baseline, num_clusters, baseline_remap.clone());
+        // Base case: 0 remaps for i..num_clusters is only possible if i == num_clusters.
+        for row in dp_remap.iter_mut().take(m_limit + 1) {
+            row[num_clusters] = (0.0, num_clusters, Attributes::default());
         }
 
-        for m in 1..=m_limit {
-            part_dp[m][num_clusters] = (0.0, num_clusters, Attributes::default());
+        // m=1: optimal time for i..num_clusters using one remap at i.
+        for (i, item) in dp_remap[1].iter_mut().enumerate().take(num_clusters) {
+            if let Some((t_seg, attr_seg)) = opt_segment_results.get(&(i, num_clusters)) {
+                *item = (*t_seg, num_clusters, attr_seg.clone());
+            }
+        }
+
+        for m in 2..=m_limit {
             for i in 0..num_clusters {
-                let mut best_t = part_dp[m - 1][i].0;
-                let mut best_j = i;
-                let mut best_attr = Attributes::default();
-                for (j, (t_rest, _, _)) in part_dp[m - 1]
+                // Option 1: Use fewer remaps
+                let mut best = dp_remap[m - 1][i].clone();
+
+                // Option 2: Remap at i for segment i..j, then use m-1 remaps for j..num_clusters
+                for (j, (t_rest, _, _)) in dp_remap[m - 1]
                     .iter()
                     .enumerate()
-                    .take(num_clusters + 1)
+                    .take(num_clusters)
                     .skip(i + 1)
                 {
-                    let (t_seg, attr_seg) = opt_segment_results.get(&(i, j)).unwrap();
-                    if t_seg + t_rest < best_t {
-                        best_t = t_seg + t_rest;
-                        best_j = j;
-                        best_attr = attr_seg.clone();
+                    if let Some((t_seg, attr_seg)) = opt_segment_results.get(&(i, j)) {
+                        if *t_rest != f64::MAX && t_seg + t_rest < best.0 {
+                            best = (t_seg + t_rest, j, attr_seg.clone());
+                        }
                     }
                 }
-                if best_j == i {
-                    // Stay with fewer remaps
-                    part_dp[m][i] = part_dp[m - 1][i].clone();
-                } else {
-                    part_dp[m][i] = (best_t, best_j, best_attr);
-                }
+                dp_remap[m][i] = best;
             }
         }
 
-        let (best_total, _, _) = part_dp[m_limit][0];
-        total_optimized_seconds = best_total;
+        // Now consider the baseline period at the beginning.
+        // We can train 0..k clusters with baseline_remap, then use m_limit remaps for k..num_clusters.
+        let mut best_total_time = baseline_cluster_times.iter().sum::<f64>();
+        let mut best_k = num_clusters;
 
-        // reconstruct remaps
+        for k in 0..num_clusters {
+            let baseline_time: f64 = baseline_cluster_times[0..k].iter().sum();
+            let (remap_time, _, _) = &dp_remap[m_limit][k];
+            if *remap_time != f64::MAX && baseline_time + remap_time < best_total_time {
+                best_total_time = baseline_time + remap_time;
+                best_k = k;
+            }
+        }
+
+        total_optimized_seconds = best_total_time;
+
+        // Reconstruct remaps
         let mut cur_remaps = Vec::new();
-        let mut cur_m = m_limit;
-        let mut cur_i = 0;
-        let mut last_attr = baseline_remap.clone();
-        while cur_i < num_clusters && cur_m > 0 {
-            let (_, next_i, attr) = &part_dp[cur_m][cur_i];
-            if next_i == &cur_i {
-                // We decided to use fewer remaps than m for this segment
-                cur_m -= 1;
-                continue;
+        if best_k < num_clusters {
+            let mut cur_m = m_limit;
+            let mut cur_i = best_k;
+            let mut last_attr = baseline_remap.clone();
+
+            while cur_i < num_clusters && cur_m > 0 {
+                let (time, next_i, attr) = &dp_remap[cur_m][cur_i];
+                let (prev_time, _, _) = &dp_remap[cur_m - 1][cur_i];
+
+                if *time == *prev_time {
+                    // We can achieve the same time with fewer remaps
+                    cur_m -= 1;
+                } else {
+                    // We used a remap at cur_i
+                    if attr != &last_attr {
+                        cur_remaps.push(PlannedRemap {
+                            entry_index: clusters[cur_i].0,
+                            attributes: attr.clone(),
+                        });
+                        last_attr = attr.clone();
+                    }
+                    cur_i = *next_i;
+                    cur_m -= 1;
+                }
             }
-            if attr != &last_attr {
-                cur_remaps.push(PlannedRemap {
-                    entry_index: clusters[cur_i].0,
-                    attributes: attr.clone(),
-                });
-                last_attr = attr.clone();
-            }
-            cur_i = *next_i;
-            // Note: we don't necessarily decrement cur_m here if we used a split that allows more remaps later,
-            // but the DP state already includes the m dimension.
-            // Actually, if we used a remap for i..j, we used ONE remap, so we go to cur_m - 1 and cur_i = j.
-            cur_m -= 1;
         }
         recommended_remaps = cur_remaps;
     }
@@ -443,7 +467,7 @@ async fn optimize_plan_attributes_internal(
         return Ok(OptimizationResult {
             recommended_remap: PlannedRemap {
                 entry_index: 0,
-                attributes: Attributes::default(),
+                attributes: baseline_remap.clone(),
             },
             original_seconds: 0,
             optimized_seconds: 0,
