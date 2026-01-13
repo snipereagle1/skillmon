@@ -1,23 +1,61 @@
 import { useQuery } from '@tanstack/react-query';
 
-import { optimizePlanAttributes } from '@/generated/commands';
-import type { Attributes } from '@/generated/types';
+import {
+  optimizePlanAttributes,
+  optimizePlanReordering,
+} from '@/generated/commands';
+import type {
+  Attributes,
+  OptimizationResult,
+  ReorderOptimizationResult,
+} from '@/generated/types';
+
+export type OptimizationMode = 'attributes' | 'reorder';
 
 export function useOptimization(
   planId: number,
   implants: Attributes,
-  characterId?: number | null
+  baselineRemap: Attributes,
+  acceleratorBonus: number,
+  characterId?: number | null,
+  mode: OptimizationMode = 'attributes',
+  maxRemaps: number = 1
 ) {
-  const query = useQuery({
-    queryKey: ['skillPlanOptimization', planId, implants, characterId],
-    queryFn: () =>
-      optimizePlanAttributes({
+  const query = useQuery<OptimizationResult | ReorderOptimizationResult, Error>(
+    {
+      queryKey: [
+        'skillPlanOptimization',
         planId,
         implants,
-        characterId: characterId || undefined,
-      }),
-    enabled: !!planId,
-  });
+        baselineRemap,
+        acceleratorBonus,
+        characterId,
+        mode,
+        maxRemaps,
+      ],
+      queryFn: async () => {
+        if (mode === 'reorder') {
+          return await optimizePlanReordering({
+            planId,
+            implants,
+            baselineRemap,
+            acceleratorBonus,
+            characterId: characterId || undefined,
+            maxRemaps,
+          });
+        } else {
+          return await optimizePlanAttributes({
+            planId,
+            implants,
+            baselineRemap,
+            acceleratorBonus,
+            characterId: characterId || undefined,
+          });
+        }
+      },
+      enabled: !!planId,
+    }
+  );
 
   return {
     optimization: query.data,

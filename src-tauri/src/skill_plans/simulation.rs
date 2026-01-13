@@ -1,4 +1,5 @@
 use crate::db;
+use crate::skill_plans::{Attributes, PlannedRemap};
 use crate::utils;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -10,21 +11,6 @@ pub struct SimulationProfile {
     pub implants: Attributes,
     pub remaps: Vec<PlannedRemap>,
     pub accelerators: Vec<PlannedAccelerator>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
-pub struct Attributes {
-    pub charisma: i64,
-    pub intelligence: i64,
-    pub memory: i64,
-    pub perception: i64,
-    pub willpower: i64,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PlannedRemap {
-    pub entry_index: usize, // Index in the skill plan entries
-    pub attributes: Attributes,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

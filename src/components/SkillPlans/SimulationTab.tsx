@@ -12,6 +12,7 @@ import {
 import { useAccountsAndCharacters } from '@/hooks/tauri/useAccountsAndCharacters';
 import { useAttributes } from '@/hooks/tauri/useAttributes';
 import { useSimulation } from '@/hooks/tauri/useSimulation';
+import { useSkillPlanWithEntries } from '@/hooks/tauri/useSkillPlans';
 
 import { SimulationPanel } from './SimulationPanel';
 import { SimulationTimeline } from './SimulationTimeline';
@@ -30,6 +31,7 @@ export function SimulationTab({ planId }: SimulationTabProps) {
   );
   const { data: accountsData } = useAccountsAndCharacters();
   const { data: characterAttributes } = useAttributes(selectedCharacterId);
+  const { data: planWithEntries } = useSkillPlanWithEntries(planId);
 
   useEffect(() => {
     if (selectedCharacterId && characterAttributes) {
@@ -114,9 +116,11 @@ export function SimulationTab({ planId }: SimulationTabProps) {
 
         <SimulationPanel
           planId={planId}
+          planName={planWithEntries?.plan.name || ''}
           characterId={selectedCharacterId}
           profile={profile}
           onProfileChange={setProfile}
+          entries={planWithEntries?.entries || []}
         />
       </div>
 

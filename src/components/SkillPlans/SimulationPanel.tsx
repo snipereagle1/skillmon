@@ -3,22 +3,30 @@ import { Minus, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import type { Attributes, SimulationProfile } from '@/generated/types';
+import type {
+  Attributes,
+  SimulationProfile,
+  SkillPlanEntryResponse,
+} from '@/generated/types';
 
 import { OptimizationDialog } from './OptimizationDialog';
 
 interface SimulationPanelProps {
   planId: number;
+  planName: string;
   characterId: number | null;
   profile: SimulationProfile;
   onProfileChange: (profile: SimulationProfile) => void;
+  entries: SkillPlanEntryResponse[];
 }
 
 export function SimulationPanel({
   planId,
+  planName,
   characterId,
   profile,
   onProfileChange,
+  entries,
 }: SimulationPanelProps) {
   const handleImplantChange = (attr: keyof Attributes, delta: number) => {
     const currentValue = profile.implants[attr];
@@ -151,9 +159,12 @@ export function SimulationPanel({
           </div>
           <OptimizationDialog
             planId={planId}
+            planName={planName}
             currentRemap={initialRemap}
             implants={profile.implants}
+            acceleratorBonus={currentAcceleratorBonus}
             characterId={characterId}
+            entries={entries}
             onApply={(remap) => {
               const otherRemaps = profile.remaps.filter(
                 (r) => r.entry_index !== 0
@@ -162,6 +173,14 @@ export function SimulationPanel({
                 ...profile,
                 remaps: [remap, ...otherRemaps],
               });
+            }}
+            onApplyReorder={(optimizedEntries, remaps) => {
+              onProfileChange({
+                ...profile,
+                remaps,
+              });
+              // Note: The parent component should handle the actual plan reordering
+              // if the user chooses to apply it to the plan.
             }}
           />
         </CardHeader>

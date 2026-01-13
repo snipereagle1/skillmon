@@ -4,6 +4,21 @@ pub mod simulation;
 
 use serde::{Deserialize, Serialize};
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+pub struct Attributes {
+    pub charisma: i64,
+    pub intelligence: i64,
+    pub memory: i64,
+    pub perception: i64,
+    pub willpower: i64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PlannedRemap {
+    pub entry_index: usize, // Index in the skill plan entries
+    pub attributes: Attributes,
+}
+
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SkillmonPlanEntry {
     pub skill_type_id: i64,
