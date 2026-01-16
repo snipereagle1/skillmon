@@ -228,6 +228,7 @@ pub async fn optimize_plan_reordering(
             if let Some(s) = attr.secondary_attribute {
                 used_attributes.insert(s);
             }
+            current_sim_sp.insert(entry.skill_type_id, target_sp);
         }
 
         entry_demands.push(EntryDemand {
@@ -235,8 +236,6 @@ pub async fn optimize_plan_reordering(
             secondary: attr.secondary_attribute,
             sp_to_train,
         });
-
-        current_sim_sp.insert(entry.skill_type_id, target_sp);
     }
 
     // Precompute distributions once

@@ -149,6 +149,7 @@ pub fn calculate_sp_for_level(rank: i64, level: i32) -> i64 {
     }
     let base: f64 = 2.0;
     let exponent = 2.5 * (level as f64 - 1.0);
-    let sp = base.powf(exponent) * 250.0 * rank as f64;
-    sp as i64
+    // Ceiling the base SP before multiplying by rank matches EVE's behavior
+    let base_sp = (base.powf(exponent) * 250.0).ceil();
+    (base_sp * rank as f64) as i64
 }
