@@ -593,3 +593,245 @@ fn get_effective_attr_value(
         _ => BASE,
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::testdata::{fixtures, TestDb};
+    use std::collections::HashMap;
+
+    #[tokio::test]
+    async fn test_optimize_plan_attributes_basic() {
+        let db = TestDb::new_with_sde().await.unwrap();
+        let plan_id = fixtures::create_skill_plan(&db.pool, "Test Plan").await;
+
+        // Add some skills (Spaceship Command I, II)
+        fixtures::add_plan_entry(&db.pool, plan_id, 3327, 1, "Planned").await;
+        fixtures::add_plan_entry(&db.pool, plan_id, 3327, 2, "Planned").await;
+
+        let entries = crate::db::skill_plans::get_plan_entries(&db.pool, plan_id)
+            .await
+            .unwrap();
+        let implants = Attributes::default();
+        let baseline = Attributes::default();
+        let current_sp = HashMap::new();
+
+        let result =
+            optimize_plan_attributes(&db.pool, &entries, &implants, &baseline, 0, &current_sp)
+                .await
+                .unwrap();
+
+        assert!(result.optimized_seconds <= result.original_seconds);
+        // Spaceship Command is Per/Wil. Optimal remap should favor Per/Wil.
+        assert!(
+            result.recommended_remap.attributes.perception > 0
+                || result.recommended_remap.attributes.willpower > 0
+        );
+        assert!(result.optimized_seconds > 0);
+        assert!(result.original_seconds > 0);
+    }
+
+    #[tokio::test]
+    async fn test_optimize_plan_reordering_with_remaps() {
+        let db = TestDb::new_with_sde().await.unwrap();
+        let plan_id = fixtures::create_skill_plan(&db.pool, "Test Reorder Remaps").await;
+
+        // Add 3 independent skills with different attribute clusters
+        // Navigation (Int/Per)
+        fixtures::add_plan_entry(&db.pool, plan_id, 3449, 1, "Planned").await;
+        // Science (Int/Mem)
+        fixtures::add_plan_entry(&db.pool, plan_id, 3402, 1, "Planned").await;
+        // Spaceship Command (Per/Wil)
+        fixtures::add_plan_entry(&db.pool, plan_id, 3327, 1, "Planned").await;
+
+        let implants = Attributes::default();
+        let baseline = Attributes::default();
+        let current_sp = HashMap::new();
+
+        let result = optimize_plan_reordering(
+            &db.pool,
+            plan_id,
+            &implants,
+            &baseline,
+            0,
+            &current_sp,
+            2, // max 2 remaps
+        )
+        .await
+        .unwrap();
+
+        assert_eq!(result.optimized_entries.len(), 3);
+        assert!(result.optimized_seconds <= result.original_seconds);
+    }
+
+    #[tokio::test]
+    async fn test_optimize_real_character_plan() {
+        let db = TestDb::new_with_sde().await.unwrap();
+
+        // 1. Load Skill Plan
+        let plan_path = format!(
+            "{}/src/testdata/test.skillmon.json",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let plan_id = fixtures::load_plan_from_json(&db.pool, &plan_path).await;
+
+        // 2. Load Attributes
+        let attr_path = format!(
+            "{}/src/testdata/character_2117051965_attributes.json",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let attr_json = std::fs::read_to_string(attr_path).unwrap();
+        let attr_raw: Attributes = serde_json::from_str(&attr_json).unwrap();
+
+        // Normalize attributes: character has +4 implants, remap is the rest above 17+4
+        let implants = Attributes {
+            intelligence: 4,
+            memory: 4,
+            perception: 4,
+            willpower: 4,
+            charisma: 4,
+        };
+        let baseline = Attributes {
+            intelligence: attr_raw.intelligence - 17 - implants.intelligence,
+            memory: attr_raw.memory - 17 - implants.memory,
+            perception: attr_raw.perception - 17 - implants.perception,
+            willpower: attr_raw.willpower - 17 - implants.willpower,
+            charisma: attr_raw.charisma - 17 - implants.charisma,
+        };
+
+        // 3. Load Skills (SP Map)
+        let skills_path = format!(
+            "{}/src/testdata/character_2117051965_skills.json",
+            env!("CARGO_MANIFEST_DIR")
+        );
+        let skills_json = std::fs::read_to_string(skills_path).unwrap();
+        #[derive(serde::Deserialize)]
+        struct JsonSkill {
+            skill_id: i64,
+            skillpoints_in_skill: i64,
+        }
+        let skills: Vec<JsonSkill> = serde_json::from_str(&skills_json).unwrap();
+        let mut current_sp = HashMap::new();
+        for s in skills {
+            current_sp.insert(s.skill_id, s.skillpoints_in_skill);
+        }
+
+        let result =
+            optimize_plan_reordering(&db.pool, plan_id, &implants, &baseline, 0, &current_sp, 1)
+                .await
+                .unwrap();
+
+        // Calculate total SP trained
+        let entries = db::skill_plans::get_plan_entries(&db.pool, plan_id)
+            .await
+            .unwrap();
+        let skill_type_ids: Vec<i64> = entries.iter().map(|e| e.skill_type_id).collect();
+        let skill_attributes = utils::get_skill_attributes(&db.pool, &skill_type_ids)
+            .await
+            .unwrap();
+        let skill_names = utils::get_skill_names(&db.pool, &skill_type_ids)
+            .await
+            .unwrap();
+
+        println!("Plan: Blops + Repro");
+
+        println!("\nOptimized Training Schedule:");
+        println!(
+            "{:<30} {:<5} {:<15} {:<12} {:<10} {:<15}",
+            "Skill Name", "Lvl", "Training Time", "SP/Hour", "SP Needed", "Attributes"
+        );
+        println!("{}", "-".repeat(100));
+
+        let mut total_sp_to_train = 0;
+        let mut temp_sp_map = current_sp.clone();
+        let mut current_remap = baseline.clone();
+
+        for (idx, entry) in result.optimized_entries.iter().enumerate() {
+            // Check if we need to apply a new remap
+            if let Some(remap) = result
+                .recommended_remaps
+                .iter()
+                .find(|r| r.entry_index == idx)
+            {
+                current_remap = remap.attributes.clone();
+                println!(
+                    "--- REMAP: Int:{}, Mem:{}, Per:{}, Wil:{}, Cha:{} ---",
+                    current_remap.intelligence,
+                    current_remap.memory,
+                    current_remap.perception,
+                    current_remap.willpower,
+                    current_remap.charisma
+                );
+            }
+
+            let attr = skill_attributes.get(&entry.skill_type_id).unwrap();
+            let rank = attr.rank.unwrap_or(1);
+            let name = skill_names
+                .get(&entry.skill_type_id)
+                .cloned()
+                .unwrap_or_else(|| "Unknown Skill".to_string());
+
+            let target_sp = utils::calculate_sp_for_level(rank, entry.planned_level as i32);
+            let current = *temp_sp_map.get(&entry.skill_type_id).unwrap_or(&0);
+
+            if target_sp > current {
+                let needed = target_sp - current;
+                total_sp_to_train += needed;
+
+                let p_val =
+                    get_effective_attr_value(&current_remap, &implants, 0, attr.primary_attribute);
+                let s_val = get_effective_attr_value(
+                    &current_remap,
+                    &implants,
+                    0,
+                    attr.secondary_attribute,
+                );
+                let sp_per_min = utils::calculate_sp_per_minute(p_val, s_val);
+                let sp_per_hour = sp_per_min * 60.0;
+                let seconds = (needed as f64 / sp_per_min) * 60.0;
+
+                let days = (seconds / 86400.0).floor();
+                let hours = ((seconds % 86400.0) / 3600.0).floor();
+                let mins = ((seconds % 3600.0) / 60.0).floor();
+
+                let time_str = format!("{:>2.0}d {:>2.0}h {:>2.0}m", days, hours, mins);
+                let attr_str = format!(
+                    "{:?}/{:?}",
+                    attr.primary_attribute, attr.secondary_attribute
+                );
+
+                println!(
+                    "{:<30} {:<5} {:<15} {:>12.1} {:>10} {:<15}",
+                    name, entry.planned_level, time_str, sp_per_hour, needed, attr_str
+                );
+
+                temp_sp_map.insert(entry.skill_type_id, target_sp);
+            }
+        }
+
+        println!("\nTotal SP to Train: {}", total_sp_to_train);
+        println!(
+            "Original Time: {:.2} days",
+            result.original_seconds as f64 / 86400.0
+        );
+        println!(
+            "Optimized Time: {:.2} days",
+            result.optimized_seconds as f64 / 86400.0
+        );
+        println!(
+            "Savings: {:.2} days",
+            (result.original_seconds - result.optimized_seconds) as f64 / 86400.0
+        );
+        println!("Remaps: {}", result.recommended_remaps.len());
+        for (i, remap) in result.recommended_remaps.iter().enumerate() {
+            println!(
+                "  Remap {}: at entry {}, attributes: {:?}",
+                i + 1,
+                remap.entry_index,
+                remap.attributes
+            );
+        }
+
+        assert!(result.optimized_seconds <= result.original_seconds);
+    }
+}

@@ -32,3 +32,4 @@ src/generated/
 src/routeTree.gen.ts
 sde/*.jsonl
 eve-online-static-data-*.zip
+src-tauri/tests/fixtures/sde_cache/

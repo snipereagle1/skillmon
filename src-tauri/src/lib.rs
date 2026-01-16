@@ -18,6 +18,9 @@ mod skill_queue;
 mod tray;
 mod utils;
 
+#[cfg(test)]
+pub mod testdata;
+
 pub use commands::auth::AuthStateMap;
 pub use notifications::checkers::skill_queue_low::NOTIFICATION_TYPE_SKILL_QUEUE_LOW;
 

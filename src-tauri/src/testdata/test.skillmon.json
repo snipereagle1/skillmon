@@ -1,0 +1,536 @@
+{
+  "version": 1,
+  "name": "Blops + Repro",
+  "description": null,
+  "auto_prerequisites": true,
+  "entries": [
+    {
+      "skill_type_id": 3327,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3331,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3327,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3327,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3327,
+      "level": 4,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3331,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3331,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 33091,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 33091,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 33091,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3335,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3335,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3335,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 33095,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 33095,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 33095,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3339,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3339,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3339,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3339,
+      "level": 4,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3339,
+      "level": 5,
+      "entry_type": "Planned",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3449,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3402,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3426,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3426,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3426,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3426,
+      "level": 4,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 11579,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 11579,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 11579,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 11579,
+      "level": 4,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3327,
+      "level": 5,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3455,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3455,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3455,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3455,
+      "level": 4,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3455,
+      "level": 5,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3402,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3402,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3402,
+      "level": 4,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3402,
+      "level": 5,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3449,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3449,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3449,
+      "level": 4,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3449,
+      "level": 5,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3456,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3456,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3456,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3456,
+      "level": 4,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3456,
+      "level": 5,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 21611,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 21611,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 21611,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 21611,
+      "level": 4,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 28656,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 28656,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 28656,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 28656,
+      "level": 4,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 28656,
+      "level": 5,
+      "entry_type": "Planned",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3409,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3409,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3409,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3409,
+      "level": 4,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3380,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3385,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3385,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3385,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3385,
+      "level": 4,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3389,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3389,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3389,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3389,
+      "level": 4,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 3389,
+      "level": 5,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 90040,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 90040,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 90040,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 90040,
+      "level": 4,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 90040,
+      "level": 5,
+      "entry_type": "Planned",
+      "notes": null
+    },
+    {
+      "skill_type_id": 46156,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 46156,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 46156,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 46156,
+      "level": 4,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 46156,
+      "level": 5,
+      "entry_type": "Planned",
+      "notes": null
+    },
+    {
+      "skill_type_id": 60381,
+      "level": 1,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 60381,
+      "level": 2,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 60381,
+      "level": 3,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 60381,
+      "level": 4,
+      "entry_type": "Prerequisite",
+      "notes": null
+    },
+    {
+      "skill_type_id": 60381,
+      "level": 5,
+      "entry_type": "Planned",
+      "notes": null
+    }
+  ]
+}
