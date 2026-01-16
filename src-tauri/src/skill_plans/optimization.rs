@@ -52,6 +52,50 @@ pub async fn optimize_plan_reordering(
     // 2. Build DAG
     let (dag, _) = crate::skill_plans::graph::PlanDag::build_from_plan(pool, plan_id).await?;
 
+    // Pre-calculate global optimal attributes for the entire plan to use as a sorting heuristic
+    let global_opt = optimize_plan_attributes_internal(
+        pool,
+        &entries,
+        implants,
+        baseline_remap,
+        accelerator_bonus,
+        current_sp_map,
+        &skill_attributes,
+    ).await?;
+    let ideal_attr = global_opt.recommended_remap.attributes;
+
+    // Pre-calculate cumulative SP weight for each node (node SP + dependent nodes SP)
+    let mut node_weights: HashMap<crate::skill_plans::graph::PlanNode, i64> = HashMap::new();
+    fn calculate_weight(
+        node: crate::skill_plans::graph::PlanNode,
+        dag: &crate::skill_plans::graph::PlanDag,
+        skill_attributes: &HashMap<i64, crate::utils::SkillAttributes>,
+        current_sp_map: &HashMap<i64, i64>,
+        memo: &mut HashMap<crate::skill_plans::graph::PlanNode, i64>,
+    ) -> i64 {
+        if let Some(&w) = memo.get(&node) {
+            return w;
+        }
+        let attr = skill_attributes.get(&node.skill_type_id).unwrap();
+        let rank = attr.rank.unwrap_or(1);
+        let total_sp = utils::calculate_sp_for_level(rank, node.level as i32);
+        let current_sp = *current_sp_map.get(&node.skill_type_id).unwrap_or(&0);
+        let weight = (total_sp - current_sp).max(0);
+        let mut total_weight = weight;
+        if let Some(deps) = dag.dependents.get(&node) {
+            for &dep in deps {
+                total_weight += calculate_weight(dep, dag, skill_attributes, current_sp_map, memo);
+            }
+        }
+        memo.insert(node, total_weight);
+        total_weight
+    }
+    let mut memo = HashMap::new();
+    for node in &dag.nodes {
+        calculate_weight(*node, &dag, &skill_attributes, current_sp_map, &mut memo);
+    }
+    node_weights = memo;
+
     // 3. Greedy topological sort by attribute clusters
     let mut optimized_entries = Vec::new();
     let mut in_degree: HashMap<crate::skill_plans::graph::PlanNode, usize> = HashMap::new();
@@ -72,75 +116,101 @@ pub async fn optimize_plan_reordering(
     let mut current_sim_sp_map = current_sp_map.clone();
 
     while !available.is_empty() {
-        // Try to pick from current cluster
+        // 1. Try to pick from current cluster
         let picked_node = if let Some(cluster) = current_cluster {
             available
                 .iter()
-                .find(|n| {
+                .filter(|n| {
                     let attr = skill_attributes.get(&n.skill_type_id).unwrap();
                     (attr.primary_attribute, attr.secondary_attribute) == cluster
                 })
+                .max_by_key(|n| node_weights.get(n).unwrap_or(&0))
                 .copied()
         } else {
             None
         };
 
         let node = picked_node.unwrap_or_else(|| {
-            // Pick a new cluster - prioritize those that train fastest with baseline_remap
-            let mut cluster_demands: HashMap<(Option<i64>, Option<i64>), i64> = HashMap::new();
-            for n in &available {
-                let attr = skill_attributes.get(&n.skill_type_id).unwrap();
-                let key = (attr.primary_attribute, attr.secondary_attribute);
+            // 2. Pick a new cluster - prioritize those that are "Baseline-heavy" vs "Ideal-heavy"
+            let available_clusters: std::collections::HashSet<(Option<i64>, Option<i64>)> = available
+                .iter()
+                .map(|n| {
+                    let attr = skill_attributes.get(&n.skill_type_id).unwrap();
+                    (attr.primary_attribute, attr.secondary_attribute)
+                })
+                .collect();
 
-                let rank = attr.rank.unwrap_or(1);
-                let total_sp = utils::calculate_sp_for_level(rank, n.level as i32);
-                let current_sp = *current_sim_sp_map.get(&n.skill_type_id).unwrap_or(&0);
-                let sp_remaining = (total_sp - current_sp).max(0);
-
-                *cluster_demands.entry(key).or_insert(0) += sp_remaining;
-            }
-
-            let best_cluster = cluster_demands
+            let best_cluster = available_clusters
                 .into_iter()
-                .max_by(|&((p1, s1), demand1), &((p2, s2), demand2)| {
-                    let p1_val =
-                        get_effective_attr_value(baseline_remap, implants, accelerator_bonus, p1);
-                    let s1_val =
-                        get_effective_attr_value(baseline_remap, implants, accelerator_bonus, s1);
-                    let sp_per_min1 = utils::calculate_sp_per_minute(p1_val, s1_val);
+                .max_by(|&(p1, s1), &(p2, s2)| {
+                    let p1_base = get_effective_attr_value(baseline_remap, implants, accelerator_bonus, p1);
+                    let s1_base = get_effective_attr_value(baseline_remap, implants, accelerator_bonus, s1);
+                    let speed1_base = utils::calculate_sp_per_minute(p1_base, s1_base);
+                    let p1_ideal = get_effective_attr_value(&ideal_attr, implants, accelerator_bonus, p1);
+                    let s1_ideal = get_effective_attr_value(&ideal_attr, implants, accelerator_bonus, s1);
+                    let speed1_ideal = utils::calculate_sp_per_minute(p1_ideal, s1_ideal);
 
-                    let p2_val =
-                        get_effective_attr_value(baseline_remap, implants, accelerator_bonus, p2);
-                    let s2_val =
-                        get_effective_attr_value(baseline_remap, implants, accelerator_bonus, s2);
-                    let sp_per_min2 = utils::calculate_sp_per_minute(p2_val, s2_val);
+                    let p2_base = get_effective_attr_value(baseline_remap, implants, accelerator_bonus, p2);
+                    let s2_base = get_effective_attr_value(baseline_remap, implants, accelerator_bonus, s2);
+                    let speed2_base = utils::calculate_sp_per_minute(p2_base, s2_base);
+                    let p2_ideal = get_effective_attr_value(&ideal_attr, implants, accelerator_bonus, p2);
+                    let s2_ideal = get_effective_attr_value(&ideal_attr, implants, accelerator_bonus, s2);
+                    let speed2_ideal = utils::calculate_sp_per_minute(p2_ideal, s2_ideal);
 
-                    // Prioritize training speed with baseline_remap, then demand
-                    let score1 = (sp_per_min1 * 1000.0) as i64 + (demand1 / 1000000);
-                    let score2 = (sp_per_min2 * 1000.0) as i64 + (demand2 / 1000000);
-                    score1.cmp(&score2)
+                    // Ratio of Baseline Speed to Ideal Speed. 
+                    // High ratio means "train this now while we are on baseline".
+                    // Low ratio means "wait until we remap to ideal".
+                    let ratio1 = speed1_base / speed1_ideal;
+                    let ratio2 = speed2_base / speed2_ideal;
+
+                    ratio1.partial_cmp(&ratio2).unwrap_or(std::cmp::Ordering::Equal)
                 })
                 .map(|(c, _)| c);
+
             current_cluster = best_cluster;
 
-            // Pick the first available node in the best cluster
             *available
                 .iter()
-                .find(|n| {
+                .filter(|n| {
                     let attr = skill_attributes.get(&n.skill_type_id).unwrap();
                     (attr.primary_attribute, attr.secondary_attribute) == best_cluster.unwrap()
                 })
+                .max_by_key(|n| node_weights.get(n).unwrap_or(&0))
                 .unwrap()
         });
 
+        // #region agent log
+        {
+            use std::io::Write;
+            if let Ok(mut file) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("/home/mckernanin/projects/eve/skillmon/.cursor/debug.log")
+            {
+                let log = serde_json::json!({
+                    "sessionId": "debug-session",
+                    "timestamp": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis(),
+                    "location": "optimization.rs:163",
+                    "hypothesisId": "H12",
+                    "message": "Greedy sort picked node with Ratio Scoring",
+                    "data": {
+                        "skill_id": node.skill_type_id,
+                        "level": node.level,
+                        "cluster": (skill_attributes.get(&node.skill_type_id).unwrap().primary_attribute, skill_attributes.get(&node.skill_type_id).unwrap().secondary_attribute)
+                    }
+                });
+                let _ = writeln!(file, "{}", log.to_string());
+            }
+        }
+        // #endregion
+
         available.remove(&node);
 
-        // Update simulated SP map for future demand calculations in this sort
+        // Update simulated SP
         let attr = skill_attributes.get(&node.skill_type_id).unwrap();
         let rank = attr.rank.unwrap_or(1);
         let total_sp = utils::calculate_sp_for_level(rank, node.level as i32);
-        let entry_sp = current_sim_sp_map.entry(node.skill_type_id).or_insert(0);
-        *entry_sp = (*entry_sp).max(total_sp);
+        current_sim_sp_map.insert(node.skill_type_id, total_sp);
 
         // Find the original entry for this node
         let original_entry = entries
@@ -194,6 +264,39 @@ pub async fn optimize_plan_reordering(
         }
         clusters.push((start_idx, current_group));
     }
+
+    // #region agent log
+    {
+        use std::io::Write;
+        if let Ok(mut file) = std::fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open("/home/mckernanin/projects/eve/skillmon/.cursor/debug.log")
+        {
+            let cluster_summaries: Vec<_> = clusters.iter().map(|(start, entries)| {
+                let first_entry = &entries[0];
+                let attr = skill_attributes.get(&first_entry.skill_type_id).unwrap();
+                serde_json::json!({
+                    "start_idx": start,
+                    "count": entries.len(),
+                    "attributes": (attr.primary_attribute, attr.secondary_attribute)
+                })
+            }).collect();
+            let log = serde_json::json!({
+                "sessionId": "debug-session",
+                "timestamp": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis(),
+                "location": "optimization.rs:198",
+                "hypothesisId": "H1",
+                "message": "Clusters grouped",
+                "data": {
+                    "num_clusters": clusters.len(),
+                    "clusters": cluster_summaries
+                }
+            });
+            let _ = writeln!(file, "{}", log.to_string());
+        }
+    }
+    // #endregion
 
     let num_clusters = clusters.len();
     if num_clusters == 0 {
@@ -290,6 +393,29 @@ pub async fn optimize_plan_reordering(
             baseline_cluster_times.push(time);
         }
 
+        // #region agent log
+        {
+            use std::io::Write;
+            if let Ok(mut file) = std::fs::OpenOptions::new()
+                .create(true)
+                .append(true)
+                .open("/home/mckernanin/projects/eve/skillmon/.cursor/debug.log")
+            {
+                let log = serde_json::json!({
+                    "sessionId": "debug-session",
+                    "timestamp": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis(),
+                    "location": "optimization.rs:293",
+                    "hypothesisId": "H3",
+                    "message": "Baseline cluster times calculated",
+                    "data": {
+                        "baseline_cluster_times_days": baseline_cluster_times.iter().map(|t| t / 86400.0).collect::<Vec<_>>()
+                    }
+                });
+                let _ = writeln!(file, "{}", log.to_string());
+            }
+        }
+        // #endregion
+
         let m_limit = max_remaps.max(0) as usize;
 
         // dp_remap[m][i] = min time to train clusters i..num_clusters using up to m remaps.
@@ -339,6 +465,34 @@ pub async fn optimize_plan_reordering(
         for k in 0..num_clusters {
             let baseline_time: f64 = baseline_cluster_times[0..k].iter().sum();
             let (remap_time, _, _) = &dp_remap[m_limit][k];
+            
+            // #region agent log
+            {
+                use std::io::Write;
+                if let Ok(mut file) = std::fs::OpenOptions::new()
+                    .create(true)
+                    .append(true)
+                    .open("/home/mckernanin/projects/eve/skillmon/.cursor/debug.log")
+                {
+                    let log = serde_json::json!({
+                        "sessionId": "debug-session",
+                        "timestamp": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis(),
+                        "location": "optimization.rs:343",
+                        "hypothesisId": "H2",
+                        "message": "DP evaluation at k",
+                        "data": {
+                            "k": k,
+                            "baseline_time_days": baseline_time / 86400.0,
+                            "remap_time_days": remap_time / 86400.0,
+                            "total_time_days": (baseline_time + remap_time) / 86400.0,
+                            "remap_attrs": if *remap_time == f64::MAX { None } else { Some(dp_remap[m_limit][k].2.clone()) }
+                        }
+                    });
+                    let _ = writeln!(file, "{}", log.to_string());
+                }
+            }
+            // #endregion
+
             if *remap_time != f64::MAX && baseline_time + remap_time < best_total_time {
                 best_total_time = baseline_time + remap_time;
                 best_k = k;
