@@ -35,6 +35,8 @@ struct EntryDemand {
     sp_to_train: i64,
 }
 
+type AttrPairDemand = HashMap<(Option<i64>, Option<i64>), i64>;
+
 pub async fn optimize_plan_reordering(
     pool: &db::Pool,
     plan_id: i64,
@@ -67,47 +69,48 @@ pub async fn optimize_plan_reordering(
         accelerator_bonus,
         current_sp_map,
         &skill_attributes,
-    ).await?;
+    )
+    .await?;
     let ideal_attr = global_opt.recommended_remap.attributes;
+
+    struct SubtreeScoreContext<'a> {
+        dag: &'a crate::skill_plans::graph::PlanDag,
+        skill_attributes: &'a HashMap<i64, crate::utils::SkillAttributes>,
+        current_sp_map: &'a HashMap<i64, i64>,
+        baseline_remap: &'a Attributes,
+        ideal_attr: &'a Attributes,
+        implants: &'a Attributes,
+        accelerator_bonus: i64,
+    }
 
     // Pre-calculate cumulative ratio-weighted SP for each node (subtree average ratio)
     fn calculate_subtree_score(
         node: crate::skill_plans::graph::PlanNode,
-        dag: &crate::skill_plans::graph::PlanDag,
-        skill_attributes: &HashMap<i64, crate::utils::SkillAttributes>,
-        current_sp_map: &HashMap<i64, i64>,
-        baseline_remap: &Attributes,
-        ideal_attr: &Attributes,
-        implants: &Attributes,
-        accelerator_bonus: i64,
+        ctx: &SubtreeScoreContext,
         memo: &mut HashMap<crate::skill_plans::graph::PlanNode, (f64, i64)>,
     ) -> (f64, i64) {
         if let Some(&w) = memo.get(&node) {
             return w;
         }
-        let attr = skill_attributes.get(&node.skill_type_id).unwrap();
+        let attr = ctx.skill_attributes.get(&node.skill_type_id).unwrap();
         let rank = attr.rank.unwrap_or(1);
         let total_sp = utils::calculate_sp_for_level(rank, node.level as i32);
-        let current_sp = *current_sp_map.get(&node.skill_type_id).unwrap_or(&0);
+        let current_sp = *ctx.current_sp_map.get(&node.skill_type_id).unwrap_or(&0);
         let weight = (total_sp - current_sp).max(0);
 
-        let ratio = calculate_ratio(attr, baseline_remap, ideal_attr, implants, accelerator_bonus);
+        let ratio = calculate_ratio(
+            attr,
+            ctx.baseline_remap,
+            ctx.ideal_attr,
+            ctx.implants,
+            ctx.accelerator_bonus,
+        );
         let mut total_weighted_sp = ratio * weight as f64;
         let mut total_sp_needed = weight;
 
-        if let Some(deps) = dag.dependents.get(&node) {
+        if let Some(deps) = ctx.dag.dependents.get(&node) {
             for &dep in deps {
-                let (w, sp) = calculate_subtree_score(
-                    dep,
-                    dag,
-                    skill_attributes,
-                    current_sp_map,
-                    baseline_remap,
-                    ideal_attr,
-                    implants,
-                    accelerator_bonus,
-                    memo,
-                );
+                let (w, sp) = calculate_subtree_score(dep, ctx, memo);
                 total_weighted_sp += w;
                 total_sp_needed += sp;
             }
@@ -115,19 +118,20 @@ pub async fn optimize_plan_reordering(
         memo.insert(node, (total_weighted_sp, total_sp_needed));
         (total_weighted_sp, total_sp_needed)
     }
+
+    let ctx = SubtreeScoreContext {
+        dag: &dag,
+        skill_attributes: &skill_attributes,
+        current_sp_map,
+        baseline_remap,
+        ideal_attr: &ideal_attr,
+        implants,
+        accelerator_bonus,
+    };
+
     let mut memo = HashMap::new();
     for node in &dag.nodes {
-        calculate_subtree_score(
-            *node,
-            &dag,
-            &skill_attributes,
-            current_sp_map,
-            baseline_remap,
-            &ideal_attr,
-            implants,
-            accelerator_bonus,
-            &mut memo,
-        );
+        calculate_subtree_score(*node, &ctx, &mut memo);
     }
     let subtree_scores = memo;
 
@@ -243,8 +247,7 @@ pub async fn optimize_plan_reordering(
 
     // Precompute cumulative demands for fast segment cost calculation
     // Using a simple Vec of Maps. Since attribute pairs are few, this is efficient enough.
-    let mut cumulative_demands: Vec<HashMap<(Option<i64>, Option<i64>), i64>> =
-        Vec::with_capacity(num_entries + 1);
+    let mut cumulative_demands: Vec<AttrPairDemand> = Vec::with_capacity(num_entries + 1);
     let mut current_demand = HashMap::new();
     cumulative_demands.push(current_demand.clone());
     for demand in &entry_demands {
@@ -361,9 +364,13 @@ pub async fn optimize_plan_reordering(
             // Option 2: Remap at i for segment i..j, then use m-1 remaps for j..num_entries
             // To speed up, we could only consider j that are "meaningful" (e.g. cluster boundaries)
             // but the plan says "entry-level granularity".
-            for j in i + 1..num_entries {
+            for (j, (t_rest, _, _)) in dp_remap[m - 1]
+                .iter()
+                .enumerate()
+                .take(num_entries)
+                .skip(i + 1)
+            {
                 if let Some((t_seg, attr_seg)) = get_segment_cost(i, j) {
-                    let (t_rest, _, _) = &dp_remap[m - 1][j];
                     if *t_rest != f64::MAX && t_seg + t_rest < best.0 {
                         best = (t_seg + t_rest, j, attr_seg.clone());
                     }
