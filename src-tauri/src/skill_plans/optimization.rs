@@ -29,6 +29,12 @@ pub struct ReorderOptimizationResult {
     pub optimized_seconds: i64,
 }
 
+struct EntryDemand {
+    primary: Option<i64>,
+    secondary: Option<i64>,
+    sp_to_train: i64,
+}
+
 pub async fn optimize_plan_reordering(
     pool: &db::Pool,
     plan_id: i64,
@@ -64,15 +70,18 @@ pub async fn optimize_plan_reordering(
     ).await?;
     let ideal_attr = global_opt.recommended_remap.attributes;
 
-    // Pre-calculate cumulative SP weight for each node (node SP + dependent nodes SP)
-    let mut node_weights: HashMap<crate::skill_plans::graph::PlanNode, i64> = HashMap::new();
-    fn calculate_weight(
+    // Pre-calculate cumulative ratio-weighted SP for each node (subtree average ratio)
+    fn calculate_subtree_score(
         node: crate::skill_plans::graph::PlanNode,
         dag: &crate::skill_plans::graph::PlanDag,
         skill_attributes: &HashMap<i64, crate::utils::SkillAttributes>,
         current_sp_map: &HashMap<i64, i64>,
-        memo: &mut HashMap<crate::skill_plans::graph::PlanNode, i64>,
-    ) -> i64 {
+        baseline_remap: &Attributes,
+        ideal_attr: &Attributes,
+        implants: &Attributes,
+        accelerator_bonus: i64,
+        memo: &mut HashMap<crate::skill_plans::graph::PlanNode, (f64, i64)>,
+    ) -> (f64, i64) {
         if let Some(&w) = memo.get(&node) {
             return w;
         }
@@ -81,22 +90,48 @@ pub async fn optimize_plan_reordering(
         let total_sp = utils::calculate_sp_for_level(rank, node.level as i32);
         let current_sp = *current_sp_map.get(&node.skill_type_id).unwrap_or(&0);
         let weight = (total_sp - current_sp).max(0);
-        let mut total_weight = weight;
+
+        let ratio = calculate_ratio(attr, baseline_remap, ideal_attr, implants, accelerator_bonus);
+        let mut total_weighted_sp = ratio * weight as f64;
+        let mut total_sp_needed = weight;
+
         if let Some(deps) = dag.dependents.get(&node) {
             for &dep in deps {
-                total_weight += calculate_weight(dep, dag, skill_attributes, current_sp_map, memo);
+                let (w, sp) = calculate_subtree_score(
+                    dep,
+                    dag,
+                    skill_attributes,
+                    current_sp_map,
+                    baseline_remap,
+                    ideal_attr,
+                    implants,
+                    accelerator_bonus,
+                    memo,
+                );
+                total_weighted_sp += w;
+                total_sp_needed += sp;
             }
         }
-        memo.insert(node, total_weight);
-        total_weight
+        memo.insert(node, (total_weighted_sp, total_sp_needed));
+        (total_weighted_sp, total_sp_needed)
     }
     let mut memo = HashMap::new();
     for node in &dag.nodes {
-        calculate_weight(*node, &dag, &skill_attributes, current_sp_map, &mut memo);
+        calculate_subtree_score(
+            *node,
+            &dag,
+            &skill_attributes,
+            current_sp_map,
+            baseline_remap,
+            &ideal_attr,
+            implants,
+            accelerator_bonus,
+            &mut memo,
+        );
     }
-    node_weights = memo;
+    let subtree_scores = memo;
 
-    // 3. Greedy topological sort by attribute clusters
+    // 3. Greedy topological sort by subtree ratio score
     let mut optimized_entries = Vec::new();
     let mut in_degree: HashMap<crate::skill_plans::graph::PlanNode, usize> = HashMap::new();
     for node in &dag.nodes {
@@ -112,97 +147,24 @@ pub async fn optimize_plan_reordering(
         .map(|(&node, _)| node)
         .collect();
 
-    let mut current_cluster: Option<(Option<i64>, Option<i64>)> = None;
     let mut current_sim_sp_map = current_sp_map.clone();
 
     while !available.is_empty() {
-        // 1. Try to pick from current cluster
-        let picked_node = if let Some(cluster) = current_cluster {
-            available
-                .iter()
-                .filter(|n| {
-                    let attr = skill_attributes.get(&n.skill_type_id).unwrap();
-                    (attr.primary_attribute, attr.secondary_attribute) == cluster
-                })
-                .max_by_key(|n| node_weights.get(n).unwrap_or(&0))
-                .copied()
-        } else {
-            None
-        };
+        // Pick the available node with the highest subtree score (weighted average ratio)
+        let node = *available
+            .iter()
+            .max_by(|a, b| {
+                let (ws_a, sp_a) = subtree_scores.get(a).unwrap_or(&(0.0, 0));
+                let (ws_b, sp_b) = subtree_scores.get(b).unwrap_or(&(0.0, 0));
 
-        let node = picked_node.unwrap_or_else(|| {
-            // 2. Pick a new cluster - prioritize those that are "Baseline-heavy" vs "Ideal-heavy"
-            let available_clusters: std::collections::HashSet<(Option<i64>, Option<i64>)> = available
-                .iter()
-                .map(|n| {
-                    let attr = skill_attributes.get(&n.skill_type_id).unwrap();
-                    (attr.primary_attribute, attr.secondary_attribute)
-                })
-                .collect();
+                let score_a = if *sp_a > 0 { ws_a / *sp_a as f64 } else { 0.0 };
+                let score_b = if *sp_b > 0 { ws_b / *sp_b as f64 } else { 0.0 };
 
-            let best_cluster = available_clusters
-                .into_iter()
-                .max_by(|&(p1, s1), &(p2, s2)| {
-                    let p1_base = get_effective_attr_value(baseline_remap, implants, accelerator_bonus, p1);
-                    let s1_base = get_effective_attr_value(baseline_remap, implants, accelerator_bonus, s1);
-                    let speed1_base = utils::calculate_sp_per_minute(p1_base, s1_base);
-                    let p1_ideal = get_effective_attr_value(&ideal_attr, implants, accelerator_bonus, p1);
-                    let s1_ideal = get_effective_attr_value(&ideal_attr, implants, accelerator_bonus, s1);
-                    let speed1_ideal = utils::calculate_sp_per_minute(p1_ideal, s1_ideal);
-
-                    let p2_base = get_effective_attr_value(baseline_remap, implants, accelerator_bonus, p2);
-                    let s2_base = get_effective_attr_value(baseline_remap, implants, accelerator_bonus, s2);
-                    let speed2_base = utils::calculate_sp_per_minute(p2_base, s2_base);
-                    let p2_ideal = get_effective_attr_value(&ideal_attr, implants, accelerator_bonus, p2);
-                    let s2_ideal = get_effective_attr_value(&ideal_attr, implants, accelerator_bonus, s2);
-                    let speed2_ideal = utils::calculate_sp_per_minute(p2_ideal, s2_ideal);
-
-                    // Ratio of Baseline Speed to Ideal Speed. 
-                    // High ratio means "train this now while we are on baseline".
-                    // Low ratio means "wait until we remap to ideal".
-                    let ratio1 = speed1_base / speed1_ideal;
-                    let ratio2 = speed2_base / speed2_ideal;
-
-                    ratio1.partial_cmp(&ratio2).unwrap_or(std::cmp::Ordering::Equal)
-                })
-                .map(|(c, _)| c);
-
-            current_cluster = best_cluster;
-
-            *available
-                .iter()
-                .filter(|n| {
-                    let attr = skill_attributes.get(&n.skill_type_id).unwrap();
-                    (attr.primary_attribute, attr.secondary_attribute) == best_cluster.unwrap()
-                })
-                .max_by_key(|n| node_weights.get(n).unwrap_or(&0))
-                .unwrap()
-        });
-
-        // #region agent log
-        {
-            use std::io::Write;
-            if let Ok(mut file) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("/home/mckernanin/projects/eve/skillmon/.cursor/debug.log")
-            {
-                let log = serde_json::json!({
-                    "sessionId": "debug-session",
-                    "timestamp": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis(),
-                    "location": "optimization.rs:163",
-                    "hypothesisId": "H12",
-                    "message": "Greedy sort picked node with Ratio Scoring",
-                    "data": {
-                        "skill_id": node.skill_type_id,
-                        "level": node.level,
-                        "cluster": (skill_attributes.get(&node.skill_type_id).unwrap().primary_attribute, skill_attributes.get(&node.skill_type_id).unwrap().secondary_attribute)
-                    }
-                });
-                let _ = writeln!(file, "{}", log.to_string());
-            }
-        }
-        // #endregion
+                score_a
+                    .partial_cmp(&score_b)
+                    .unwrap_or(std::cmp::Ordering::Equal)
+            })
+            .unwrap();
 
         available.remove(&node);
 
@@ -236,300 +198,232 @@ pub async fn optimize_plan_reordering(
         }
     }
 
-    // 4. Group by cluster and calculate optimal remaps
-    let mut recommended_remaps = Vec::new();
-    let total_optimized_seconds: f64;
-
-    // Group optimized_entries into clusters
-    let mut clusters = Vec::new();
-    if !optimized_entries.is_empty() {
-        let first_attr = skill_attributes
-            .get(&optimized_entries[0].skill_type_id)
-            .unwrap();
-        let mut current_key = (first_attr.primary_attribute, first_attr.secondary_attribute);
-        let mut current_group = Vec::new();
-        let mut start_idx = 0;
-
-        for (idx, entry) in optimized_entries.iter().enumerate() {
-            let attr = skill_attributes.get(&entry.skill_type_id).unwrap();
-            let key = (attr.primary_attribute, attr.secondary_attribute);
-
-            if key != current_key {
-                clusters.push((start_idx, current_group));
-                current_group = Vec::new();
-                current_key = key;
-                start_idx = idx;
-            }
-            current_group.push(entry.clone());
-        }
-        clusters.push((start_idx, current_group));
+    // 4. Calculate optimal remaps at entry-level granularity
+    let num_entries = optimized_entries.len();
+    if num_entries == 0 {
+        return Ok(ReorderOptimizationResult {
+            optimized_entries,
+            recommended_remaps: Vec::new(),
+            original_seconds: 0,
+            optimized_seconds: 0,
+        });
     }
 
-    // #region agent log
-    {
-        use std::io::Write;
-        if let Ok(mut file) = std::fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open("/home/mckernanin/projects/eve/skillmon/.cursor/debug.log")
-        {
-            let cluster_summaries: Vec<_> = clusters.iter().map(|(start, entries)| {
-                let first_entry = &entries[0];
-                let attr = skill_attributes.get(&first_entry.skill_type_id).unwrap();
-                serde_json::json!({
-                    "start_idx": start,
-                    "count": entries.len(),
-                    "attributes": (attr.primary_attribute, attr.secondary_attribute)
-                })
-            }).collect();
-            let log = serde_json::json!({
-                "sessionId": "debug-session",
-                "timestamp": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis(),
-                "location": "optimization.rs:198",
-                "hypothesisId": "H1",
-                "message": "Clusters grouped",
-                "data": {
-                    "num_clusters": clusters.len(),
-                    "clusters": cluster_summaries
-                }
-            });
-            let _ = writeln!(file, "{}", log.to_string());
+    // Precompute attribute pairs and SP to train for each entry
+    let mut entry_demands = Vec::with_capacity(num_entries);
+    let mut current_sim_sp = current_sp_map.clone();
+    let mut used_attributes = std::collections::HashSet::new();
+
+    for entry in &optimized_entries {
+        let attr = skill_attributes.get(&entry.skill_type_id).unwrap();
+        let rank = attr.rank.unwrap_or(1);
+        let target_sp = utils::calculate_sp_for_level(rank, entry.planned_level as i32);
+        let start_sp = *current_sim_sp.get(&entry.skill_type_id).unwrap_or(&0);
+        let sp_to_train = (target_sp - start_sp).max(0);
+
+        if sp_to_train > 0 {
+            if let Some(p) = attr.primary_attribute {
+                used_attributes.insert(p);
+            }
+            if let Some(s) = attr.secondary_attribute {
+                used_attributes.insert(s);
+            }
+        }
+
+        entry_demands.push(EntryDemand {
+            primary: attr.primary_attribute,
+            secondary: attr.secondary_attribute,
+            sp_to_train,
+        });
+
+        current_sim_sp.insert(entry.skill_type_id, target_sp);
+    }
+
+    // Precompute distributions once
+    let all_distributions = generate_distributions(&used_attributes);
+
+    // Precompute cumulative demands for fast segment cost calculation
+    // Using a simple Vec of Maps. Since attribute pairs are few, this is efficient enough.
+    let mut cumulative_demands: Vec<HashMap<(Option<i64>, Option<i64>), i64>> =
+        Vec::with_capacity(num_entries + 1);
+    let mut current_demand = HashMap::new();
+    cumulative_demands.push(current_demand.clone());
+    for demand in &entry_demands {
+        if demand.sp_to_train > 0 {
+            *current_demand
+                .entry((demand.primary, demand.secondary))
+                .or_insert(0) += demand.sp_to_train;
+        }
+        cumulative_demands.push(current_demand.clone());
+    }
+
+    // Precompute baseline times
+    let mut baseline_entry_times = Vec::with_capacity(num_entries);
+    for demand in &entry_demands {
+        if demand.sp_to_train > 0 {
+            let p_val = get_effective_attr_value(
+                baseline_remap,
+                implants,
+                accelerator_bonus,
+                demand.primary,
+            );
+            let s_val = get_effective_attr_value(
+                baseline_remap,
+                implants,
+                accelerator_bonus,
+                demand.secondary,
+            );
+            let sp_per_min = utils::calculate_sp_per_minute(p_val, s_val);
+            if sp_per_min > 0.0 {
+                baseline_entry_times.push((demand.sp_to_train as f64 / sp_per_min) * 60.0);
+            } else {
+                baseline_entry_times.push(0.0);
+            }
+        } else {
+            baseline_entry_times.push(0.0);
         }
     }
-    // #endregion
 
-    let num_clusters = clusters.len();
-    if num_clusters == 0 {
-        total_optimized_seconds = 0.0;
-    } else {
-        // Convert clusters to SkillPlanEntry for calculations
-        let cluster_entries: Vec<Vec<crate::db::skill_plans::SkillPlanEntry>> = clusters
-            .iter()
-            .map(|(_, entries)| {
-                entries
-                    .iter()
-                    .map(|e| crate::db::skill_plans::SkillPlanEntry {
-                        entry_id: e.entry_id,
-                        plan_id,
-                        skill_type_id: e.skill_type_id,
-                        planned_level: e.planned_level,
-                        sort_order: 0,
-                        entry_type: String::new(),
-                        notes: e.notes.clone(),
-                    })
-                    .collect()
-            })
-            .collect();
+    let m_limit = max_remaps.max(0) as usize;
 
-        // precalculate sp_map at cluster boundaries
-        let mut cluster_sp_maps = Vec::with_capacity(num_clusters + 1);
-        let mut cur_sp_map = current_sp_map.clone();
-        cluster_sp_maps.push(cur_sp_map.clone());
-        for entries in &cluster_entries {
-            for entry in entries {
-                let attr = skill_attributes.get(&entry.skill_type_id).unwrap();
-                let rank = attr.rank.unwrap_or(1);
-                let total_sp = utils::calculate_sp_for_level(rank, entry.planned_level as i32);
+    // cost[i][j] = min time for entries i..j with its optimal remap
+    let mut opt_segment_results: HashMap<(usize, usize), (f64, Attributes)> = HashMap::new();
 
-                let current_val = cur_sp_map.entry(entry.skill_type_id).or_insert(0);
-                *current_val = (*current_val).max(total_sp);
-            }
-            cluster_sp_maps.push(cur_sp_map.clone());
+    // Helper to compute optimal time for a segment [i, j)
+    let mut get_segment_cost = |i: usize, j: usize| -> Option<(f64, Attributes)> {
+        if let Some(cached) = opt_segment_results.get(&(i, j)) {
+            return Some(cached.clone());
         }
 
-        // cost[i][j] = min time for clusters i..j with its optimal remap
-        let mut opt_segment_results = HashMap::new();
-        for (i, sp_map) in cluster_sp_maps.iter().enumerate().take(num_clusters) {
-            for j in i + 1..=num_clusters {
-                let mut flat_entries = Vec::new();
-                for entries in cluster_entries.iter().take(j).skip(i) {
-                    flat_entries.extend(entries.clone());
-                }
-                let opt = optimize_plan_attributes_internal(
-                    pool,
-                    &flat_entries,
-                    implants,
-                    baseline_remap,
-                    accelerator_bonus,
-                    sp_map,
-                    &skill_attributes,
-                )
-                .await?;
-                opt_segment_results.insert(
-                    (i, j),
-                    (
-                        opt.optimized_seconds as f64,
-                        opt.recommended_remap.attributes,
-                    ),
-                );
+        let mut segment_demand = HashMap::new();
+        let start_demand = &cumulative_demands[i];
+        let end_demand = &cumulative_demands[j];
+
+        let mut has_any_demand = false;
+        for (key, &total_sp) in end_demand {
+            let start_sp = *start_demand.get(key).unwrap_or(&0);
+            let sp = total_sp - start_sp;
+            if sp > 0 {
+                segment_demand.insert(*key, sp);
+                has_any_demand = true;
             }
         }
 
-        let mut baseline_cluster_times = Vec::new();
-        for i in 0..num_clusters {
-            let mut time = 0.0;
-            let mut demand_map = HashMap::new();
-            for entry in &cluster_entries[i] {
-                let attr = skill_attributes.get(&entry.skill_type_id).unwrap();
-                let key = (attr.primary_attribute, attr.secondary_attribute);
-                let rank = attr.rank.unwrap_or(1);
-                let total_sp = utils::calculate_sp_for_level(rank, entry.planned_level as i32);
-                let current_sp = *cluster_sp_maps[i].get(&entry.skill_type_id).unwrap_or(&0);
-                let sp_remaining = (total_sp - current_sp).max(0);
-                if sp_remaining > 0 {
-                    *demand_map.entry(key).or_insert(0) += sp_remaining;
-                }
-            }
-            for ((p, s), sp) in demand_map {
-                let p_val =
-                    get_effective_attr_value(baseline_remap, implants, accelerator_bonus, p);
-                let s_val =
-                    get_effective_attr_value(baseline_remap, implants, accelerator_bonus, s);
+        if !has_any_demand {
+            return None;
+        }
+
+        let mut min_seconds = f64::MAX;
+        let mut best_dist = Attributes::default();
+
+        for dist in &all_distributions {
+            let mut total_seconds = 0.0;
+            for ((p, s), sp) in &segment_demand {
+                let p_val = get_effective_attr_value(dist, implants, accelerator_bonus, *p);
+                let s_val = get_effective_attr_value(dist, implants, accelerator_bonus, *s);
                 let sp_per_min = utils::calculate_sp_per_minute(p_val, s_val);
                 if sp_per_min > 0.0 {
-                    time += (sp as f64 / sp_per_min) * 60.0;
+                    total_seconds += (*sp as f64 / sp_per_min) * 60.0;
                 }
             }
-            baseline_cluster_times.push(time);
-        }
-
-        // #region agent log
-        {
-            use std::io::Write;
-            if let Ok(mut file) = std::fs::OpenOptions::new()
-                .create(true)
-                .append(true)
-                .open("/home/mckernanin/projects/eve/skillmon/.cursor/debug.log")
-            {
-                let log = serde_json::json!({
-                    "sessionId": "debug-session",
-                    "timestamp": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis(),
-                    "location": "optimization.rs:293",
-                    "hypothesisId": "H3",
-                    "message": "Baseline cluster times calculated",
-                    "data": {
-                        "baseline_cluster_times_days": baseline_cluster_times.iter().map(|t| t / 86400.0).collect::<Vec<_>>()
-                    }
-                });
-                let _ = writeln!(file, "{}", log.to_string());
-            }
-        }
-        // #endregion
-
-        let m_limit = max_remaps.max(0) as usize;
-
-        // dp_remap[m][i] = min time to train clusters i..num_clusters using up to m remaps.
-        // Each remap is an optimal remap for a segment.
-        let mut dp_remap =
-            vec![vec![(f64::MAX, 0, Attributes::default()); num_clusters + 1]; m_limit + 1];
-
-        // Base case: 0 remaps for i..num_clusters is only possible if i == num_clusters.
-        for row in dp_remap.iter_mut().take(m_limit + 1) {
-            row[num_clusters] = (0.0, num_clusters, Attributes::default());
-        }
-
-        // m=1: optimal time for i..num_clusters using one remap at i.
-        for (i, item) in dp_remap[1].iter_mut().enumerate().take(num_clusters) {
-            if let Some((t_seg, attr_seg)) = opt_segment_results.get(&(i, num_clusters)) {
-                *item = (*t_seg, num_clusters, attr_seg.clone());
+            if total_seconds < min_seconds {
+                min_seconds = total_seconds;
+                best_dist = dist.clone();
             }
         }
 
-        for m in 2..=m_limit {
-            for i in 0..num_clusters {
-                // Option 1: Use fewer remaps
-                let mut best = dp_remap[m - 1][i].clone();
+        opt_segment_results.insert((i, j), (min_seconds, best_dist.clone()));
+        Some((min_seconds, best_dist))
+    };
 
-                // Option 2: Remap at i for segment i..j, then use m-1 remaps for j..num_clusters
-                for (j, (t_rest, _, _)) in dp_remap[m - 1]
-                    .iter()
-                    .enumerate()
-                    .take(num_clusters)
-                    .skip(i + 1)
-                {
-                    if let Some((t_seg, attr_seg)) = opt_segment_results.get(&(i, j)) {
-                        if *t_rest != f64::MAX && t_seg + t_rest < best.0 {
-                            best = (t_seg + t_rest, j, attr_seg.clone());
-                        }
+    // dp_remap[m][i] = min time to train entries i..num_entries using up to m remaps.
+    let mut dp_remap =
+        vec![vec![(f64::MAX, 0, Attributes::default()); num_entries + 1]; m_limit + 1];
+
+    // Base case: 0 remaps for i..num_entries is only possible if i == num_entries.
+    for row in dp_remap.iter_mut().take(m_limit + 1) {
+        row[num_entries] = (0.0, num_entries, Attributes::default());
+    }
+
+    // m=1: optimal time for i..num_entries using one remap at i.
+    for i in (0..num_entries).rev() {
+        if let Some((t_seg, attr_seg)) = get_segment_cost(i, num_entries) {
+            dp_remap[1][i] = (t_seg, num_entries, attr_seg.clone());
+        }
+    }
+
+    // For m > 1, we only compute segments if num_entries is reasonably small or if we really need them.
+    // If num_entries is very large, this might be slow, but for 100-200 entries it's fine.
+    for m in 2..=m_limit {
+        for i in (0..num_entries).rev() {
+            // Option 1: Use fewer remaps
+            let mut best = dp_remap[m - 1][i].clone();
+
+            // Option 2: Remap at i for segment i..j, then use m-1 remaps for j..num_entries
+            // To speed up, we could only consider j that are "meaningful" (e.g. cluster boundaries)
+            // but the plan says "entry-level granularity".
+            for j in i + 1..num_entries {
+                if let Some((t_seg, attr_seg)) = get_segment_cost(i, j) {
+                    let (t_rest, _, _) = &dp_remap[m - 1][j];
+                    if *t_rest != f64::MAX && t_seg + t_rest < best.0 {
+                        best = (t_seg + t_rest, j, attr_seg.clone());
                     }
                 }
-                dp_remap[m][i] = best;
             }
+            dp_remap[m][i] = best;
         }
+    }
 
-        // Now consider the baseline period at the beginning.
-        // We can train 0..k clusters with baseline_remap, then use m_limit remaps for k..num_clusters.
-        let mut best_total_time = baseline_cluster_times.iter().sum::<f64>();
-        let mut best_k = num_clusters;
+    // Now consider the baseline period at the beginning.
+    // We can train 0..k entries with baseline_remap, then use m_limit remaps for k..num_entries.
+    let mut best_total_time = baseline_entry_times.iter().sum::<f64>();
+    let mut best_k = num_entries;
 
-        for k in 0..num_clusters {
-            let baseline_time: f64 = baseline_cluster_times[0..k].iter().sum();
-            let (remap_time, _, _) = &dp_remap[m_limit][k];
-            
-            // #region agent log
-            {
-                use std::io::Write;
-                if let Ok(mut file) = std::fs::OpenOptions::new()
-                    .create(true)
-                    .append(true)
-                    .open("/home/mckernanin/projects/eve/skillmon/.cursor/debug.log")
-                {
-                    let log = serde_json::json!({
-                        "sessionId": "debug-session",
-                        "timestamp": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_millis(),
-                        "location": "optimization.rs:343",
-                        "hypothesisId": "H2",
-                        "message": "DP evaluation at k",
-                        "data": {
-                            "k": k,
-                            "baseline_time_days": baseline_time / 86400.0,
-                            "remap_time_days": remap_time / 86400.0,
-                            "total_time_days": (baseline_time + remap_time) / 86400.0,
-                            "remap_attrs": if *remap_time == f64::MAX { None } else { Some(dp_remap[m_limit][k].2.clone()) }
-                        }
+    let mut cumulative_baseline = Vec::with_capacity(num_entries + 1);
+    let mut current_sum = 0.0;
+    cumulative_baseline.push(current_sum);
+    for time in &baseline_entry_times {
+        current_sum += time;
+        cumulative_baseline.push(current_sum);
+    }
+
+    for k in 0..num_entries {
+        let baseline_time = cumulative_baseline[k];
+        let (remap_time, _, _) = &dp_remap[m_limit][k];
+
+        if *remap_time != f64::MAX && baseline_time + remap_time < best_total_time {
+            best_total_time = baseline_time + remap_time;
+            best_k = k;
+        }
+    }
+
+    let total_optimized_seconds = best_total_time;
+
+    // Reconstruct remaps
+    let mut recommended_remaps = Vec::new();
+    if best_k < num_entries {
+        let mut cur_m = m_limit;
+        let mut cur_i = best_k;
+        let mut last_attr = baseline_remap.clone();
+
+        while cur_i < num_entries && cur_m > 0 {
+            let (time, next_i, attr) = &dp_remap[cur_m][cur_i];
+            let (prev_time, _, _) = &dp_remap[cur_m - 1][cur_i];
+
+            if *time == *prev_time && cur_m > 1 {
+                cur_m -= 1;
+            } else {
+                if attr != &last_attr {
+                    recommended_remaps.push(PlannedRemap {
+                        entry_index: cur_i,
+                        attributes: attr.clone(),
                     });
-                    let _ = writeln!(file, "{}", log.to_string());
+                    last_attr = attr.clone();
                 }
-            }
-            // #endregion
-
-            if *remap_time != f64::MAX && baseline_time + remap_time < best_total_time {
-                best_total_time = baseline_time + remap_time;
-                best_k = k;
+                cur_i = *next_i;
+                cur_m -= 1;
             }
         }
-
-        total_optimized_seconds = best_total_time;
-
-        // Reconstruct remaps
-        let mut cur_remaps = Vec::new();
-        if best_k < num_clusters {
-            let mut cur_m = m_limit;
-            let mut cur_i = best_k;
-            let mut last_attr = baseline_remap.clone();
-
-            while cur_i < num_clusters && cur_m > 0 {
-                let (time, next_i, attr) = &dp_remap[cur_m][cur_i];
-                let (prev_time, _, _) = &dp_remap[cur_m - 1][cur_i];
-
-                if *time == *prev_time {
-                    // We can achieve the same time with fewer remaps
-                    cur_m -= 1;
-                } else {
-                    // We used a remap at cur_i
-                    if attr != &last_attr {
-                        cur_remaps.push(PlannedRemap {
-                            entry_index: clusters[cur_i].0,
-                            attributes: attr.clone(),
-                        });
-                        last_attr = attr.clone();
-                    }
-                    cur_i = *next_i;
-                    cur_m -= 1;
-                }
-            }
-        }
-        recommended_remaps = cur_remaps;
     }
 
     // 5. Calculate original time (No Remap, Original Order)
@@ -729,6 +623,31 @@ fn generate_distributions(used_ids: &std::collections::HashSet<i64>) -> Vec<Attr
 
     backtrack(0, TOTAL_REMAP_POINTS, &mut current, &is_used, &mut results);
     results
+}
+
+fn calculate_ratio(
+    skill_attr: &crate::utils::SkillAttributes,
+    baseline_remap: &Attributes,
+    ideal_attr: &Attributes,
+    implants: &Attributes,
+    accelerator_bonus: i64,
+) -> f64 {
+    let p = skill_attr.primary_attribute;
+    let s = skill_attr.secondary_attribute;
+
+    let p_base = get_effective_attr_value(baseline_remap, implants, accelerator_bonus, p);
+    let s_base = get_effective_attr_value(baseline_remap, implants, accelerator_bonus, s);
+    let speed_base = utils::calculate_sp_per_minute(p_base, s_base);
+
+    let p_ideal = get_effective_attr_value(ideal_attr, implants, accelerator_bonus, p);
+    let s_ideal = get_effective_attr_value(ideal_attr, implants, accelerator_bonus, s);
+    let speed_ideal = utils::calculate_sp_per_minute(p_ideal, s_ideal);
+
+    if speed_ideal > 0.0 {
+        speed_base / speed_ideal
+    } else {
+        1.0
+    }
 }
 
 fn get_effective_attr_value(
