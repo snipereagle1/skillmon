@@ -44,6 +44,7 @@ import {
   useImportSkillPlanJson,
   useReorderPlanEntries,
 } from '@/hooks/tauri/useSkillPlans';
+import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { formatDuration } from '@/lib/utils';
 
 import { RemapSchedule } from './RemapSchedule';
@@ -101,6 +102,7 @@ export function OptimizationDialog({
 
   const reorderMutation = useReorderPlanEntries();
   const importPlanMutation = useImportSkillPlanJson();
+  const { trackAction } = useUndoRedo();
 
   const timeSaved = useMemo(() => {
     if (!optimization) return 0;
@@ -132,8 +134,24 @@ export function OptimizationDialog({
 
     if (isReorderResult(optimization)) {
       // Apply the reorder to the actual plan in DB
-      const entryIds = optimization.optimized_entries.map((e) => e.entry_id);
-      await reorderMutation.mutateAsync({ planId, entryIds });
+      const oldEntryIds = entries.map((e) => e.entry_id);
+      const newEntryIds = optimization.optimized_entries.map((e) => e.entry_id);
+
+      await trackAction(
+        'Optimize Plan Order',
+        async () => {
+          await reorderMutation.mutateAsync({
+            planId,
+            entryIds: newEntryIds,
+          });
+        },
+        async () => {
+          await reorderMutation.mutateAsync({
+            planId,
+            entryIds: oldEntryIds,
+          });
+        }
+      );
 
       // Update local simulation state
       if (onApplyReorder) {

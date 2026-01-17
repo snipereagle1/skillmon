@@ -17,9 +17,11 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import type { SkillPlanEntryResponse } from '@/generated/types';
 import {
+  useAddPlanEntry,
   useDeletePlanEntry,
   useUpdatePlanEntry,
 } from '@/hooks/tauri/useSkillPlans';
+import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { cn } from '@/lib/utils';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
@@ -56,6 +58,8 @@ export function PlanEntryRow({
 
   const deleteEntryMutation = useDeletePlanEntry();
   const updateEntryMutation = useUpdatePlanEntry();
+  const addEntryMutation = useAddPlanEntry();
+  const { trackAction } = useUndoRedo();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editLevel, setEditLevel] = useState(entry.planned_level);
   const [editNotes, setEditNotes] = useState(entry.notes || '');
@@ -79,20 +83,68 @@ export function PlanEntryRow({
       return;
     }
 
+    let currentEntryId = entry.entry_id;
+
     try {
-      await deleteEntryMutation.mutateAsync({ entryId: entry.entry_id });
+      await trackAction(
+        `Delete ${entry.skill_name}`,
+        async () => {
+          await deleteEntryMutation.mutateAsync({ entryId: currentEntryId });
+        },
+        async () => {
+          const result = await addEntryMutation.mutateAsync({
+            planId: entry.plan_id,
+            skillTypeId: entry.skill_type_id,
+            plannedLevel: entry.planned_level,
+            notes: entry.notes,
+          });
+          // Update the ID for next redo/undo
+          const restored = result.entries.find(
+            (e) =>
+              e.skill_type_id === entry.skill_type_id &&
+              e.planned_level === entry.planned_level
+          );
+          if (restored) {
+            currentEntryId = restored.entry_id;
+          }
+        }
+      );
     } catch (err) {
       console.error('Failed to delete entry:', err);
     }
   };
 
   const handleSave = async () => {
+    const oldLevel = entry.planned_level;
+    const oldNotes = entry.notes;
+    const newLevel = editLevel;
+    const newNotes = editNotes.trim() || null;
+
+    if (oldLevel === newLevel && oldNotes === newNotes) {
+      setEditDialogOpen(false);
+      return;
+    }
+
+    const currentEntryId = entry.entry_id;
+
     try {
-      await updateEntryMutation.mutateAsync({
-        entryId: entry.entry_id,
-        plannedLevel: editLevel,
-        notes: editNotes.trim() || null,
-      });
+      await trackAction(
+        `Update ${entry.skill_name}`,
+        async () => {
+          await updateEntryMutation.mutateAsync({
+            entryId: currentEntryId,
+            plannedLevel: newLevel,
+            notes: newNotes,
+          });
+        },
+        async () => {
+          await updateEntryMutation.mutateAsync({
+            entryId: currentEntryId,
+            plannedLevel: oldLevel,
+            notes: oldNotes,
+          });
+        }
+      );
       setEditDialogOpen(false);
     } catch (err) {
       console.error('Failed to update entry:', err);

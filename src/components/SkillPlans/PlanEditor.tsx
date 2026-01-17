@@ -7,7 +7,7 @@ import {
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
-import { Copy } from 'lucide-react';
+import { Copy, Redo2, Undo2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -27,6 +27,7 @@ import {
   useValidateReorder,
 } from '@/hooks/tauri/useSkillPlans';
 import { useSortableList } from '@/hooks/useSortableList';
+import { useUndoRedo } from '@/hooks/useUndoRedo';
 
 import { AddSkillDialog } from './AddSkillDialog';
 import { ImportPlanDialog } from './ImportPlanDialog';
@@ -44,6 +45,15 @@ export function PlanEditor({ planId }: PlanEditorProps) {
   const reorderMutation = useReorderPlanEntries();
   const validateReorderMutation = useValidateReorder();
   const updatePlanMutation = useUpdateSkillPlan();
+  const {
+    trackAction,
+    undo,
+    redo,
+    canUndo,
+    canRedo,
+    isPerformingAction,
+    clear,
+  } = useUndoRedo();
   const [isEditingName, setIsEditingName] = useState(false);
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editName, setEditName] = useState('');
@@ -90,11 +100,32 @@ export function PlanEditor({ planId }: PlanEditorProps) {
   } = useSortableList({
     items: sortedEntries,
     onReorder: async (newOrder) => {
+      const oldOrderIds = sortedEntries.map((e) => e.entry_id);
+      const newOrderIds = newOrder.map((e) => e.entry_id);
+
+      if (
+        oldOrderIds.length === newOrderIds.length &&
+        oldOrderIds.every((id, i) => id === newOrderIds[i])
+      ) {
+        return;
+      }
+
       try {
-        await reorderMutation.mutateAsync({
-          planId,
-          entryIds: newOrder.map((e) => e.entry_id),
-        });
+        await trackAction(
+          'Reorder Entries',
+          async () => {
+            await reorderMutation.mutateAsync({
+              planId,
+              entryIds: newOrderIds,
+            });
+          },
+          async () => {
+            await reorderMutation.mutateAsync({
+              planId,
+              entryIds: oldOrderIds,
+            });
+          }
+        );
       } catch (err) {
         console.error('Failed to reorder plan entries:', err);
         reset();
@@ -105,6 +136,37 @@ export function PlanEditor({ planId }: PlanEditorProps) {
     },
     getId: (e) => e.entry_id,
   });
+
+  // Clear undo stack when switching plans
+  useEffect(() => {
+    clear();
+  }, [planId, clear]);
+
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const isInput =
+        e.target instanceof HTMLInputElement ||
+        e.target instanceof HTMLTextAreaElement;
+
+      if (isInput) return;
+
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) {
+          redo();
+        } else {
+          undo();
+        }
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
   // Effect to validate proposed order while dragging
   useEffect(() => {
@@ -420,6 +482,26 @@ export function PlanEditor({ planId }: PlanEditorProps) {
           </div>
         )}
         <div className="flex gap-2">
+          <div className="flex gap-1 mr-2 border-r pr-2 border-border">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={undo}
+              disabled={!canUndo || isPerformingAction}
+              title="Undo"
+            >
+              <Undo2 className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={redo}
+              disabled={!canRedo || isPerformingAction}
+              title="Redo"
+            >
+              <Redo2 className="h-4 w-4" />
+            </Button>
+          </div>
           <Button
             variant="outline"
             size="sm"
