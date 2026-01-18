@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Brain, GripVertical, Pencil, Trash2 } from 'lucide-react';
+import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -15,14 +15,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import type { SkillPlanEntryResponse } from '@/generated/types';
-import type { Remap } from '@/hooks/tauri/useRemaps';
+import type { Remap, SkillPlanEntryResponse } from '@/generated/types';
 import {
   useAddPlanEntry,
   useDeletePlanEntry,
@@ -33,6 +26,7 @@ import { cn } from '@/lib/utils';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
 import { LevelIndicator } from '../SkillQueue/LevelIndicator';
+import { PlanRemapRow } from './PlanRemapRow';
 
 interface PlanEntryRowProps {
   entry: SkillPlanEntryResponse;
@@ -167,125 +161,109 @@ export function PlanEntryRow({
 
   return (
     <>
-      <div
-        ref={setNodeRef}
-        style={style}
-        className={cn(
-          'relative px-4 py-3 border-b last:border-b-0 border-border/50 transition-colors',
-          isPrerequisite && 'bg-muted/30',
-          isDragging && 'bg-accent opacity-50',
-          validationStatus === 'error' &&
-            'bg-destructive/10 border-destructive/50',
-          validationStatus === 'warning' &&
-            'bg-yellow-500/10 border-yellow-500/50'
-        )}
-      >
-        <div className="flex items-center justify-between gap-4 relative z-10">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <div
-              {...attributes}
-              {...listeners}
-              className={cn(
-                'cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded',
-                validationStatus === 'error' && 'text-destructive',
-                validationStatus === 'warning' &&
-                  'text-yellow-600 dark:text-yellow-500'
-              )}
-            >
-              <GripVertical className="h-4 w-4" />
-            </div>
-            <LevelIndicator level={entry.planned_level} />
-            <div className="flex flex-col flex-1 min-w-0">
-              <span
+      <div ref={setNodeRef} style={style} className={cn(isDragging && 'z-50')}>
+        <div
+          className={cn(
+            'relative px-4 py-3 border-b border-border/50 transition-colors',
+            isPrerequisite && 'bg-muted/30',
+            isDragging && 'bg-accent opacity-50',
+            validationStatus === 'error' &&
+              'bg-destructive/10 border-destructive/50',
+            validationStatus === 'warning' &&
+              'bg-yellow-500/10 border-yellow-500/50'
+          )}
+        >
+          <div className="flex items-center justify-between gap-4 relative z-10">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div
+                {...attributes}
+                {...listeners}
                 className={cn(
-                  'text-foreground font-medium truncate cursor-pointer hover:underline',
-                  isPrerequisite && 'text-muted-foreground',
+                  'cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded',
                   validationStatus === 'error' && 'text-destructive',
                   validationStatus === 'warning' &&
                     'text-yellow-600 dark:text-yellow-500'
                 )}
-                onClick={() => openSkillDetail(entry.skill_type_id, null)}
               >
-                {entry.skill_name} {levelRoman}
-              </span>
-              {remapAfter && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Brain className="h-3 w-3 text-primary inline-block ml-1.5" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>Neural remap scheduled after this skill</p>
-                      <p className="text-xs font-mono">
-                        I:{remapAfter.intelligence} P:{remapAfter.perception} C:
-                        {remapAfter.charisma} W:{remapAfter.willpower} M:
-                        {remapAfter.memory}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-              {entry.notes && (
-                <span className="text-xs text-muted-foreground truncate">
-                  {entry.notes}
+                <GripVertical className="h-4 w-4" />
+              </div>
+              <LevelIndicator level={entry.planned_level} />
+              <div className="flex flex-col flex-1 min-w-0">
+                <span
+                  className={cn(
+                    'text-foreground font-medium truncate cursor-pointer hover:underline',
+                    isPrerequisite && 'text-muted-foreground',
+                    validationStatus === 'error' && 'text-destructive',
+                    validationStatus === 'warning' &&
+                      'text-yellow-600 dark:text-yellow-500'
+                  )}
+                  onClick={() => openSkillDetail(entry.skill_type_id, null)}
+                >
+                  {entry.skill_name} {levelRoman}
                 </span>
-              )}
+                {entry.notes && (
+                  <span className="text-xs text-muted-foreground truncate">
+                    {entry.notes}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <span
+                className={cn(
+                  'text-sm whitespace-nowrap',
+                  isPrerequisite ? 'text-muted-foreground' : 'text-foreground'
+                )}
+              >
+                {entry.skillpoints_for_level.toLocaleString('en-US')} SP
+              </span>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setEditLevel(entry.planned_level);
+                  setEditNotes(entry.notes || '');
+                  setEditDialogOpen(true);
+                }}
+                className="h-8 w-8 p-0"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDelete}
+                disabled={deleteEntryMutation.isPending}
+                className="h-8 w-8 p-0"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                'text-sm whitespace-nowrap',
-                isPrerequisite ? 'text-muted-foreground' : 'text-foreground'
-              )}
-            >
-              {entry.skillpoints_for_level.toLocaleString('en-US')} SP
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setEditLevel(entry.planned_level);
-                setEditNotes(entry.notes || '');
-                setEditDialogOpen(true);
-              }}
-              className="h-8 w-8 p-0"
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDelete}
-              disabled={deleteEntryMutation.isPending}
-              className="h-8 w-8 p-0"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+          <div className="absolute bottom-0 left-0 right-0 h-0.5 pointer-events-none">
+            {offsetPercentage > 0 && (
+              <div
+                className="absolute h-full bg-blue-400/20 dark:bg-blue-500/20"
+                style={{ left: '0%', width: `${offsetPercentage}%` }}
+              />
+            )}
+            {spPercentage > 0 && (
+              <div
+                className={cn(
+                  'absolute h-full',
+                  isPrerequisite
+                    ? 'bg-muted-foreground/50'
+                    : 'bg-blue-400 dark:bg-blue-500'
+                )}
+                style={{
+                  left: `${offsetPercentage}%`,
+                  width: `${displayWidth}%`,
+                }}
+              />
+            )}
           </div>
         </div>
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 pointer-events-none">
-          {offsetPercentage > 0 && (
-            <div
-              className="absolute h-full bg-blue-400/20 dark:bg-blue-500/20"
-              style={{ left: '0%', width: `${offsetPercentage}%` }}
-            />
-          )}
-          {spPercentage > 0 && (
-            <div
-              className={cn(
-                'absolute h-full',
-                isPrerequisite
-                  ? 'bg-muted-foreground/50'
-                  : 'bg-blue-400 dark:bg-blue-500'
-              )}
-              style={{
-                left: `${offsetPercentage}%`,
-                width: `${displayWidth}%`,
-              }}
-            />
-          )}
-        </div>
+        {remapAfter && <PlanRemapRow remap={remapAfter} />}
       </div>
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>

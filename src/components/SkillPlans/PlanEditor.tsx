@@ -40,6 +40,7 @@ import { AddSkillDialog } from './AddSkillDialog';
 import { ImportPlanDialog } from './ImportPlanDialog';
 import { PlanComparisonTab } from './PlanComparisonTab';
 import { PlanEntryRow } from './PlanEntryRow';
+import { PlanRemapRow } from './PlanRemapRow';
 import { PlanRemapsTab } from './PlanRemapsTab';
 import { SimulationTab } from './SimulationTab';
 import { SkillPlanValidationDisplay } from './SkillPlanValidationDisplay';
@@ -604,30 +605,38 @@ export function PlanEditor({ planId }: PlanEditorProps) {
                   strategy={verticalListSortingStrategy}
                 >
                   {(() => {
+                    const startRemap = planRemaps?.find(
+                      (r) => r.after_skill_type_id === null
+                    );
                     let cumulativeSP = 0;
-                    return localItems.map((entry) => {
-                      const offsetPercentage =
-                        totalSP > 0 ? (cumulativeSP / totalSP) * 100 : 0;
-                      cumulativeSP += entry.skillpoints_for_level;
-                      const validationStatus = validationMap.get(
-                        `${entry.skill_type_id}-${entry.planned_level}`
-                      );
-                      const remapAfter = planRemaps?.find(
-                        (r) =>
-                          r.after_skill_type_id === entry.skill_type_id &&
-                          r.after_skill_level === entry.planned_level
-                      );
-                      return (
-                        <PlanEntryRow
-                          key={entry.entry_id}
-                          entry={entry}
-                          totalPlanSP={totalSP}
-                          offsetPercentage={offsetPercentage}
-                          validationStatus={validationStatus}
-                          remapAfter={remapAfter}
-                        />
-                      );
-                    });
+                    return (
+                      <>
+                        {startRemap && <PlanRemapRow remap={startRemap} />}
+                        {localItems.map((entry) => {
+                          const offsetPercentage =
+                            totalSP > 0 ? (cumulativeSP / totalSP) * 100 : 0;
+                          cumulativeSP += entry.skillpoints_for_level;
+                          const validationStatus = validationMap.get(
+                            `${entry.skill_type_id}-${entry.planned_level}`
+                          );
+                          const remapAfter = planRemaps?.find(
+                            (r) =>
+                              r.after_skill_type_id === entry.skill_type_id &&
+                              r.after_skill_level === entry.planned_level
+                          );
+                          return (
+                            <PlanEntryRow
+                              key={entry.entry_id}
+                              entry={entry}
+                              totalPlanSP={totalSP}
+                              offsetPercentage={offsetPercentage}
+                              validationStatus={validationStatus}
+                              remapAfter={remapAfter}
+                            />
+                          );
+                        })}
+                      </>
+                    );
                   })()}
                 </SortableContext>
               </DndContext>
