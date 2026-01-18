@@ -1,6 +1,8 @@
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
+import { match, P } from 'ts-pattern';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   Table,
@@ -97,7 +99,7 @@ export function Attributes({ characterId }: AttributesProps) {
           </TableHeader>
           <TableBody>
             {ATTRIBUTE_NAMES.map(({ key, label }) => {
-              const attr: AttributeBreakdown = data[key as keyof typeof data];
+              const attr: AttributeBreakdown = data[key];
               return (
                 <TableRow key={key}>
                   <TableCell className="font-medium">{label}</TableCell>
@@ -113,16 +115,71 @@ export function Attributes({ characterId }: AttributesProps) {
         </Table>
       </div>
 
+      <div className="flex flex-wrap gap-4 px-1">
+        <div className="flex flex-col gap-1 border rounded-md p-3 bg-muted/20 flex-1 min-w-[200px]">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Bonus Remaps
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-bold">{data.bonus_remaps ?? 0}</span>
+            {(data.bonus_remaps ?? 0) > 0 && (
+              <Badge
+                variant="secondary"
+                className="bg-green-500/10 text-green-500 border-green-500/20"
+              >
+                Available
+              </Badge>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1 border rounded-md p-3 bg-muted/20 flex-1 min-w-[200px]">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Next Primary Remap
+          </span>
+          <span className="text-lg font-semibold">
+            {match(data.accrued_remap_cooldown_date)
+              .with(P.nullish, () => 'Available Now')
+              .with(
+                P.when((d) => !d || new Date(d) <= new Date()),
+                () => 'Available Now'
+              )
+              .otherwise((d) =>
+                new Date(d).toLocaleDateString(undefined, {
+                  year: 'numeric',
+                  month: 'long',
+                  day: 'numeric',
+                })
+              )}
+          </span>
+        </div>
+
+        {data.last_remap_date && (
+          <div className="flex flex-col gap-1 border rounded-md p-3 bg-muted/20 flex-1 min-w-[200px]">
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+              Last Remap
+            </span>
+            <span className="text-lg font-semibold">
+              {new Date(data.last_remap_date).toLocaleDateString(undefined, {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+              })}
+            </span>
+          </div>
+        )}
+      </div>
+
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
-          <h3 className="text-lg font-semibold">Remap History</h3>
+          <h3 className="text-lg font-semibold">Planned Remaps</h3>
           <Button
             size="sm"
             onClick={() => setIsAddDialogOpen(true)}
             className="gap-2"
           >
             <Plus className="h-4 w-4" />
-            Record Remap
+            Plan Remap
           </Button>
         </div>
 
@@ -131,7 +188,7 @@ export function Attributes({ characterId }: AttributesProps) {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Date</TableHead>
+                  <TableHead>Scheduled At</TableHead>
                   <TableHead className="text-center">Perception</TableHead>
                   <TableHead className="text-center">Memory</TableHead>
                   <TableHead className="text-center">Willpower</TableHead>
@@ -143,8 +200,8 @@ export function Attributes({ characterId }: AttributesProps) {
               <TableBody>
                 {remaps.map((remap) => (
                   <TableRow key={remap.remap_id}>
-                    <TableCell className="text-muted-foreground whitespace-nowrap">
-                      {new Date(remap.created_at * 1000).toLocaleDateString()}
+                    <TableCell className="font-medium">
+                      {remap.after_skill_type_id ? 'After Skill' : 'At Start'}
                     </TableCell>
                     <TableCell className="text-center">
                       +{remap.perception}
@@ -178,7 +235,7 @@ export function Attributes({ characterId }: AttributesProps) {
           </div>
         ) : (
           <div className="text-center py-8 border border-dashed rounded-md text-muted-foreground">
-            No remap history found.
+            No planned remaps found.
           </div>
         )}
       </div>

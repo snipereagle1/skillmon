@@ -3,12 +3,17 @@ import { Brain } from 'lucide-react';
 import type { Remap } from '@/generated/types';
 import { cn } from '@/lib/utils';
 
-interface PlanRemapRowProps {
+interface RemapRowProps {
   remap: Remap;
   className?: string;
+  showGripPlaceholder?: boolean;
 }
 
-export function PlanRemapRow({ remap, className }: PlanRemapRowProps) {
+export function RemapRow({
+  remap,
+  className,
+  showGripPlaceholder = true,
+}: RemapRowProps) {
   return (
     <div
       className={cn(
@@ -19,6 +24,7 @@ export function PlanRemapRow({ remap, className }: PlanRemapRowProps) {
       <div className="flex items-center gap-3 flex-1 min-w-0">
         {/* Align with skill names: Grip(20px) + Gap(12px) + LevelIndicator(56px) = 88px */}
         <div className="flex items-center w-[88px] shrink-0">
+          {showGripPlaceholder && <div className="w-8" />}
           <Brain className="h-4 w-4 text-primary" />
         </div>
         <span className="font-medium text-primary">Neural Remap</span>

@@ -1,5 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import { Plus } from 'lucide-react';
+import React from 'react';
 import { toast } from 'sonner';
 
 import { Badge } from '@/components/ui/badge';
@@ -7,8 +8,10 @@ import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import type { CharacterSkillQueue, SkillmonPlan } from '@/generated/types';
 import { useForceRefreshSkillQueue } from '@/hooks/tauri/useForceRefreshSkillQueue';
+import { useCharacterRemaps } from '@/hooks/tauri/useRemaps';
 import { useImportSkillPlanJson } from '@/hooks/tauri/useSkillPlans';
 
+import { RemapRow } from '../Remaps/RemapRow';
 import { SkillQueueEntry } from './SkillQueueEntry';
 import { calculateTrainingHours, formatDurationFromHours } from './utils';
 
@@ -22,6 +25,7 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
   const queueSize = queue.skill_queue.length;
   const forceRefresh = useForceRefreshSkillQueue();
   const importPlan = useImportSkillPlanJson();
+  const { data: remaps } = useCharacterRemaps(characterId);
   const navigate = useNavigate();
 
   const handleCreatePlanFromQueue = () => {
@@ -159,22 +163,43 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
             (() => {
               const totalHours = calculateTotalTimeHours();
               let cumulativeHours = 0;
-              return queue.skill_queue.map((skill, idx) => {
-                const offsetPercentage =
-                  totalHours > 0 ? (cumulativeHours / totalHours) * 100 : 0;
-                const skillHours = calculateTrainingHours(skill);
-                cumulativeHours += skillHours;
-                return (
-                  <SkillQueueEntry
-                    key={`${skill.skill_id}-${idx}`}
-                    skill={skill}
-                    totalQueueHours={totalHours}
-                    offsetPercentage={offsetPercentage}
-                    isPaused={queue.is_paused ?? false}
-                    characterId={characterId}
-                  />
-                );
-              });
+              const startRemap = remaps?.find((r) => !r.after_skill_type_id);
+
+              return (
+                <>
+                  {startRemap && (
+                    <RemapRow remap={startRemap} showGripPlaceholder={false} />
+                  )}
+                  {queue.skill_queue.map((skill, idx) => {
+                    const offsetPercentage =
+                      totalHours > 0 ? (cumulativeHours / totalHours) * 100 : 0;
+                    const skillHours = calculateTrainingHours(skill);
+                    cumulativeHours += skillHours;
+                    const remapAfter = remaps?.find(
+                      (r) =>
+                        r.after_skill_type_id === skill.skill_id &&
+                        r.after_skill_level === skill.finished_level
+                    );
+                    return (
+                      <React.Fragment key={`${skill.skill_id}-${idx}`}>
+                        <SkillQueueEntry
+                          skill={skill}
+                          totalQueueHours={totalHours}
+                          offsetPercentage={offsetPercentage}
+                          isPaused={queue.is_paused ?? false}
+                          characterId={characterId}
+                        />
+                        {remapAfter && (
+                          <RemapRow
+                            remap={remapAfter}
+                            showGripPlaceholder={false}
+                          />
+                        )}
+                      </React.Fragment>
+                    );
+                  })}
+                </>
+              );
             })()
           )}
         </div>

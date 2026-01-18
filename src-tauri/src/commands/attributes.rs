@@ -30,6 +30,9 @@ pub struct CharacterAttributesBreakdown {
     pub memory: AttributeBreakdown,
     pub perception: AttributeBreakdown,
     pub willpower: AttributeBreakdown,
+    pub bonus_remaps: Option<i64>,
+    pub accrued_remap_cooldown_date: Option<String>,
+    pub last_remap_date: Option<String>,
 }
 
 #[tauri::command]
@@ -55,56 +58,54 @@ pub async fn get_character_attributes_breakdown(
     let client = esi_helpers::create_authenticated_client(&access_token)
         .map_err(|e| format!("Failed to create client: {}", e))?;
 
-    let attributes = match esi_helpers::get_cached_character_attributes(
-        &pool,
-        &client,
-        character_id,
-        &rate_limits,
-    )
-    .await
-    {
-        Ok(Some(attrs)) => CharacterAttributesResponse {
-            charisma: attrs.charisma,
-            intelligence: attrs.intelligence,
-            memory: attrs.memory,
-            perception: attrs.perception,
-            willpower: attrs.willpower,
-        },
-        Ok(None) => {
-            if let Ok(Some(cached_attrs)) = db::get_character_attributes(&pool, character_id).await
-            {
+    let (attributes, bonus_remaps, accrued_remap_cooldown_date, last_remap_date) =
+        match esi_helpers::get_cached_character_attributes(
+            &pool,
+            &client,
+            character_id,
+            &rate_limits,
+        )
+        .await
+        {
+            Ok(Some(attrs)) => (
                 CharacterAttributesResponse {
-                    charisma: cached_attrs.charisma,
-                    intelligence: cached_attrs.intelligence,
-                    memory: cached_attrs.memory,
-                    perception: cached_attrs.perception,
-                    willpower: cached_attrs.willpower,
+                    charisma: attrs.charisma,
+                    intelligence: attrs.intelligence,
+                    memory: attrs.memory,
+                    perception: attrs.perception,
+                    willpower: attrs.willpower,
+                },
+                attrs.bonus_remaps,
+                attrs
+                    .accrued_remap_cooldown_date
+                    .as_ref()
+                    .map(|d| d.to_rfc3339()),
+                attrs.last_remap_date.as_ref().map(|d| d.to_rfc3339()),
+            ),
+            _ => {
+                if let Ok(Some(cached_attrs)) =
+                    db::get_character_attributes(&pool, character_id).await
+                {
+                    (
+                        CharacterAttributesResponse {
+                            charisma: cached_attrs.charisma,
+                            intelligence: cached_attrs.intelligence,
+                            memory: cached_attrs.memory,
+                            perception: cached_attrs.perception,
+                            willpower: cached_attrs.willpower,
+                        },
+                        cached_attrs.bonus_remaps,
+                        cached_attrs.accrued_remap_cooldown_date,
+                        cached_attrs.last_remap_date,
+                    )
+                } else {
+                    return Err(
+                        "Character attributes not found. Please refresh your character data."
+                            .to_string(),
+                    );
                 }
-            } else {
-                return Err(
-                    "Character attributes not found. Please refresh your character data."
-                        .to_string(),
-                );
             }
-        }
-        Err(_) => {
-            if let Ok(Some(cached_attrs)) = db::get_character_attributes(&pool, character_id).await
-            {
-                CharacterAttributesResponse {
-                    charisma: cached_attrs.charisma,
-                    intelligence: cached_attrs.intelligence,
-                    memory: cached_attrs.memory,
-                    perception: cached_attrs.perception,
-                    willpower: cached_attrs.willpower,
-                }
-            } else {
-                return Err(
-                    "Character attributes not found. Please refresh your character data."
-                        .to_string(),
-                );
-            }
-        }
-    };
+        };
 
     let current_implants =
         esi_helpers::get_cached_character_implants(&pool, &client, character_id, &rate_limits)
@@ -227,5 +228,8 @@ pub async fn get_character_attributes_breakdown(
             accelerator,
             total: attribute_totals[4],
         },
+        bonus_remaps,
+        accrued_remap_cooldown_date,
+        last_remap_date,
     })
 }

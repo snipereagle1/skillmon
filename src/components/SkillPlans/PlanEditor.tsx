@@ -36,11 +36,11 @@ import {
 import { useSortableList } from '@/hooks/useSortableList';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 
+import { RemapRow } from '../Remaps/RemapRow';
 import { AddSkillDialog } from './AddSkillDialog';
 import { ImportPlanDialog } from './ImportPlanDialog';
 import { PlanComparisonTab } from './PlanComparisonTab';
 import { PlanEntryRow } from './PlanEntryRow';
-import { PlanRemapRow } from './PlanRemapRow';
 import { PlanRemapsTab } from './PlanRemapsTab';
 import { SimulationTab } from './SimulationTab';
 import { SkillPlanValidationDisplay } from './SkillPlanValidationDisplay';
@@ -611,7 +611,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
                     let cumulativeSP = 0;
                     return (
                       <>
-                        {startRemap && <PlanRemapRow remap={startRemap} />}
+                        {startRemap && <RemapRow remap={startRemap} />}
                         {localItems.map((entry) => {
                           const offsetPercentage =
                             totalSP > 0 ? (cumulativeSP / totalSP) * 100 : 0;

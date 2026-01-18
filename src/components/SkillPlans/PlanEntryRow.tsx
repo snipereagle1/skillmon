@@ -25,8 +25,8 @@ import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { cn } from '@/lib/utils';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
+import { RemapRow } from '../Remaps/RemapRow';
 import { LevelIndicator } from '../SkillQueue/LevelIndicator';
-import { PlanRemapRow } from './PlanRemapRow';
 
 interface PlanEntryRowProps {
   entry: SkillPlanEntryResponse;
@@ -263,7 +263,7 @@ export function PlanEntryRow({
             )}
           </div>
         </div>
-        {remapAfter && <PlanRemapRow remap={remapAfter} />}
+        {remapAfter && <RemapRow remap={remapAfter} />}
       </div>
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>

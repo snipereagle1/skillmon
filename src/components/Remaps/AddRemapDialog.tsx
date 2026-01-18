@@ -21,6 +21,7 @@ import {
 import type { Attributes } from '@/generated/types';
 import { useSaveRemap } from '@/hooks/tauri/useRemaps';
 import { useSkillPlanWithEntries } from '@/hooks/tauri/useSkillPlans';
+import { useSkillQueue } from '@/hooks/tauri/useSkillQueue';
 
 interface AddRemapDialogProps {
   open: boolean;
@@ -41,6 +42,7 @@ const ATTRIBUTES: (keyof Attributes)[] = [
   'charisma',
 ];
 
+// eslint-disable-next-line complexity
 export function AddRemapDialog({
   open,
   onOpenChange,
@@ -48,7 +50,7 @@ export function AddRemapDialog({
   planId = null,
   afterSkillTypeId = null,
   afterSkillLevel = null,
-  title = 'Record Remap',
+  title = 'Plan Remap',
   description = 'Set the attribute points for this remap. You have 14 points to distribute, with a maximum of 10 in any single attribute.',
 }: AddRemapDialogProps) {
   const [attributes, setAttributes] = useState<Attributes>({
@@ -82,6 +84,7 @@ export function AddRemapDialog({
   }
 
   const { data: planWithEntries } = useSkillPlanWithEntries(planId);
+  const { data: characterQueue } = useSkillQueue(characterId);
   const saveRemapMutation = useSaveRemap();
 
   const totalPoints = Object.values(attributes).reduce(
@@ -143,7 +146,7 @@ export function AddRemapDialog({
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
-          {planId && planWithEntries && (
+          {(planId && planWithEntries) || (characterId && characterQueue) ? (
             <div className="space-y-2">
               <Label htmlFor="after-skill">Apply Remap After</Label>
               <Select
@@ -154,19 +157,30 @@ export function AddRemapDialog({
                   <SelectValue placeholder="Select when to apply" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="start">At Start of Plan</SelectItem>
-                  {planWithEntries.entries.map((entry) => (
-                    <SelectItem
-                      key={`${entry.skill_type_id}-${entry.planned_level}`}
-                      value={`${entry.skill_type_id}-${entry.planned_level}`}
-                    >
-                      {entry.skill_name} {entry.planned_level}
-                    </SelectItem>
-                  ))}
+                  <SelectItem value="start">At Start</SelectItem>
+                  {planId &&
+                    planWithEntries?.entries.map((entry) => (
+                      <SelectItem
+                        key={`${entry.skill_type_id}-${entry.planned_level}`}
+                        value={`${entry.skill_type_id}-${entry.planned_level}`}
+                      >
+                        {entry.skill_name} {entry.planned_level}
+                      </SelectItem>
+                    ))}
+                  {!planId &&
+                    characterId &&
+                    characterQueue?.skill_queue.map((item, idx) => (
+                      <SelectItem
+                        key={`${item.skill_id}-${item.finished_level}-${idx}`}
+                        value={`${item.skill_id}-${item.finished_level}`}
+                      >
+                        {item.skill_name} {item.finished_level}
+                      </SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>
-          )}
+          ) : null}
 
           <div className="flex items-center justify-between px-1">
             <span className="text-sm font-medium">Points Distributed</span>
