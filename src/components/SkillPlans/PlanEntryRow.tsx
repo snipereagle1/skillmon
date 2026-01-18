@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Pencil, Trash2, Brain } from 'lucide-react';
+import { Brain, GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -14,13 +14,13 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Tooltip,
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import { Textarea } from '@/components/ui/textarea';
 import type { SkillPlanEntryResponse } from '@/generated/types';
 import type { Remap } from '@/hooks/tauri/useRemaps';
 import {
@@ -217,7 +217,9 @@ export function PlanEntryRow({
                     <TooltipContent>
                       <p>Neural remap scheduled after this skill</p>
                       <p className="text-xs font-mono">
-                        I:{remapAfter.intelligence} P:{remapAfter.perception} C:{remapAfter.charisma} W:{remapAfter.willpower} M:{remapAfter.memory}
+                        I:{remapAfter.intelligence} P:{remapAfter.perception} C:
+                        {remapAfter.charisma} W:{remapAfter.willpower} M:
+                        {remapAfter.memory}
                       </p>
                     </TooltipContent>
                   </Tooltip>

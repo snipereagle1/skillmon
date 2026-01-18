@@ -1,9 +1,9 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use sqlx::{FromRow, Executor};
+use sqlx::FromRow;
 
-use crate::skill_plans::Attributes;
 use super::Pool;
+use crate::skill_plans::Attributes;
 
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Remap {
@@ -47,7 +47,7 @@ where
         "INSERT INTO remaps (
             character_id, plan_id, after_skill_type_id, after_skill_level,
             intelligence, perception, charisma, willpower, memory
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(character_id)
     .bind(plan_id)
@@ -68,7 +68,7 @@ pub async fn get_plan_remaps(pool: &Pool, plan_id: i64) -> Result<Vec<Remap>> {
     let remaps = sqlx::query_as::<_, Remap>(
         "SELECT remap_id, character_id, plan_id, after_skill_type_id, after_skill_level,
                 intelligence, perception, charisma, willpower, memory, created_at
-         FROM remaps WHERE plan_id = ? ORDER BY created_at ASC"
+         FROM remaps WHERE plan_id = ? ORDER BY created_at ASC",
     )
     .bind(plan_id)
     .fetch_all(pool)
@@ -80,7 +80,7 @@ pub async fn get_character_remaps(pool: &Pool, character_id: i64) -> Result<Vec<
     let remaps = sqlx::query_as::<_, Remap>(
         "SELECT remap_id, character_id, plan_id, after_skill_type_id, after_skill_level,
                 intelligence, perception, charisma, willpower, memory, created_at
-         FROM remaps WHERE character_id = ? ORDER BY created_at ASC"
+         FROM remaps WHERE character_id = ? ORDER BY created_at ASC",
     )
     .bind(character_id)
     .fetch_all(pool)
@@ -95,7 +95,7 @@ pub async fn delete_remap(pool: &Pool, remap_id: i64) -> Result<()> {
         .await?;
     Ok(())
 }
-
+#[allow(dead_code)]
 pub async fn delete_plan_remaps(pool: &Pool, plan_id: i64) -> Result<()> {
     sqlx::query("DELETE FROM remaps WHERE plan_id = ?")
         .bind(plan_id)

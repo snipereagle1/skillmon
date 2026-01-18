@@ -1,4 +1,4 @@
-import { Trash2, Plus } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -13,6 +13,7 @@ import {
 import type { AttributeBreakdown } from '@/generated/types';
 import { useAttributes } from '@/hooks/tauri/useAttributes';
 import { useCharacterRemaps, useDeleteRemap } from '@/hooks/tauri/useRemaps';
+
 import { AddRemapDialog } from './Remaps/AddRemapDialog';
 
 interface AttributesProps {
@@ -28,8 +29,13 @@ const ATTRIBUTE_NAMES = [
 ] as const;
 
 export function Attributes({ characterId }: AttributesProps) {
-  const { data, isLoading: isLoadingAttributes, error: attributeError } = useAttributes(characterId);
-  const { data: remaps, isLoading: isLoadingRemaps } = useCharacterRemaps(characterId);
+  const {
+    data,
+    isLoading: isLoadingAttributes,
+    error: attributeError,
+  } = useAttributes(characterId);
+  const { data: remaps, isLoading: isLoadingRemaps } =
+    useCharacterRemaps(characterId);
   const deleteRemapMutation = useDeleteRemap();
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
 
@@ -42,7 +48,10 @@ export function Attributes({ characterId }: AttributesProps) {
   }
 
   if (attributeError) {
-    const errorMessage = attributeError instanceof Error ? attributeError.message : String(attributeError);
+    const errorMessage =
+      attributeError instanceof Error
+        ? attributeError.message
+        : String(attributeError);
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-destructive">Error: {errorMessage}</p>
@@ -107,7 +116,11 @@ export function Attributes({ characterId }: AttributesProps) {
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
           <h3 className="text-lg font-semibold">Remap History</h3>
-          <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-2">
+          <Button
+            size="sm"
+            onClick={() => setIsAddDialogOpen(true)}
+            className="gap-2"
+          >
             <Plus className="h-4 w-4" />
             Record Remap
           </Button>
@@ -133,11 +146,21 @@ export function Attributes({ characterId }: AttributesProps) {
                     <TableCell className="text-muted-foreground whitespace-nowrap">
                       {new Date(remap.created_at * 1000).toLocaleDateString()}
                     </TableCell>
-                    <TableCell className="text-center">+{remap.perception}</TableCell>
-                    <TableCell className="text-center">+{remap.memory}</TableCell>
-                    <TableCell className="text-center">+{remap.willpower}</TableCell>
-                    <TableCell className="text-center">+{remap.intelligence}</TableCell>
-                    <TableCell className="text-center">+{remap.charisma}</TableCell>
+                    <TableCell className="text-center">
+                      +{remap.perception}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      +{remap.memory}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      +{remap.willpower}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      +{remap.intelligence}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      +{remap.charisma}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"

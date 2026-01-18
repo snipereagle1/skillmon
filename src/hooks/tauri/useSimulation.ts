@@ -1,9 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 
 import { simulateSkillPlan } from '@/generated/commands';
-import type { SimulationProfile, SkillPlanEntryResponse } from '@/generated/types';
-import { usePlanRemaps, type Remap } from './useRemaps';
+import type {
+  SimulationProfile,
+  SkillPlanEntryResponse,
+} from '@/generated/types';
+
+import { type Remap, usePlanRemaps } from './useRemaps';
 import { useSkillPlanWithEntries } from './useSkillPlans';
 
 export function useSimulation(planId: number, characterId?: number | null) {
@@ -22,9 +26,11 @@ export function useSimulation(planId: number, characterId?: number | null) {
   const { data: planRemaps } = usePlanRemaps(planId);
   const { data: planWithEntries } = useSkillPlanWithEntries(planId);
 
-  // Initialize profile with plan remaps when they load
-  useEffect(() => {
-    if (planRemaps && planWithEntries && profile.remaps.length === 0) {
+  const [appliedPlanId, setAppliedPlanId] = useState<number | null>(null);
+
+  // Sync profile with plan remaps when data becomes available for a new plan
+  if (planRemaps && planWithEntries && appliedPlanId !== planId) {
+    if (profile.remaps.length === 0) {
       const mappedRemaps = planRemaps.map((r: Remap) => {
         let entryIndex = 0;
         if (r.after_skill_type_id) {
@@ -56,7 +62,8 @@ export function useSimulation(planId: number, characterId?: number | null) {
         }));
       }
     }
-  }, [planRemaps, planWithEntries]);
+    setAppliedPlanId(planId);
+  }
 
   const query = useQuery({
     queryKey: ['skillPlanSimulation', planId, profile, characterId],

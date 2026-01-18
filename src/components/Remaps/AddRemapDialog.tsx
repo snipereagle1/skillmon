@@ -1,5 +1,5 @@
-import { useState } from 'react';
 import { Minus, Plus } from 'lucide-react';
+import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -53,7 +53,10 @@ export function AddRemapDialog({
 
   const saveRemapMutation = useSaveRemap();
 
-  const totalPoints = Object.values(attributes).reduce((sum, val) => sum + val, 0);
+  const totalPoints = Object.values(attributes).reduce(
+    (sum, val) => sum + val,
+    0
+  );
 
   const handleAttributeChange = (attr: keyof Attributes, delta: number) => {
     const currentValue = attributes[attr];
@@ -102,7 +105,9 @@ export function AddRemapDialog({
         <div className="grid gap-4 py-4">
           <div className="flex items-center justify-between px-1">
             <span className="text-sm font-medium">Points Distributed</span>
-            <span className={`text-sm font-bold ${totalPoints === 14 ? 'text-green-600' : 'text-muted-foreground'}`}>
+            <span
+              className={`text-sm font-bold ${totalPoints === 14 ? 'text-green-600' : 'text-muted-foreground'}`}
+            >
               {totalPoints} / 14
             </span>
           </div>
@@ -140,7 +145,9 @@ export function AddRemapDialog({
 
           {saveRemapMutation.isError && (
             <p className="text-sm text-destructive">
-              {saveRemapMutation.error instanceof Error ? saveRemapMutation.error.message : 'Failed to save remap'}
+              {saveRemapMutation.error instanceof Error
+                ? saveRemapMutation.error.message
+                : 'Failed to save remap'}
             </p>
           )}
         </div>

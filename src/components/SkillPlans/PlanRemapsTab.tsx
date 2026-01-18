@@ -1,4 +1,4 @@
-import { Trash2, Calendar, Plus } from 'lucide-react';
+import { Calendar, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -10,8 +10,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { usePlanRemaps, useDeleteRemap } from '@/hooks/tauri/useRemaps';
+import { useDeleteRemap, usePlanRemaps } from '@/hooks/tauri/useRemaps';
 import { useSkillPlanWithEntries } from '@/hooks/tauri/useSkillPlans';
+
 import { AddRemapDialog } from '../Remaps/AddRemapDialog';
 
 interface PlanRemapsTabProps {
@@ -51,7 +52,11 @@ export function PlanRemapsTab({ planId }: PlanRemapsTabProps) {
             Saved remaps that will be applied during simulation of this plan.
           </p>
         </div>
-        <Button size="sm" onClick={() => setIsAddDialogOpen(true)} className="gap-2">
+        <Button
+          size="sm"
+          onClick={() => setIsAddDialogOpen(true)}
+          className="gap-2"
+        >
           <Plus className="h-4 w-4" />
           Add Remap
         </Button>
@@ -74,7 +79,9 @@ export function PlanRemapsTab({ planId }: PlanRemapsTabProps) {
             <TableBody>
               {remaps.map((remap) => {
                 const skillName = entries.find(
-                  (e) => e.skill_type_id === remap.after_skill_type_id && e.planned_level === remap.after_skill_level
+                  (e) =>
+                    e.skill_type_id === remap.after_skill_type_id &&
+                    e.planned_level === remap.after_skill_level
                 )?.skill_name;
 
                 return (
@@ -87,11 +94,21 @@ export function PlanRemapsTab({ planId }: PlanRemapsTabProps) {
                           : 'At Start of Plan'}
                       </div>
                     </TableCell>
-                    <TableCell className="text-center">+{remap.perception}</TableCell>
-                    <TableCell className="text-center">+{remap.memory}</TableCell>
-                    <TableCell className="text-center">+{remap.willpower}</TableCell>
-                    <TableCell className="text-center">+{remap.intelligence}</TableCell>
-                    <TableCell className="text-center">+{remap.charisma}</TableCell>
+                    <TableCell className="text-center">
+                      +{remap.perception}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      +{remap.memory}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      +{remap.willpower}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      +{remap.intelligence}
+                    </TableCell>
+                    <TableCell className="text-center">
+                      +{remap.charisma}
+                    </TableCell>
                     <TableCell className="text-right">
                       <Button
                         variant="ghost"
@@ -111,7 +128,9 @@ export function PlanRemapsTab({ planId }: PlanRemapsTabProps) {
       ) : (
         <div className="text-center py-12 border border-dashed rounded-md text-muted-foreground">
           <p>No saved remaps for this plan.</p>
-          <p className="text-sm">Use the "Optimize" tool in Simulation or add one manually.</p>
+          <p className="text-sm">
+            Use the &quot;Optimize&quot; tool in Simulation or add one manually.
+          </p>
         </div>
       )}
 
