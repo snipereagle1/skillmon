@@ -226,6 +226,14 @@ export function OptimizationDialog({
           notes: original.notes || null,
         };
       }),
+      remaps: optimization.recommended_remaps.map((remap) => {
+        const entry = optimization.optimized_entries[remap.entry_index];
+        return {
+          after_skill_type_id: entry?.skill_type_id || null,
+          after_skill_level: entry?.planned_level || null,
+          attributes: remap.attributes,
+        };
+      }),
     };
 
     await importPlanMutation.mutateAsync({ plan });
