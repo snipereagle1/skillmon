@@ -3,11 +3,12 @@ import { useState } from 'react';
 
 import { simulateSkillPlan } from '@/generated/commands';
 import type {
+  Remap,
   SimulationProfile,
   SkillPlanEntryResponse,
 } from '@/generated/types';
 
-import { type Remap, usePlanRemaps } from './useRemaps';
+import { usePlanRemaps } from './useRemaps';
 import { useSkillPlanWithEntries } from './useSkillPlans';
 
 export function useSimulation(planId: number, characterId?: number | null) {
