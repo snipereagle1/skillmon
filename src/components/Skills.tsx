@@ -1,5 +1,6 @@
 import { X } from 'lucide-react';
 import { startTransition, useEffect, useRef, useState } from 'react';
+import { match, P } from 'ts-pattern';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -67,13 +68,19 @@ export function Skills({ characterId }: SkillsProps) {
   const selectedGroup = data.groups.find((g) => g.group_id === selectedGroupId);
 
   // Filter skills based on search query or selected group
-  const filteredSkills = searchQuery.trim()
-    ? data.skills.filter((s) =>
-        s.skill_name.toLowerCase().includes(searchQuery.toLowerCase())
+  const filteredSkills = match({
+    searchQuery: searchQuery.trim(),
+    selectedGroupId,
+  })
+    .with({ searchQuery: P.select(P.when((q: string) => q.length > 0)) }, (q) =>
+      data.skills.filter((s) =>
+        s.skill_name.toLowerCase().includes(q.toLowerCase())
       )
-    : selectedGroupId !== null
-      ? data.skills.filter((s) => s.group_id === selectedGroupId)
-      : [];
+    )
+    .with({ selectedGroupId: P.select(P.not(null)) }, (id) =>
+      data.skills.filter((s) => s.group_id === id)
+    )
+    .otherwise(() => []);
 
   const sortedSkills = filteredSkills.sort((a, b) =>
     a.skill_name.localeCompare(b.skill_name)
@@ -163,67 +170,72 @@ export function Skills({ characterId }: SkillsProps) {
 
       {/* Bottom section: Skills */}
       <div className="flex-1 min-h-0 overflow-y-auto p-4">
-        {searchQuery.trim() ? (
-          sortedSkills.length === 0 ? (
-            <div className="flex items-center justify-center h-32">
-              <p className="text-muted-foreground">
-                No skills found matching &quot;{searchQuery}&quot;
-              </p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-              <div className="space-y-2">
-                {skillsColumn1.map((skill) => (
-                  <SkillItem
-                    key={skill.skill_id}
-                    skill={skill}
-                    onClick={() => handleSkillClick(skill.skill_id)}
-                  />
-                ))}
-              </div>
-              <div className="space-y-2">
-                {skillsColumn2.map((skill) => (
-                  <SkillItem
-                    key={skill.skill_id}
-                    skill={skill}
-                    onClick={() => handleSkillClick(skill.skill_id)}
-                  />
-                ))}
-              </div>
-            </div>
+        {match({ searchQuery: searchQuery.trim(), sortedSkills, selectedGroup })
+          .with(
+            { searchQuery: P.select(P.when((q: string) => q.length > 0)) },
+            (q) =>
+              sortedSkills.length === 0 ? (
+                <div className="flex items-center justify-center h-32">
+                  <p className="text-muted-foreground">
+                    No skills found matching &quot;{q}&quot;
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                  <div className="space-y-2">
+                    {skillsColumn1.map((skill) => (
+                      <SkillItem
+                        key={skill.skill_id}
+                        skill={skill}
+                        onClick={() => handleSkillClick(skill.skill_id)}
+                      />
+                    ))}
+                  </div>
+                  <div className="space-y-2">
+                    {skillsColumn2.map((skill) => (
+                      <SkillItem
+                        key={skill.skill_id}
+                        skill={skill}
+                        onClick={() => handleSkillClick(skill.skill_id)}
+                      />
+                    ))}
+                  </div>
+                </div>
+              )
           )
-        ) : selectedGroup ? (
-          sortedSkills.length === 0 ? (
-            <div className="flex items-center justify-center h-32">
-              <p className="text-muted-foreground">No skills in this group</p>
-            </div>
-          ) : (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-2">
-              <div className="space-y-2">
-                {skillsColumn1.map((skill) => (
-                  <SkillItem
-                    key={skill.skill_id}
-                    skill={skill}
-                    onClick={() => handleSkillClick(skill.skill_id)}
-                  />
-                ))}
+          .with({ selectedGroup: P.not(undefined) }, () =>
+            sortedSkills.length === 0 ? (
+              <div className="flex items-center justify-center h-32">
+                <p className="text-muted-foreground">No skills in this group</p>
               </div>
-              <div className="space-y-2">
-                {skillsColumn2.map((skill) => (
-                  <SkillItem
-                    key={skill.skill_id}
-                    skill={skill}
-                    onClick={() => handleSkillClick(skill.skill_id)}
-                  />
-                ))}
+            ) : (
+              <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+                <div className="space-y-2">
+                  {skillsColumn1.map((skill) => (
+                    <SkillItem
+                      key={skill.skill_id}
+                      skill={skill}
+                      onClick={() => handleSkillClick(skill.skill_id)}
+                    />
+                  ))}
+                </div>
+                <div className="space-y-2">
+                  {skillsColumn2.map((skill) => (
+                    <SkillItem
+                      key={skill.skill_id}
+                      skill={skill}
+                      onClick={() => handleSkillClick(skill.skill_id)}
+                    />
+                  ))}
+                </div>
               </div>
-            </div>
+            )
           )
-        ) : (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground">Select a skill group</p>
-          </div>
-        )}
+          .otherwise(() => (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">Select a skill group</p>
+            </div>
+          ))}
       </div>
     </div>
   );

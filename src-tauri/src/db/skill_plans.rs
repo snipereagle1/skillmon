@@ -9,6 +9,7 @@ pub struct SkillPlan {
     pub plan_id: i64,
     pub name: String,
     pub description: Option<String>,
+    pub auto_prerequisites: i64,
     pub created_at: i64,
     pub updated_at: i64,
 }
@@ -24,19 +25,19 @@ pub struct SkillPlanEntry {
     pub notes: Option<String>,
 }
 
-#[derive(Debug, Clone)]
-pub struct SkillPrerequisite {
-    pub required_skill_id: i64,
-    pub required_level: i64,
-}
-
-pub async fn create_skill_plan(pool: &Pool, name: &str, description: Option<&str>) -> Result<i64> {
+pub async fn create_skill_plan(
+    pool: &Pool,
+    name: &str,
+    description: Option<&str>,
+    auto_prerequisites: bool,
+) -> Result<i64> {
     let now = chrono::Utc::now().timestamp();
     let result = sqlx::query(
-        "INSERT INTO skill_plans (name, description, created_at, updated_at) VALUES (?, ?, ?, ?)",
+        "INSERT INTO skill_plans (name, description, auto_prerequisites, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
     )
     .bind(name)
     .bind(description)
+    .bind(if auto_prerequisites { 1 } else { 0 })
     .bind(now)
     .bind(now)
     .execute(pool)
@@ -49,7 +50,7 @@ pub async fn create_skill_plan(pool: &Pool, name: &str, description: Option<&str
 
 pub async fn get_all_skill_plans(pool: &Pool) -> Result<Vec<SkillPlan>> {
     let plans = sqlx::query_as::<_, SkillPlan>(
-        "SELECT plan_id, name, description, created_at, updated_at FROM skill_plans ORDER BY created_at DESC",
+        "SELECT plan_id, name, description, auto_prerequisites, created_at, updated_at FROM skill_plans ORDER BY created_at DESC",
     )
     .fetch_all(pool)
     .await?;
@@ -59,7 +60,7 @@ pub async fn get_all_skill_plans(pool: &Pool) -> Result<Vec<SkillPlan>> {
 
 pub async fn get_skill_plan(pool: &Pool, plan_id: i64) -> Result<Option<SkillPlan>> {
     let plan = sqlx::query_as::<_, SkillPlan>(
-        "SELECT plan_id, name, description, created_at, updated_at FROM skill_plans WHERE plan_id = ?",
+        "SELECT plan_id, name, description, auto_prerequisites, created_at, updated_at FROM skill_plans WHERE plan_id = ?",
     )
     .bind(plan_id)
     .fetch_optional(pool)
@@ -73,13 +74,15 @@ pub async fn update_skill_plan(
     plan_id: i64,
     name: &str,
     description: Option<&str>,
+    auto_prerequisites: bool,
 ) -> Result<()> {
     let now = chrono::Utc::now().timestamp();
     sqlx::query(
-        "UPDATE skill_plans SET name = ?, description = ?, updated_at = ? WHERE plan_id = ?",
+        "UPDATE skill_plans SET name = ?, description = ?, auto_prerequisites = ?, updated_at = ? WHERE plan_id = ?",
     )
     .bind(name)
     .bind(description)
+    .bind(if auto_prerequisites { 1 } else { 0 })
     .bind(now)
     .bind(plan_id)
     .execute(pool)
@@ -111,52 +114,18 @@ pub async fn get_plan_entries(pool: &Pool, plan_id: i64) -> Result<Vec<SkillPlan
     Ok(entries)
 }
 
-pub async fn add_plan_entry(
-    pool: &Pool,
-    plan_id: i64,
-    skill_type_id: i64,
-    planned_level: i64,
-    entry_type: &str,
-    notes: Option<&str>,
-) -> Result<i64> {
-    let max_sort_order: Option<i64> =
-        sqlx::query_scalar("SELECT MAX(sort_order) FROM skill_plan_entries WHERE plan_id = ?")
-            .bind(plan_id)
-            .fetch_optional(pool)
-            .await?;
-
-    let next_sort_order = max_sort_order.unwrap_or(-1) + 1;
-
-    sqlx::query(
-        "INSERT INTO skill_plan_entries (plan_id, skill_type_id, planned_level, sort_order, entry_type, notes)
-         VALUES (?, ?, ?, ?, ?, ?)
-         ON CONFLICT(plan_id, skill_type_id, planned_level) DO UPDATE SET
-         entry_type = CASE
-             WHEN excluded.entry_type = 'Planned' THEN excluded.entry_type
-             WHEN skill_plan_entries.entry_type = 'Planned' THEN skill_plan_entries.entry_type
-             ELSE excluded.entry_type
-         END,
-         notes = excluded.notes",
+pub async fn get_plan_nodes_in_order(pool: &Pool, plan_id: i64) -> Result<Vec<(i64, i64)>> {
+    let nodes = sqlx::query_as::<_, (i64, i64)>(
+        "SELECT skill_type_id, planned_level
+         FROM skill_plan_entries
+         WHERE plan_id = ?
+         ORDER BY sort_order",
     )
     .bind(plan_id)
-    .bind(skill_type_id)
-    .bind(planned_level)
-    .bind(next_sort_order)
-    .bind(entry_type)
-    .bind(notes)
-    .execute(pool)
+    .fetch_all(pool)
     .await?;
 
-    let entry_id = sqlx::query_scalar::<_, i64>(
-        "SELECT entry_id FROM skill_plan_entries WHERE plan_id = ? AND skill_type_id = ? AND planned_level = ?",
-    )
-    .bind(plan_id)
-    .bind(skill_type_id)
-    .bind(planned_level)
-    .fetch_one(pool)
-    .await?;
-
-    Ok(entry_id)
+    Ok(nodes)
 }
 
 pub async fn update_plan_entry(
@@ -238,44 +207,6 @@ pub async fn reorder_plan_entries(pool: &Pool, plan_id: i64, entry_ids: &[i64]) 
     Ok(())
 }
 
-pub async fn get_prerequisites_recursive(
-    pool: &Pool,
-    skill_type_id: i64,
-) -> Result<Vec<SkillPrerequisite>> {
-    let mut prerequisites = Vec::new();
-    let mut visited = std::collections::HashSet::new();
-    let mut stack = vec![skill_type_id];
-
-    while let Some(skill_id) = stack.pop() {
-        if visited.contains(&skill_id) {
-            continue;
-        }
-        visited.insert(skill_id);
-
-        let reqs: Vec<(i64, i64)> = sqlx::query_as::<_, (i64, i64)>(
-            "SELECT required_skill_id, required_level
-             FROM sde_skill_requirements
-             WHERE skill_type_id = ?",
-        )
-        .bind(skill_id)
-        .fetch_all(pool)
-        .await?;
-
-        for (required_skill_id, required_level) in reqs {
-            prerequisites.push(SkillPrerequisite {
-                required_skill_id,
-                required_level,
-            });
-
-            if !visited.contains(&required_skill_id) {
-                stack.push(required_skill_id);
-            }
-        }
-    }
-
-    Ok(prerequisites)
-}
-
 pub async fn get_skill_type_id_by_name(pool: &Pool, skill_name: &str) -> Result<Option<i64>> {
     let type_id = sqlx::query_scalar::<_, i64>(
         "SELECT type_id FROM sde_types WHERE name = ? AND published = 1",
@@ -285,4 +216,58 @@ pub async fn get_skill_type_id_by_name(pool: &Pool, skill_name: &str) -> Result<
     .await?;
 
     Ok(type_id)
+}
+
+pub async fn search_skills(pool: &Pool, query: &str) -> Result<Vec<(i64, String)>> {
+    let search_pattern = format!("%{}%", query);
+    let skills = sqlx::query_as::<_, (i64, String)>(
+        "SELECT type_id, name FROM sde_types
+         WHERE group_id IN (SELECT group_id FROM sde_groups WHERE category_id = 16)
+         AND published = 1
+         AND name LIKE ?
+         ORDER BY name
+         LIMIT 100",
+    )
+    .bind(&search_pattern)
+    .fetch_all(pool)
+    .await?;
+
+    Ok(skills)
+}
+
+pub async fn get_entry_type<'a, E>(
+    executor: E,
+    plan_id: i64,
+    skill_id: i64,
+    level: i64,
+) -> Result<Option<String>>
+where
+    E: sqlx::Executor<'a, Database = sqlx::Sqlite>,
+{
+    let entry_type = sqlx::query_scalar::<_, String>(
+        "SELECT entry_type FROM skill_plan_entries WHERE plan_id = ? AND skill_type_id = ? AND planned_level = ?",
+    )
+    .bind(plan_id)
+    .bind(skill_id)
+    .bind(level)
+    .fetch_optional(executor)
+    .await?;
+
+    Ok(entry_type)
+}
+
+pub async fn get_entry_details_by_id(
+    pool: &Pool,
+    entry_id: i64,
+) -> Result<Option<(i64, i64, i64, String)>> {
+    let details = sqlx::query_as::<_, (i64, i64, i64, String)>(
+        "SELECT plan_id, skill_type_id, planned_level, entry_type
+         FROM skill_plan_entries
+         WHERE entry_id = ?",
+    )
+    .bind(entry_id)
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(details)
 }

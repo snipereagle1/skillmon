@@ -23,7 +23,7 @@ pub async fn get_type_names(
     pool: State<'_, db::Pool>,
     type_ids: Vec<i64>,
 ) -> Result<Vec<TypeNameEntry>, String> {
-    let map = utils::get_type_names_helper(&pool, &type_ids).await?;
+    let map = utils::get_type_names(&pool, &type_ids).await?;
     Ok(map
         .into_iter()
         .map(|(type_id, name)| TypeNameEntry { type_id, name })

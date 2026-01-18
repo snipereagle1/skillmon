@@ -313,6 +313,18 @@ async fn extract_selected_files(
     .await?
 }
 
+#[cfg(test)]
+pub async fn import_from_files_for_test(
+    pool: &SqlitePool,
+    files: &HashMap<String, PathBuf>,
+) -> Result<()> {
+    let latest = LatestBuild {
+        build_number: 0,
+        release_date: "test".to_string(),
+    };
+    import_from_files(pool, files, &latest).await
+}
+
 async fn import_from_files(
     pool: &SqlitePool,
     files: &HashMap<String, PathBuf>,

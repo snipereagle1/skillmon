@@ -442,7 +442,7 @@ pub async fn get_skill_details(
     prerequisite_skill_ids.sort();
     prerequisite_skill_ids.dedup();
 
-    let skill_names = utils::get_skill_names(&pool, &prerequisite_skill_ids)
+    let skill_names = utils::get_type_names(&pool, &prerequisite_skill_ids)
         .await
         .map_err(|e| format!("Failed to get prerequisite skill names: {}", e))?;
 
@@ -509,7 +509,7 @@ pub async fn get_skill_details(
     required_for_type_ids.sort();
     required_for_type_ids.dedup();
 
-    let type_names = utils::get_type_names_helper(&pool, &required_for_type_ids)
+    let type_names = utils::get_type_names(&pool, &required_for_type_ids)
         .await
         .map_err(|e| format!("Failed to get type names: {}", e))?;
 

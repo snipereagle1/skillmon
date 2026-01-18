@@ -1,5 +1,6 @@
 import {
   DragEndEvent,
+  DragOverEvent,
   DragStartEvent,
   KeyboardSensor,
   PointerSensor,
@@ -51,9 +52,25 @@ export function useSortableList<T>({
     setActiveId(event.active.id as number | string);
   };
 
+  const handleDragOver = (event: DragOverEvent) => {
+    const { active, over } = event;
+    if (over && active.id !== over.id) {
+      const oldIndex = localItems.findIndex(
+        (item) => getId(item) === active.id
+      );
+      const newIndex = localItems.findIndex((item) => getId(item) === over.id);
+
+      if (oldIndex !== -1 && newIndex !== -1) {
+        setLocalItems((prev) => arrayMove(prev, oldIndex, newIndex));
+      }
+    }
+  };
+
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
     if (over && active.id !== over.id) {
+      // The localItems might have already been moved in handleDragOver,
+      // but let's ensure it's correct for onReorder.
       const oldIndex = localItems.findIndex(
         (item) => getId(item) === active.id
       );
@@ -63,7 +80,13 @@ export function useSortableList<T>({
         const newOrder = arrayMove(localItems, oldIndex, newIndex);
         setLocalItems(newOrder);
         onReorder(newOrder);
+      } else {
+        // If they were already moved in DragOver, localItems is already the new order
+        onReorder(localItems);
       }
+    } else if (over && active.id === over.id) {
+      // Just dropped where it was, but might have been moved in DragOver
+      onReorder(localItems);
     }
     setActiveId(null);
   };
@@ -73,12 +96,20 @@ export function useSortableList<T>({
       ? localItems.find((item) => getId(item) === activeId)
       : null;
 
+  const reset = () => {
+    setLocalItems(items);
+    setPrevItems(items);
+  };
+
   return {
     localItems,
     activeId,
     activeItem,
+    isDragging: activeId !== null,
     sensors,
     handleDragStart,
+    handleDragOver,
     handleDragEnd,
+    reset,
   };
 }

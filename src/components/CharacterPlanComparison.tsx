@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { match, P } from 'ts-pattern';
 
 import type { PlanComparisonEntry } from '@/generated/types';
 import { usePlanComparison } from '@/hooks/tauri/usePlanComparison';
@@ -136,144 +137,155 @@ export function CharacterPlanComparison({
           <h2 className="font-semibold text-sm">Skill Plans</h2>
         </div>
         <div className="flex-1 overflow-y-auto">
-          {isLoadingPlans ? (
-            <div className="flex items-center justify-center h-full p-4">
-              <p className="text-sm text-muted-foreground">Loading plans...</p>
-            </div>
-          ) : !plans || plans.length === 0 ? (
-            <div className="flex items-center justify-center h-full p-4">
-              <p className="text-sm text-muted-foreground text-center">
-                No plans available. Create a plan in the Plans tab.
-              </p>
-            </div>
-          ) : (
-            <div className="p-2 space-y-1">
-              {plans.map((plan) => (
-                <div
-                  key={plan.plan_id}
-                  onClick={() => setSelectedPlanId(plan.plan_id)}
-                  className={cn(
-                    'p-3 rounded-md cursor-pointer transition-colors',
-                    selectedPlanId === plan.plan_id
-                      ? 'bg-muted text-white'
-                      : 'hover:bg-muted'
-                  )}
-                >
-                  <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold truncate text-sm">
-                      {plan.name}
-                    </h3>
-                    {plan.description && (
-                      <p
-                        className={cn(
-                          'text-xs mt-1 line-clamp-2',
-                          selectedPlanId === plan.plan_id
-                            ? 'text-white/80'
-                            : 'text-muted-foreground'
-                        )}
-                      >
-                        {plan.description}
-                      </p>
+          {match({ isLoadingPlans, plans })
+            .with({ isLoadingPlans: true }, () => (
+              <div className="flex items-center justify-center h-full p-4">
+                <p className="text-sm text-muted-foreground">
+                  Loading plans...
+                </p>
+              </div>
+            ))
+            .with({ plans: P.union(undefined, []) }, () => (
+              <div className="flex items-center justify-center h-full p-4">
+                <p className="text-sm text-muted-foreground text-center">
+                  No plans available. Create a plan in the Plans tab.
+                </p>
+              </div>
+            ))
+            .with({ plans: P.select(P.not(undefined)) }, (plans) => (
+              <div className="p-2 space-y-1">
+                {plans.map((plan) => (
+                  <div
+                    key={plan.plan_id}
+                    onClick={() => setSelectedPlanId(plan.plan_id)}
+                    className={cn(
+                      'p-3 rounded-md cursor-pointer transition-colors',
+                      selectedPlanId === plan.plan_id
+                        ? 'bg-muted text-white'
+                        : 'hover:bg-muted'
                     )}
+                  >
+                    <div className="flex-1 min-w-0">
+                      <h3 className="font-semibold truncate text-sm">
+                        {plan.name}
+                      </h3>
+                      {plan.description && (
+                        <p
+                          className={cn(
+                            'text-xs mt-1 line-clamp-2',
+                            selectedPlanId === plan.plan_id
+                              ? 'text-white/80'
+                              : 'text-muted-foreground'
+                          )}
+                        >
+                          {plan.description}
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            ))
+            .exhaustive()}
         </div>
       </div>
       <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
-        {selectedPlanId === null ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground">
-              Select a plan from the sidebar to view comparison
-            </p>
-          </div>
-        ) : isLoadingComparison ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground">Loading comparison...</p>
-          </div>
-        ) : !comparison ? (
-          <div className="flex items-center justify-center h-full">
-            <p className="text-muted-foreground">Failed to load comparison</p>
-          </div>
-        ) : (
-          <div className="flex flex-col h-full min-h-0">
-            <div className="border-b border-border p-4 space-y-3 shrink-0">
-              <div>
-                <h2 className="text-lg font-semibold">
-                  {comparison.plan.name}
-                </h2>
-                {comparison.plan.description && (
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {comparison.plan.description}
-                  </p>
+        {match({ selectedPlanId, isLoadingComparison, comparison })
+          .with({ selectedPlanId: null }, () => (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">
+                Select a plan from the sidebar to view comparison
+              </p>
+            </div>
+          ))
+          .with({ isLoadingComparison: true }, () => (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">Loading comparison...</p>
+            </div>
+          ))
+          .with({ comparison: P.nullish }, () => (
+            <div className="flex items-center justify-center h-full">
+              <p className="text-muted-foreground">Failed to load comparison</p>
+            </div>
+          ))
+          .with({ comparison: P.select(P.not(P.nullish)) }, (comp) => (
+            <div className="flex flex-col h-full min-h-0">
+              <div className="border-b border-border p-4 space-y-3 shrink-0">
+                <div>
+                  <h2 className="text-lg font-semibold">{comp.plan.name}</h2>
+                  {comp.plan.description && (
+                    <p className="text-sm text-muted-foreground mt-1">
+                      {comp.plan.description}
+                    </p>
+                  )}
+                </div>
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground">
+                      Total Skills
+                    </div>
+                    <div className="text-lg font-semibold">{stats.total}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground">
+                      Complete
+                    </div>
+                    <div className="text-lg font-semibold text-green-400">
+                      {stats.complete}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground">
+                      In Progress
+                    </div>
+                    <div className="text-lg font-semibold text-yellow-400">
+                      {stats.in_progress}
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs text-muted-foreground">
+                      Not Started
+                    </div>
+                    <div className="text-lg font-semibold text-muted-foreground">
+                      {stats.not_started}
+                    </div>
+                  </div>
+                </div>
+                {stats.totalMissingSP > 0 && (
+                  <div className="pt-2 border-t border-border">
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">
+                        Total Missing SP:{' '}
+                      </span>
+                      <span className="font-semibold text-yellow-400">
+                        {formatSkillpoints(stats.totalMissingSP)}
+                      </span>
+                    </div>
+                  </div>
                 )}
               </div>
-              <div className="grid grid-cols-4 gap-4">
-                <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground">
-                    Total Skills
+              <div className="flex-1 overflow-y-auto">
+                {sortedEntries.length === 0 ? (
+                  <div className="flex items-center justify-center h-32">
+                    <p className="text-muted-foreground">
+                      No entries in this plan
+                    </p>
                   </div>
-                  <div className="text-lg font-semibold">{stats.total}</div>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground">Complete</div>
-                  <div className="text-lg font-semibold text-green-400">
-                    {stats.complete}
+                ) : (
+                  <div>
+                    {sortedEntries.map((entry) => (
+                      <ComparisonEntryRow
+                        key={entry.entry_id}
+                        entry={entry}
+                        characterId={characterId}
+                      />
+                    ))}
                   </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground">
-                    In Progress
-                  </div>
-                  <div className="text-lg font-semibold text-yellow-400">
-                    {stats.in_progress}
-                  </div>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-xs text-muted-foreground">
-                    Not Started
-                  </div>
-                  <div className="text-lg font-semibold text-muted-foreground">
-                    {stats.not_started}
-                  </div>
-                </div>
+                )}
               </div>
-              {stats.totalMissingSP > 0 && (
-                <div className="pt-2 border-t border-border">
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">
-                      Total Missing SP:{' '}
-                    </span>
-                    <span className="font-semibold text-yellow-400">
-                      {formatSkillpoints(stats.totalMissingSP)}
-                    </span>
-                  </div>
-                </div>
-              )}
             </div>
-            <div className="flex-1 overflow-y-auto">
-              {sortedEntries.length === 0 ? (
-                <div className="flex items-center justify-center h-32">
-                  <p className="text-muted-foreground">
-                    No entries in this plan
-                  </p>
-                </div>
-              ) : (
-                <div>
-                  {sortedEntries.map((entry) => (
-                    <ComparisonEntryRow
-                      key={entry.entry_id}
-                      entry={entry}
-                      characterId={characterId}
-                    />
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+          ))
+          .exhaustive()}
       </div>
     </div>
   );

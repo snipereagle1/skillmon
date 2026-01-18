@@ -255,7 +255,7 @@ pub async fn get_skill_queues(
         .collect::<std::collections::HashSet<_>>()
         .into_iter()
         .collect();
-    let skill_names = utils::get_skill_names(&pool, &unique_skill_ids)
+    let skill_names = utils::get_type_names(&pool, &unique_skill_ids)
         .await
         .map_err(|e| format!("Failed to get skill names: {}", e))?;
     let skill_attributes = utils::get_skill_attributes(&pool, &unique_skill_ids)

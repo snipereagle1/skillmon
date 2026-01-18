@@ -1,4 +1,6 @@
-import { Pencil, Trash2 } from 'lucide-react';
+import { useSortable } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical, Pencil, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -13,29 +15,54 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import type { SkillPlanEntryResponse } from '@/generated/types';
+import type { Remap, SkillPlanEntryResponse } from '@/generated/types';
 import {
+  useAddPlanEntry,
   useDeletePlanEntry,
   useUpdatePlanEntry,
 } from '@/hooks/tauri/useSkillPlans';
+import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { cn } from '@/lib/utils';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
+import { RemapRow } from '../Remaps/RemapRow';
 import { LevelIndicator } from '../SkillQueue/LevelIndicator';
 
 interface PlanEntryRowProps {
   entry: SkillPlanEntryResponse;
   totalPlanSP: number;
   offsetPercentage: number;
+  validationStatus?: 'error' | 'warning';
+  remapAfter?: Remap;
 }
 
+// eslint-disable-next-line complexity
 export function PlanEntryRow({
   entry,
   totalPlanSP,
   offsetPercentage,
+  validationStatus,
+  remapAfter,
 }: PlanEntryRowProps) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: entry.entry_id });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    zIndex: isDragging ? 50 : undefined,
+  };
+
   const deleteEntryMutation = useDeletePlanEntry();
   const updateEntryMutation = useUpdatePlanEntry();
+  const addEntryMutation = useAddPlanEntry();
+  const { trackAction } = useUndoRedo();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editLevel, setEditLevel] = useState(entry.planned_level);
   const [editNotes, setEditNotes] = useState(entry.notes || '');
@@ -59,20 +86,68 @@ export function PlanEntryRow({
       return;
     }
 
+    let currentEntryId = entry.entry_id;
+
     try {
-      await deleteEntryMutation.mutateAsync({ entryId: entry.entry_id });
+      await trackAction(
+        `Delete ${entry.skill_name}`,
+        async () => {
+          await deleteEntryMutation.mutateAsync({ entryId: currentEntryId });
+        },
+        async () => {
+          const result = await addEntryMutation.mutateAsync({
+            planId: entry.plan_id,
+            skillTypeId: entry.skill_type_id,
+            plannedLevel: entry.planned_level,
+            notes: entry.notes,
+          });
+          // Update the ID for next redo/undo
+          const restored = result.entries.find(
+            (e) =>
+              e.skill_type_id === entry.skill_type_id &&
+              e.planned_level === entry.planned_level
+          );
+          if (restored) {
+            currentEntryId = restored.entry_id;
+          }
+        }
+      );
     } catch (err) {
       console.error('Failed to delete entry:', err);
     }
   };
 
   const handleSave = async () => {
+    const oldLevel = entry.planned_level;
+    const oldNotes = entry.notes;
+    const newLevel = editLevel;
+    const newNotes = editNotes.trim() || null;
+
+    if (oldLevel === newLevel && oldNotes === newNotes) {
+      setEditDialogOpen(false);
+      return;
+    }
+
+    const currentEntryId = entry.entry_id;
+
     try {
-      await updateEntryMutation.mutateAsync({
-        entryId: entry.entry_id,
-        plannedLevel: editLevel,
-        notes: editNotes.trim() || null,
-      });
+      await trackAction(
+        `Update ${entry.skill_name}`,
+        async () => {
+          await updateEntryMutation.mutateAsync({
+            entryId: currentEntryId,
+            plannedLevel: newLevel,
+            notes: newNotes,
+          });
+        },
+        async () => {
+          await updateEntryMutation.mutateAsync({
+            entryId: currentEntryId,
+            plannedLevel: oldLevel,
+            notes: oldNotes,
+          });
+        }
+      );
       setEditDialogOpen(false);
     } catch (err) {
       console.error('Failed to update entry:', err);
@@ -86,86 +161,109 @@ export function PlanEntryRow({
 
   return (
     <>
-      <div
-        className={cn(
-          'relative px-4 py-3 border-b last:border-b-0 border-border/50',
-          isPrerequisite && 'bg-muted/30'
-        )}
-      >
-        <div className="flex items-center justify-between gap-4 relative z-10">
-          <div className="flex items-center gap-3 flex-1 min-w-0">
-            <LevelIndicator level={entry.planned_level} />
-            <div className="flex flex-col flex-1 min-w-0">
+      <div ref={setNodeRef} style={style} className={cn(isDragging && 'z-50')}>
+        <div
+          className={cn(
+            'relative px-4 py-3 border-b border-border/50 transition-colors',
+            isPrerequisite && 'bg-muted/30',
+            isDragging && 'bg-accent opacity-50',
+            validationStatus === 'error' &&
+              'bg-destructive/10 border-destructive/50',
+            validationStatus === 'warning' &&
+              'bg-yellow-500/10 border-yellow-500/50'
+          )}
+        >
+          <div className="flex items-center justify-between gap-4 relative z-10">
+            <div className="flex items-center gap-3 flex-1 min-w-0">
+              <div
+                {...attributes}
+                {...listeners}
+                className={cn(
+                  'cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded',
+                  validationStatus === 'error' && 'text-destructive',
+                  validationStatus === 'warning' &&
+                    'text-yellow-600 dark:text-yellow-500'
+                )}
+              >
+                <GripVertical className="h-4 w-4" />
+              </div>
+              <LevelIndicator level={entry.planned_level} />
+              <div className="flex flex-col flex-1 min-w-0">
+                <span
+                  className={cn(
+                    'text-foreground font-medium truncate cursor-pointer hover:underline',
+                    isPrerequisite && 'text-muted-foreground',
+                    validationStatus === 'error' && 'text-destructive',
+                    validationStatus === 'warning' &&
+                      'text-yellow-600 dark:text-yellow-500'
+                  )}
+                  onClick={() => openSkillDetail(entry.skill_type_id, null)}
+                >
+                  {entry.skill_name} {levelRoman}
+                </span>
+                {entry.notes && (
+                  <span className="text-xs text-muted-foreground truncate">
+                    {entry.notes}
+                  </span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
               <span
                 className={cn(
-                  'text-foreground font-medium truncate cursor-pointer hover:underline',
-                  isPrerequisite && 'text-muted-foreground'
+                  'text-sm whitespace-nowrap',
+                  isPrerequisite ? 'text-muted-foreground' : 'text-foreground'
                 )}
-                onClick={() => openSkillDetail(entry.skill_type_id, null)}
               >
-                {entry.skill_name} {levelRoman}
+                {entry.skillpoints_for_level.toLocaleString('en-US')} SP
               </span>
-              {entry.notes && (
-                <span className="text-xs text-muted-foreground truncate">
-                  {entry.notes}
-                </span>
-              )}
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  setEditLevel(entry.planned_level);
+                  setEditNotes(entry.notes || '');
+                  setEditDialogOpen(true);
+                }}
+                className="h-8 w-8 p-0"
+              >
+                <Pencil className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleDelete}
+                disabled={deleteEntryMutation.isPending}
+                className="h-8 w-8 p-0"
+              >
+                <Trash2 className="h-4 w-4" />
+              </Button>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <span
-              className={cn(
-                'text-sm whitespace-nowrap',
-                isPrerequisite ? 'text-muted-foreground' : 'text-foreground'
-              )}
-            >
-              {entry.skillpoints_for_level.toLocaleString('en-US')} SP
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setEditLevel(entry.planned_level);
-                setEditNotes(entry.notes || '');
-                setEditDialogOpen(true);
-              }}
-              className="h-8 w-8 p-0"
-            >
-              <Pencil className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleDelete}
-              disabled={deleteEntryMutation.isPending}
-              className="h-8 w-8 p-0"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+          <div className="absolute bottom-0 left-0 right-0 h-0.5 pointer-events-none">
+            {offsetPercentage > 0 && (
+              <div
+                className="absolute h-full bg-blue-400/20 dark:bg-blue-500/20"
+                style={{ left: '0%', width: `${offsetPercentage}%` }}
+              />
+            )}
+            {spPercentage > 0 && (
+              <div
+                className={cn(
+                  'absolute h-full',
+                  isPrerequisite
+                    ? 'bg-muted-foreground/50'
+                    : 'bg-blue-400 dark:bg-blue-500'
+                )}
+                style={{
+                  left: `${offsetPercentage}%`,
+                  width: `${displayWidth}%`,
+                }}
+              />
+            )}
           </div>
         </div>
-        <div className="absolute bottom-0 left-0 right-0 h-0.5 pointer-events-none">
-          {offsetPercentage > 0 && (
-            <div
-              className="absolute h-full bg-blue-400/20 dark:bg-blue-500/20"
-              style={{ left: '0%', width: `${offsetPercentage}%` }}
-            />
-          )}
-          {spPercentage > 0 && (
-            <div
-              className={cn(
-                'absolute h-full',
-                isPrerequisite
-                  ? 'bg-muted-foreground/50'
-                  : 'bg-blue-400 dark:bg-blue-500'
-              )}
-              style={{
-                left: `${offsetPercentage}%`,
-                width: `${displayWidth}%`,
-              }}
-            />
-          )}
-        </div>
+        {remapAfter && <RemapRow remap={remapAfter} />}
       </div>
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>

@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { invoke } from '@tauri-apps/api/core';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -20,7 +21,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { deletePlanEntry } from '@/generated/commands';
+import type { SkillPlanWithEntriesResponse } from '@/generated/types';
 import { useAddPlanEntry } from '@/hooks/tauri/useSkillPlans';
+import { useUndoRedo } from '@/hooks/useUndoRedo';
 
 interface AddSkillDialogProps {
   open: boolean;
@@ -45,6 +49,8 @@ export function AddSkillDialog({
   const [notes, setNotes] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const addEntryMutation = useAddPlanEntry();
+  const queryClient = useQueryClient();
+  const { trackAction } = useUndoRedo();
 
   const searchSkills = async (query: string) => {
     if (!query.trim()) {
@@ -78,12 +84,45 @@ export function AddSkillDialog({
     if (!selectedSkillId) return;
 
     try {
-      await addEntryMutation.mutateAsync({
-        planId,
-        skillTypeId: selectedSkillId,
-        plannedLevel: level,
-        notes: notes.trim() || null,
-      });
+      const currentData =
+        queryClient.getQueryData<SkillPlanWithEntriesResponse>([
+          'skillPlanWithEntries',
+          planId,
+        ]);
+      const beforeEntryIds = new Set(
+        currentData?.entries.map((e) => e.entry_id) || []
+      );
+
+      let addedEntryIds: number[] = [];
+
+      await trackAction(
+        `Add ${selectedSkill?.name || 'Skill'}`,
+        async () => {
+          const result = await addEntryMutation.mutateAsync({
+            planId,
+            skillTypeId: selectedSkillId,
+            plannedLevel: level,
+            notes: notes.trim() || null,
+          });
+
+          // Store the newly added entry IDs for undo
+          const afterEntryIds = result.entries.map((e) => e.entry_id);
+          addedEntryIds = afterEntryIds.filter((id) => !beforeEntryIds.has(id));
+        },
+        async () => {
+          for (const entryId of addedEntryIds) {
+            // eslint-disable-next-line no-await-in-loop
+            await deletePlanEntry({ entryId });
+          }
+          queryClient.invalidateQueries({
+            queryKey: ['skillPlanWithEntries', planId],
+          });
+          queryClient.invalidateQueries({
+            queryKey: ['skillPlanValidation', planId],
+          });
+        }
+      );
+
       setSearchQuery('');
       setSelectedSkillId(null);
       setLevel(5);

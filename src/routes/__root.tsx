@@ -8,6 +8,7 @@ import { NotificationDrawer } from '@/components/NotificationDrawer';
 import { SkillDetail } from '@/components/SkillDetail';
 import { Button } from '@/components/ui/button';
 import { NavigationTabs } from '@/components/ui/navigation-tabs';
+import { Toaster } from '@/components/ui/sonner';
 import { Spinner } from '@/components/ui/spinner';
 import { useAuthEvents } from '@/hooks/tauri/useAuthEvents';
 import { useStartupState } from '@/hooks/tauri/useStartupState';
@@ -81,6 +82,7 @@ function RootComponent() {
         skillId={skillId}
         characterId={characterId}
       />
+      <Toaster />
     </div>
   );
 }

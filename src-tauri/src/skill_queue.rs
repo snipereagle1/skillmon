@@ -241,7 +241,7 @@ pub async fn build_character_skill_queue(
         })
         .collect();
 
-    let skill_names = utils::get_skill_names(pool, &skill_ids)
+    let skill_names = utils::get_type_names(pool, &skill_ids)
         .await
         .map_err(|e| format!("Failed to get skill names: {}", e))?;
     let skill_attributes = utils::get_skill_attributes(pool, &skill_ids)
