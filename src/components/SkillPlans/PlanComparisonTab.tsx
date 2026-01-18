@@ -9,10 +9,12 @@ import {
   DropdownMenu,
   DropdownMenuCheckboxItem,
   DropdownMenuContent,
-  DropdownMenuLabel,
+  DropdownMenuGroup,
+  DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Table,
   TableBody,
@@ -56,6 +58,17 @@ export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
       }
       return next;
     });
+  };
+
+  const selectAll = () => {
+    setExcludedCharacterIds(new Set());
+  };
+
+  const selectNone = () => {
+    if (!data) return;
+    setExcludedCharacterIds(
+      new Set(data.comparisons.map((c) => c.character_id))
+    );
   };
 
   const formatDuration = (seconds: number) => {
@@ -110,86 +123,114 @@ export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-56">
-            <DropdownMenuLabel>Show Characters</DropdownMenuLabel>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                selectAll();
+              }}
+            >
+              Select All
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(e) => {
+                e.preventDefault();
+                selectNone();
+              }}
+            >
+              Select None
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            {data.comparisons.map((c) => (
-              <DropdownMenuCheckboxItem
-                key={c.character_id}
-                checked={!excludedCharacterIds.has(c.character_id)}
-                onCheckedChange={() => toggleCharacter(c.character_id)}
-              >
-                {c.character_name}
-              </DropdownMenuCheckboxItem>
-            ))}
+            <DropdownMenuGroup>
+              {data.comparisons.map((c) => (
+                <DropdownMenuCheckboxItem
+                  key={c.character_id}
+                  checked={!excludedCharacterIds.has(c.character_id)}
+                  onCheckedChange={() => toggleCharacter(c.character_id)}
+                  onSelect={(e) => e.preventDefault()}
+                >
+                  {c.character_name}
+                </DropdownMenuCheckboxItem>
+              ))}
+            </DropdownMenuGroup>
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
 
-      <div className="border rounded-md overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Character</TableHead>
-              <TableHead className="text-right">Completed SP</TableHead>
-              <TableHead className="text-right">Missing SP</TableHead>
-              <TableHead className="text-right">Time Remaining</TableHead>
-              <TableHead>Status</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredComparisons.map((c) => (
-              <TableRow
-                key={c.character_id}
-                className="cursor-pointer hover:bg-muted/50"
-                onClick={() =>
-                  navigate({
-                    to: '/characters/$characterId/plans',
-                    params: { characterId: String(c.character_id) },
-                    search: { planId },
-                  })
-                }
-              >
-                <TableCell className="font-medium">
-                  {c.character_name}
-                </TableCell>
-                <TableCell className="text-right">
-                  {c.completed_sp.toLocaleString()}
-                </TableCell>
-                <TableCell className="text-right">
-                  {c.missing_sp.toLocaleString()}
-                </TableCell>
-                <TableCell className="text-right">
-                  {formatDuration(c.time_to_completion_seconds)}
-                </TableCell>
-                <TableCell>
-                  <div className="flex gap-2">
-                    <Badge
-                      variant={match(c.status)
-                        .with('complete', () => 'default' as const)
-                        .with('in_progress', () => 'secondary' as const)
-                        .otherwise(() => 'outline' as const)}
-                    >
-                      {c.status.replace('_', ' ')}
-                    </Badge>
-                    {!c.has_prerequisites && (
-                      <Badge variant="destructive">Missing Prereqs</Badge>
-                    )}
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-            {filteredComparisons.length === 0 && (
+      <div className="border rounded-md flex-1 min-h-0">
+        <ScrollArea className="h-full">
+          <Table>
+            <TableHeader className="sticky top-0 bg-background z-10">
               <TableRow>
-                <TableCell
-                  colSpan={5}
-                  className="text-center py-8 text-muted-foreground"
-                >
-                  No characters selected or available.
-                </TableCell>
+                <TableHead className="bg-background border-b">
+                  Character
+                </TableHead>
+                <TableHead className="text-right bg-background border-b">
+                  Completed SP
+                </TableHead>
+                <TableHead className="text-right bg-background border-b">
+                  Missing SP
+                </TableHead>
+                <TableHead className="text-right bg-background border-b">
+                  Time Remaining
+                </TableHead>
+                <TableHead className="bg-background border-b">Status</TableHead>
               </TableRow>
-            )}
-          </TableBody>
-        </Table>
+            </TableHeader>
+            <TableBody>
+              {filteredComparisons.map((c) => (
+                <TableRow
+                  key={c.character_id}
+                  className="cursor-pointer hover:bg-muted/50"
+                  onClick={() =>
+                    navigate({
+                      to: '/characters/$characterId/plans',
+                      params: { characterId: String(c.character_id) },
+                      search: { planId },
+                    })
+                  }
+                >
+                  <TableCell className="font-medium">
+                    {c.character_name}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {c.completed_sp.toLocaleString('en-US')}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {c.missing_sp.toLocaleString('en-US')}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    {formatDuration(c.time_to_completion_seconds)}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex gap-2">
+                      <Badge
+                        variant={match(c.status)
+                          .with('complete', () => 'default' as const)
+                          .with('in_progress', () => 'secondary' as const)
+                          .otherwise(() => 'outline' as const)}
+                      >
+                        {c.status.replace('_', ' ')}
+                      </Badge>
+                      {!c.has_prerequisites && (
+                        <Badge variant="destructive">Missing Prereqs</Badge>
+                      )}
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+              {filteredComparisons.length === 0 && (
+                <TableRow>
+                  <TableCell
+                    colSpan={5}
+                    className="text-center py-8 text-muted-foreground"
+                  >
+                    No characters selected or available.
+                  </TableCell>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </ScrollArea>
       </div>
     </div>
   );
