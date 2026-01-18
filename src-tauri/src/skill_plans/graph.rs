@@ -92,10 +92,15 @@ impl PlanDag {
         let mut in_degree: HashMap<PlanNode, usize> = HashMap::new();
 
         for node in &self.nodes {
-            in_degree.insert(
-                *node,
-                self.dependencies.get(node).map_or(0, |deps| deps.len()),
-            );
+            let mut degree = 0;
+            if let Some(deps) = self.dependencies.get(node) {
+                for prereq in deps {
+                    if self.nodes.contains(prereq) {
+                        degree += 1;
+                    }
+                }
+            }
+            in_degree.insert(*node, degree);
         }
 
         // We use a queue for nodes with in-degree 0.

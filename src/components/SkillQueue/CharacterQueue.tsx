@@ -1,8 +1,13 @@
+import { useNavigate } from '@tanstack/react-router';
+import { Plus } from 'lucide-react';
+import { toast } from 'sonner';
+
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import type { CharacterSkillQueue } from '@/generated/types';
+import type { CharacterSkillQueue, SkillmonPlan } from '@/generated/types';
 import { useForceRefreshSkillQueue } from '@/hooks/tauri/useForceRefreshSkillQueue';
+import { useImportSkillPlanJson } from '@/hooks/tauri/useSkillPlans';
 
 import { SkillQueueEntry } from './SkillQueueEntry';
 import { calculateTrainingHours, formatDurationFromHours } from './utils';
@@ -16,6 +21,47 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
   const MAX_QUEUE_SIZE = 150;
   const queueSize = queue.skill_queue.length;
   const forceRefresh = useForceRefreshSkillQueue();
+  const importPlan = useImportSkillPlanJson();
+  const navigate = useNavigate();
+
+  const handleCreatePlanFromQueue = () => {
+    if (queue.skill_queue.length === 0) {
+      toast.error('Cannot create a plan from an empty queue');
+      return;
+    }
+
+    const plan: SkillmonPlan = {
+      version: 1,
+      name: `${queue.character_name} Queue Plan`,
+      description: `Imported from training queue on ${new Date().toLocaleDateString()}`,
+      auto_prerequisites: true,
+      entries: queue.skill_queue.map((item) => ({
+        skill_type_id: item.skill_id,
+        level: item.finished_level,
+        entry_type: 'Planned',
+        notes: null,
+      })),
+      remaps: [],
+    };
+
+    importPlan.mutate(
+      { plan },
+      {
+        onSuccess: (planId) => {
+          toast.success('Skill plan created from queue');
+          navigate({
+            to: '/plans/$planId',
+            params: { planId: String(planId) },
+          });
+        },
+        onError: (error) => {
+          toast.error('Failed to create plan', {
+            description: error instanceof Error ? error.message : String(error),
+          });
+        },
+      }
+    );
+  };
 
   const calculateTotalTime = (): string => {
     if (queue.skill_queue.length === 0) return '0d 0h 0m';
@@ -78,14 +124,29 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
                 </Badge>
               )}
             </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => characterId && forceRefresh.mutate(characterId)}
-              disabled={forceRefresh.isPending || !characterId}
-            >
-              {forceRefresh.isPending ? 'Refreshing...' : 'Refresh'}
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleCreatePlanFromQueue}
+                disabled={
+                  importPlan.isPending || queue.skill_queue.length === 0
+                }
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                {importPlan.isPending
+                  ? 'Creating...'
+                  : 'Create Plan from Queue'}
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => characterId && forceRefresh.mutate(characterId)}
+                disabled={forceRefresh.isPending || !characterId}
+              >
+                {forceRefresh.isPending ? 'Refreshing...' : 'Refresh'}
+              </Button>
+            </div>
           </div>
         </div>
 
