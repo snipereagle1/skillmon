@@ -808,7 +808,7 @@ mod tests {
         let skill_attributes = utils::get_skill_attributes(&db.pool, &skill_type_ids)
             .await
             .unwrap();
-        let skill_names = utils::get_skill_names(&db.pool, &skill_type_ids)
+        let skill_names = utils::get_type_names(&db.pool, &skill_type_ids)
             .await
             .unwrap();
 

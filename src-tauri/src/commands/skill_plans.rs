@@ -107,8 +107,7 @@ pub async fn import_skill_plan_json(
         }
 
         let type_names = if !all_type_ids.is_empty() {
-            utils::get_type_names_helper(&pool, &all_type_ids.into_iter().collect::<Vec<_>>())
-                .await?
+            utils::get_type_names(&pool, &all_type_ids.into_iter().collect::<Vec<_>>()).await?
         } else {
             std::collections::HashMap::new()
         };
@@ -324,11 +323,15 @@ pub async fn get_skill_plan_with_entries(
         .await
         .map_err(|e| format!("Failed to get skill attributes: {}", e))?;
 
+    let skill_names = utils::get_type_names(&pool, &skill_type_ids)
+        .await
+        .map_err(|e| format!("Failed to get skill names: {}", e))?;
+
     let mut entry_responses = Vec::new();
     for entry in entries {
-        let skill_name = db::skill_plans::get_skill_name(&pool, entry.skill_type_id)
-            .await
-            .map_err(|e| format!("Failed to get skill name: {}", e))?
+        let skill_name = skill_names
+            .get(&entry.skill_type_id)
+            .cloned()
             .unwrap_or_else(|| format!("Unknown Skill ({})", entry.skill_type_id));
 
         let skill_attr = skill_attributes.get(&entry.skill_type_id);
@@ -611,8 +614,7 @@ pub async fn validate_skill_plan(
 
     if !all_type_ids.is_empty() {
         let names =
-            utils::get_type_names_helper(&pool, &all_type_ids.into_iter().collect::<Vec<_>>())
-                .await?;
+            utils::get_type_names(&pool, &all_type_ids.into_iter().collect::<Vec<_>>()).await?;
         type_names = names;
     }
 
@@ -739,8 +741,7 @@ pub async fn validate_reorder(
 
     if !all_type_ids.is_empty() {
         let names =
-            utils::get_type_names_helper(&pool, &all_type_ids.into_iter().collect::<Vec<_>>())
-                .await?;
+            utils::get_type_names(&pool, &all_type_ids.into_iter().collect::<Vec<_>>()).await?;
         type_names = names;
     }
 
@@ -1138,10 +1139,15 @@ pub async fn export_skill_plan_text(
         .map_err(|e| format!("Failed to get plan entries: {}", e))?;
 
     let mut lines = Vec::new();
+    let skill_type_ids: Vec<i64> = entries.iter().map(|e| e.skill_type_id).collect();
+    let skill_names = utils::get_type_names(&pool, &skill_type_ids)
+        .await
+        .map_err(|e| format!("Failed to get skill names: {}", e))?;
+
     for entry in entries {
-        let skill_name = db::skill_plans::get_skill_name(&pool, entry.skill_type_id)
-            .await
-            .map_err(|e| format!("Failed to get skill name: {}", e))?
+        let skill_name = skill_names
+            .get(&entry.skill_type_id)
+            .cloned()
             .unwrap_or_else(|| format!("Unknown Skill ({})", entry.skill_type_id));
 
         lines.push(format!("{} {}", skill_name, entry.planned_level));
@@ -1283,10 +1289,15 @@ pub async fn export_skill_plan_xml(
         .write_event(Event::Empty(sorting_elem))
         .map_err(|e| format!("Failed to write sorting element: {}", e))?;
 
+    let skill_type_ids: Vec<i64> = entries.iter().map(|e| e.skill_type_id).collect();
+    let skill_names = utils::get_type_names(&pool, &skill_type_ids)
+        .await
+        .map_err(|e| format!("Failed to get skill names: {}", e))?;
+
     for entry in entries {
-        let skill_name = db::skill_plans::get_skill_name(&pool, entry.skill_type_id)
-            .await
-            .map_err(|e| format!("Failed to get skill name: {}", e))?
+        let skill_name = skill_names
+            .get(&entry.skill_type_id)
+            .cloned()
             .unwrap_or_else(|| format!("Unknown Skill ({})", entry.skill_type_id));
 
         let skill_id_str = entry.skill_type_id.to_string();
@@ -1400,11 +1411,15 @@ pub async fn compare_skill_plan_with_character(
         .await
         .map_err(|e| format!("Failed to get skill attributes: {}", e))?;
 
+    let skill_names = utils::get_type_names(&pool, &skill_type_ids)
+        .await
+        .map_err(|e| format!("Failed to get skill names: {}", e))?;
+
     let mut comparison_entries = Vec::new();
     for entry in entries {
-        let skill_name = db::skill_plans::get_skill_name(&pool, entry.skill_type_id)
-            .await
-            .map_err(|e| format!("Failed to get skill name: {}", e))?
+        let skill_name = skill_names
+            .get(&entry.skill_type_id)
+            .cloned()
             .unwrap_or_else(|| format!("Unknown Skill ({})", entry.skill_type_id));
 
         let char_skill = character_skills_map.get(&entry.skill_type_id);

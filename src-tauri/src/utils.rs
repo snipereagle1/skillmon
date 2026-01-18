@@ -11,43 +11,7 @@ pub struct SkillAttributes {
     pub rank: Option<i64>,
 }
 
-pub async fn get_skill_names(
-    pool: &db::Pool,
-    skill_ids: &[i64],
-) -> Result<HashMap<i64, String>, String> {
-    if skill_ids.is_empty() {
-        return Ok(HashMap::new());
-    }
-
-    let mut skill_names = HashMap::new();
-
-    for chunk in skill_ids.chunks(100) {
-        let mut query_builder: QueryBuilder<Sqlite> =
-            QueryBuilder::new("SELECT type_id, name FROM sde_types WHERE type_id IN (");
-
-        let mut separated = query_builder.separated(", ");
-        for skill_id in chunk {
-            separated.push_bind(skill_id);
-        }
-        separated.push_unseparated(")");
-
-        let query = query_builder.build();
-        let rows = query
-            .fetch_all(pool)
-            .await
-            .map_err(|e| format!("Failed to query skill names: {}", e))?;
-
-        for row in rows {
-            let type_id: i64 = row.get(0);
-            let name: String = row.get(1);
-            skill_names.insert(type_id, name);
-        }
-    }
-
-    Ok(skill_names)
-}
-
-pub async fn get_type_names_helper(
+pub async fn get_type_names(
     pool: &db::Pool,
     type_ids: &[i64],
 ) -> Result<HashMap<i64, String>, String> {

@@ -218,15 +218,6 @@ pub async fn get_skill_type_id_by_name(pool: &Pool, skill_name: &str) -> Result<
     Ok(type_id)
 }
 
-pub async fn get_skill_name(pool: &Pool, type_id: i64) -> Result<Option<String>> {
-    let name = sqlx::query_scalar::<_, String>("SELECT name FROM sde_types WHERE type_id = ?")
-        .bind(type_id)
-        .fetch_optional(pool)
-        .await?;
-
-    Ok(name)
-}
-
 pub async fn search_skills(pool: &Pool, query: &str) -> Result<Vec<(i64, String)>> {
     let search_pattern = format!("%{}%", query);
     let skills = sqlx::query_as::<_, (i64, String)>(
