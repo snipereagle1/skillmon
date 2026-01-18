@@ -143,8 +143,9 @@ export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
                 className="cursor-pointer hover:bg-muted/50"
                 onClick={() =>
                   navigate({
-                    to: '/characters/$characterId',
+                    to: '/characters/$characterId/plans',
                     params: { characterId: String(c.character_id) },
+                    search: { planId },
                   })
                 }
               >

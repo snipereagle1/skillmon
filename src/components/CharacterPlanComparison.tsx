@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { match, P } from 'ts-pattern';
 
 import type { PlanComparisonEntry } from '@/generated/types';
@@ -11,6 +10,8 @@ import { LevelIndicator } from './SkillQueue/LevelIndicator';
 
 interface CharacterPlanComparisonProps {
   characterId: number | null;
+  selectedPlanId: number | null;
+  onPlanChange: (planId: number | null) => void;
 }
 
 function formatSkillpoints(sp: number): string {
@@ -99,9 +100,10 @@ function ComparisonEntryRow({
 
 export function CharacterPlanComparison({
   characterId,
+  selectedPlanId,
+  onPlanChange,
 }: CharacterPlanComparisonProps) {
   const { data: plans, isLoading: isLoadingPlans } = useSkillPlans();
-  const [selectedPlanId, setSelectedPlanId] = useState<number | null>(null);
   const { data: comparison, isLoading: isLoadingComparison } =
     usePlanComparison(selectedPlanId, characterId);
 
@@ -157,7 +159,7 @@ export function CharacterPlanComparison({
                 {plans.map((plan) => (
                   <div
                     key={plan.plan_id}
-                    onClick={() => setSelectedPlanId(plan.plan_id)}
+                    onClick={() => onPlanChange(plan.plan_id)}
                     className={cn(
                       'p-3 rounded-md cursor-pointer transition-colors',
                       selectedPlanId === plan.plan_id
