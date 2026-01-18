@@ -11,8 +11,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { Attributes } from '@/generated/types';
 import { useSaveRemap } from '@/hooks/tauri/useRemaps';
+import { useSkillPlanWithEntries } from '@/hooks/tauri/useSkillPlans';
 
 interface AddRemapDialogProps {
   open: boolean;
@@ -51,6 +59,29 @@ export function AddRemapDialog({
     charisma: 0,
   });
 
+  const [selectedSkillId, setSelectedSkillId] = useState<string>('start');
+
+  // Adjust state when dialog opens by tracking the open prop change during render
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      setSelectedSkillId(
+        afterSkillTypeId && afterSkillLevel
+          ? `${afterSkillTypeId}-${afterSkillLevel}`
+          : 'start'
+      );
+      setAttributes({
+        perception: 0,
+        memory: 0,
+        willpower: 0,
+        intelligence: 0,
+        charisma: 0,
+      });
+    }
+  }
+
+  const { data: planWithEntries } = useSkillPlanWithEntries(planId);
   const saveRemapMutation = useSaveRemap();
 
   const totalPoints = Object.values(attributes).reduce(
@@ -73,11 +104,20 @@ export function AddRemapDialog({
 
   const handleSave = async () => {
     try {
+      let finalAfterSkillTypeId = null;
+      let finalAfterSkillLevel = null;
+
+      if (selectedSkillId !== 'start') {
+        const [typeId, level] = selectedSkillId.split('-').map(Number);
+        finalAfterSkillTypeId = typeId;
+        finalAfterSkillLevel = level;
+      }
+
       await saveRemapMutation.mutateAsync({
         characterId,
         planId,
-        afterSkillTypeId,
-        afterSkillLevel,
+        afterSkillTypeId: finalAfterSkillTypeId,
+        afterSkillLevel: finalAfterSkillLevel,
         attributes,
       });
       onOpenChange(false);
@@ -103,6 +143,31 @@ export function AddRemapDialog({
         </DialogHeader>
 
         <div className="grid gap-4 py-4">
+          {planId && planWithEntries && (
+            <div className="space-y-2">
+              <Label htmlFor="after-skill">Apply Remap After</Label>
+              <Select
+                value={selectedSkillId}
+                onValueChange={setSelectedSkillId}
+              >
+                <SelectTrigger id="after-skill">
+                  <SelectValue placeholder="Select when to apply" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="start">At Start of Plan</SelectItem>
+                  {planWithEntries.entries.map((entry) => (
+                    <SelectItem
+                      key={`${entry.skill_type_id}-${entry.planned_level}`}
+                      value={`${entry.skill_type_id}-${entry.planned_level}`}
+                    >
+                      {entry.skill_name} {entry.planned_level}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           <div className="flex items-center justify-between px-1">
             <span className="text-sm font-medium">Points Distributed</span>
             <span
