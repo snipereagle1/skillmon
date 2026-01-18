@@ -80,7 +80,19 @@ export function useCreateSkillPlan() {
     mutationFn: async (params: CreateSkillPlanParams) => {
       return await createSkillPlan(params);
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
+      // Remove any existing queries for this ID in case it was reused by the backend
+      queryClient.removeQueries({ queryKey: ['skillPlan', data] });
+      queryClient.removeQueries({ queryKey: ['skillPlanWithEntries', data] });
+      queryClient.removeQueries({ queryKey: ['skillPlanValidation', data] });
+      queryClient.removeQueries({ queryKey: ['planComparison', data] });
+      queryClient.removeQueries({ queryKey: ['planComparisonAll', data] });
+      queryClient.removeQueries({ queryKey: ['exportSkillPlanText', data] });
+      queryClient.removeQueries({ queryKey: ['exportSkillPlanXml', data] });
+      queryClient.removeQueries({ queryKey: ['remaps', 'plan', data] });
+      queryClient.removeQueries({ queryKey: ['skillPlanSimulation', data] });
+      queryClient.removeQueries({ queryKey: ['skillPlanOptimization', data] });
+
       queryClient.invalidateQueries({ queryKey: ['skillPlans'] });
     },
   });
@@ -115,15 +127,36 @@ export function useDeleteSkillPlan() {
     },
     onSuccess: (_, params) => {
       queryClient.invalidateQueries({ queryKey: ['skillPlans'] });
-      queryClient.invalidateQueries({ queryKey: ['skillPlan', params.planId] });
-      queryClient.invalidateQueries({
+
+      // Completely remove queries for the deleted plan to avoid stale cache issues
+      // if the ID is reused by the backend
+      queryClient.removeQueries({ queryKey: ['skillPlan', params.planId] });
+      queryClient.removeQueries({
         queryKey: ['skillPlanWithEntries', params.planId],
       });
-      queryClient.invalidateQueries({
+      queryClient.removeQueries({
+        queryKey: ['skillPlanValidation', params.planId],
+      });
+      queryClient.removeQueries({
+        queryKey: ['planComparison', params.planId],
+      });
+      queryClient.removeQueries({
+        queryKey: ['planComparisonAll', params.planId],
+      });
+      queryClient.removeQueries({
         queryKey: ['exportSkillPlanText', params.planId],
       });
-      queryClient.invalidateQueries({
+      queryClient.removeQueries({
         queryKey: ['exportSkillPlanXml', params.planId],
+      });
+      queryClient.removeQueries({
+        queryKey: ['remaps', 'plan', params.planId],
+      });
+      queryClient.removeQueries({
+        queryKey: ['skillPlanSimulation', params.planId],
+      });
+      queryClient.removeQueries({
+        queryKey: ['skillPlanOptimization', params.planId],
       });
     },
   });
