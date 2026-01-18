@@ -1,6 +1,7 @@
 import { useNavigate } from '@tanstack/react-router';
 import { Filter } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { match } from 'ts-pattern';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -162,13 +163,10 @@ export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
                 <TableCell>
                   <div className="flex gap-2">
                     <Badge
-                      variant={
-                        c.status === 'complete'
-                          ? 'default'
-                          : c.status === 'in_progress'
-                            ? 'secondary'
-                            : 'outline'
-                      }
+                      variant={match(c.status)
+                        .with('complete', () => 'default' as const)
+                        .with('in_progress', () => 'secondary' as const)
+                        .otherwise(() => 'outline' as const)}
                     >
                       {c.status.replace('_', ' ')}
                     </Badge>

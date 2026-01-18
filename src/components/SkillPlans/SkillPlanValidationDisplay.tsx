@@ -1,4 +1,5 @@
 import { AlertCircle, AlertTriangle, CheckCircle2, Info } from 'lucide-react';
+import { match, P } from 'ts-pattern';
 
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type {
@@ -40,28 +41,35 @@ export function SkillPlanValidationDisplay({
 
   const statusContent = (
     <div className="flex items-center gap-2">
-      {validation.is_valid && !hasIssues ? (
-        <>
-          <CheckCircle2 className="h-4 w-4 text-green-500" />
-          <span className="text-xs font-medium text-green-600 dark:text-green-400">
-            {isProposed ? 'Proposed order is valid' : 'Plan is valid'}
-          </span>
-        </>
-      ) : validation.errors.length > 0 ? (
-        <>
-          <AlertCircle className="h-4 w-4 text-destructive" />
-          <span className="text-xs font-bold text-destructive">
-            {isProposed ? 'Proposed order has errors' : 'Plan has errors'}
-          </span>
-        </>
-      ) : (
-        <>
-          <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
-          <span className="text-xs font-bold text-yellow-700 dark:text-yellow-400">
-            {isProposed ? 'Proposed order has warnings' : 'Plan has warnings'}
-          </span>
-        </>
-      )}
+      {match({
+        isValid: validation.is_valid,
+        hasIssues,
+        errorCount: validation.errors.length,
+      })
+        .with({ isValid: true, hasIssues: false }, () => (
+          <>
+            <CheckCircle2 className="h-4 w-4 text-green-500" />
+            <span className="text-xs font-medium text-green-600 dark:text-green-400">
+              {isProposed ? 'Proposed order is valid' : 'Plan is valid'}
+            </span>
+          </>
+        ))
+        .with({ errorCount: P.select(P.when((c) => c > 0)) }, () => (
+          <>
+            <AlertCircle className="h-4 w-4 text-destructive" />
+            <span className="text-xs font-bold text-destructive">
+              {isProposed ? 'Proposed order has errors' : 'Plan has errors'}
+            </span>
+          </>
+        ))
+        .otherwise(() => (
+          <>
+            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
+            <span className="text-xs font-bold text-yellow-700 dark:text-yellow-400">
+              {isProposed ? 'Proposed order has warnings' : 'Plan has warnings'}
+            </span>
+          </>
+        ))}
     </div>
   );
 

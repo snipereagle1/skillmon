@@ -1,4 +1,4 @@
-import { Calendar,Minus, Plus, Trash2 } from 'lucide-react';
+import { Calendar, Minus, Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +9,7 @@ import type {
   SimulationProfile,
   SkillPlanEntryResponse,
 } from '@/generated/types';
-import { useDeleteRemap,usePlanRemaps } from '@/hooks/tauri/useRemaps';
+import { useDeleteRemap, usePlanRemaps } from '@/hooks/tauri/useRemaps';
 
 import { OptimizationDialog } from './OptimizationDialog';
 
@@ -187,7 +187,7 @@ export function SimulationPanel({
                 remaps: [remap, ...otherRemaps],
               });
             }}
-            onApplyReorder={(optimizedEntries, remaps) => {
+            onApplyReorder={(_optimizedEntries, remaps) => {
               onProfileChange({
                 ...profile,
                 remaps,
@@ -235,10 +235,17 @@ export function SimulationPanel({
                   Saved Plan Remaps
                 </Label>
                 {savedRemaps.map((remap) => {
-                  const skillName = entries.find(e => e.skill_type_id === remap.after_skill_type_id && e.planned_level === remap.after_skill_level)?.skill_name;
+                  const skillName = entries.find(
+                    (e) =>
+                      e.skill_type_id === remap.after_skill_type_id &&
+                      e.planned_level === remap.after_skill_level
+                  )?.skill_name;
 
                   return (
-                    <div key={remap.remap_id} className="flex items-center justify-between text-xs bg-muted/50 p-2 rounded-md border border-border">
+                    <div
+                      key={remap.remap_id}
+                      className="flex items-center justify-between text-xs bg-muted/50 p-2 rounded-md border border-border"
+                    >
                       <div className="space-y-1">
                         <div className="font-medium flex items-center gap-1.5">
                           <Calendar className="h-3 w-3 text-muted-foreground" />
@@ -247,7 +254,8 @@ export function SimulationPanel({
                             : 'At Start'}
                         </div>
                         <div className="text-muted-foreground font-mono">
-                          I:{remap.intelligence} P:{remap.perception} C:{remap.charisma} W:{remap.willpower} M:{remap.memory}
+                          I:{remap.intelligence} P:{remap.perception} C:
+                          {remap.charisma} W:{remap.willpower} M:{remap.memory}
                         </div>
                       </div>
                       <Button

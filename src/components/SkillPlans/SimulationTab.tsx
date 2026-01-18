@@ -1,5 +1,6 @@
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import { match, P } from 'ts-pattern';
 
 import { Label } from '@/components/ui/label';
 import {
@@ -125,22 +126,26 @@ export function SimulationTab({ planId }: SimulationTabProps) {
       </div>
 
       <div className="flex-1 min-w-0">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          </div>
-        ) : error ? (
-          <div className="flex items-center justify-center h-full text-destructive">
-            Error:{' '}
-            {error instanceof Error ? error.message : 'Simulation failed'}
-          </div>
-        ) : simulation ? (
-          <SimulationTimeline result={simulation} profile={profile} />
-        ) : (
-          <div className="flex items-center justify-center h-full text-muted-foreground">
-            No simulation data available.
-          </div>
-        )}
+        {match({ isLoading, error, simulation })
+          .with({ isLoading: true }, () => (
+            <div className="flex items-center justify-center h-full">
+              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+            </div>
+          ))
+          .with({ error: P.not(null) }, ({ error }) => (
+            <div className="flex items-center justify-center h-full text-destructive">
+              Error:{' '}
+              {error instanceof Error ? error.message : 'Simulation failed'}
+            </div>
+          ))
+          .with({ simulation: P.select(P.not(P.nullish)) }, (sim) => (
+            <SimulationTimeline result={sim} profile={profile} />
+          ))
+          .otherwise(() => (
+            <div className="flex items-center justify-center h-full text-muted-foreground">
+              No simulation data available.
+            </div>
+          ))}
       </div>
     </div>
   );

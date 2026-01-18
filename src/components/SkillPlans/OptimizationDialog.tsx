@@ -1,6 +1,7 @@
 import { ArrowRight, Check, Loader2, RefreshCw, Save, Zap } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
+import { match, P } from 'ts-pattern';
 
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -141,7 +142,9 @@ export function OptimizationDialog({
       if (isReorderResult(optimization)) {
         // Apply the reorder to the actual plan in DB
         const oldEntryIds = entries.map((e) => e.entry_id);
-        const newEntryIds = optimization.optimized_entries.map((e) => e.entry_id);
+        const newEntryIds = optimization.optimized_entries.map(
+          (e) => e.entry_id
+        );
 
         await trackAction(
           'Optimize Plan Order',
@@ -177,9 +180,11 @@ export function OptimizationDialog({
         // Update local simulation state
         if (onApplyReorder) {
           const entryMap = new Map(entries.map((e) => [e.entry_id, e]));
-          const optimizedWithNames = optimization.optimized_entries.map((e) => ({
-            ...entryMap.get(e.entry_id)!,
-          })) as SkillPlanEntryResponse[];
+          const optimizedWithNames = optimization.optimized_entries.map(
+            (e) => ({
+              ...entryMap.get(e.entry_id)!,
+            })
+          ) as SkillPlanEntryResponse[];
 
           onApplyReorder(optimizedWithNames, optimization.recommended_remaps);
         }
@@ -253,162 +258,157 @@ export function OptimizationDialog({
           </TabsList>
 
           <div className="mt-4">
-            {isLoading ? (
-              <div className="flex flex-col items-center justify-center py-12 gap-4">
-                <Loader2 className="h-8 w-8 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">
-                  Running optimization algorithm...
-                </p>
-              </div>
-            ) : error ? (
-              <div className="py-12 text-center text-destructive">
-                Failed to calculate optimization:{' '}
-                {error instanceof Error ? error.message : 'Unknown error'}
-              </div>
-            ) : optimization ? (
-              <div className="space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="bg-muted/50 p-4 rounded-lg text-center">
-                    <div className="text-sm text-muted-foreground">
-                      Base Time
-                    </div>
-                    <div className="text-xl font-bold">
-                      {formatDuration(
-                        (
-                          optimization as
-                            | OptimizationResult
-                            | ReorderOptimizationResult
-                        ).original_seconds
-                      )}
-                    </div>
-                  </div>
-                  <div className="bg-primary/10 p-4 rounded-lg text-center border border-primary/20">
-                    <div className="text-sm text-primary font-medium">
-                      Optimized Time
-                    </div>
-                    <div className="text-xl font-bold text-primary">
-                      {formatDuration(
-                        (
-                          optimization as
-                            | OptimizationResult
-                            | ReorderOptimizationResult
-                        ).optimized_seconds
-                      )}
-                    </div>
-                  </div>
+            {match({ isLoading, error, optimization })
+              .with({ isLoading: true }, () => (
+                <div className="flex flex-col items-center justify-center py-12 gap-4">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">
+                    Running optimization algorithm...
+                  </p>
                 </div>
-
-                {timeSaved > 0 ? (
-                  <div className="flex items-center gap-2 text-green-600 dark:text-green-400 bg-green-500/10 p-3 rounded-md text-sm font-medium">
-                    <Check className="h-4 w-4" />
-                    Total savings: {formatDuration(timeSaved)}
-                  </div>
-                ) : (
-                  <div className="text-center text-sm text-muted-foreground bg-muted p-3 rounded-md">
-                    Plan is already optimal!
-                  </div>
-                )}
-
-                <TabsContent value="attributes" className="mt-0">
-                  <div className="rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Attribute</TableHead>
-                          <TableHead className="text-center">Current</TableHead>
-                          <TableHead></TableHead>
-                          <TableHead className="text-center">
-                            Recommended
-                          </TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {ATTRIBUTES.map((attr) => {
-                          const currentVal = currentRemap[attr];
-                          if (!optimization || isReorderResult(optimization)) {
-                            return null;
-                          }
-
-                          const recommendedVal =
-                            optimization.recommended_remap.attributes[attr];
-                          const isChanged = currentVal !== recommendedVal;
-
-                          return (
-                            <TableRow key={attr}>
-                              <TableCell className="capitalize font-medium">
-                                {attr}
-                              </TableCell>
-                              <TableCell className="text-center">
-                                +{currentVal}
-                              </TableCell>
-                              <TableCell className="text-center w-8">
-                                {isChanged && (
-                                  <ArrowRight className="h-3 w-3 mx-auto text-muted-foreground" />
-                                )}
-                              </TableCell>
-                              <TableCell
-                                className={`text-center font-bold ${
-                                  isChanged ? 'text-primary' : ''
-                                }`}
-                              >
-                                +{recommendedVal}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                </TabsContent>
-
-                <TabsContent value="reorder" className="mt-0">
-                  <div className="flex items-center gap-4 mb-4 p-3 bg-muted/30 rounded-md">
-                    <Label htmlFor="max-remaps" className="text-sm font-medium">
-                      Maximum remaps:
-                    </Label>
-                    <Select
-                      value={maxRemaps.toString()}
-                      onValueChange={(v) => setMaxRemaps(parseInt(v))}
-                    >
-                      <SelectTrigger id="max-remaps" className="w-[120px]">
-                        <SelectValue placeholder="Select" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="1">1 remap</SelectItem>
-                        <SelectItem value="2">2 remaps</SelectItem>
-                        <SelectItem value="3">3 remaps</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <p className="text-xs text-muted-foreground italic">
-                      (Recommend 1 for most plans)
-                    </p>
+              ))
+              .with({ error: P.not(null) }, ({ error }) => (
+                <div className="py-12 text-center text-destructive">
+                  Failed to calculate optimization:{' '}
+                  {error instanceof Error ? error.message : 'Unknown error'}
+                </div>
+              ))
+              .with({ optimization: P.select(P.not(undefined)) }, (opt) => (
+                <div className="space-y-6">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-muted/50 p-4 rounded-lg text-center">
+                      <div className="text-sm text-muted-foreground">
+                        Base Time
+                      </div>
+                      <div className="text-xl font-bold">
+                        {formatDuration(opt.original_seconds)}
+                      </div>
+                    </div>
+                    <div className="bg-primary/10 p-4 rounded-lg text-center border border-primary/20">
+                      <div className="text-sm text-primary font-medium">
+                        Optimized Time
+                      </div>
+                      <div className="text-xl font-bold text-primary">
+                        {formatDuration(opt.optimized_seconds)}
+                      </div>
+                    </div>
                   </div>
 
-                  {optimization && isReorderResult(optimization) && (
-                    <RemapSchedule
-                      remaps={optimization.recommended_remaps}
-                      currentAttributes={currentRemap}
-                      optimizedEntries={optimization.optimized_entries.map(
-                        (opt) => {
+                  {timeSaved > 0 ? (
+                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400 bg-green-500/10 p-3 rounded-md text-sm font-medium">
+                      <Check className="h-4 w-4" />
+                      Total savings: {formatDuration(timeSaved)}
+                    </div>
+                  ) : (
+                    <div className="text-center text-sm text-muted-foreground bg-muted p-3 rounded-md">
+                      Plan is already optimal!
+                    </div>
+                  )}
+
+                  <TabsContent value="attributes" className="mt-0">
+                    <div className="rounded-md border">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Attribute</TableHead>
+                            <TableHead className="text-center">
+                              Current
+                            </TableHead>
+                            <TableHead></TableHead>
+                            <TableHead className="text-center">
+                              Recommended
+                            </TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {ATTRIBUTES.map((attr) => {
+                            const currentVal = currentRemap[attr];
+                            if (isReorderResult(opt)) {
+                              return null;
+                            }
+
+                            const recommendedVal =
+                              opt.recommended_remap.attributes[attr];
+                            const isChanged = currentVal !== recommendedVal;
+
+                            return (
+                              <TableRow key={attr}>
+                                <TableCell className="capitalize font-medium">
+                                  {attr}
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  +{currentVal}
+                                </TableCell>
+                                <TableCell className="text-center w-8">
+                                  {isChanged && (
+                                    <ArrowRight className="h-3 w-3 mx-auto text-muted-foreground" />
+                                  )}
+                                </TableCell>
+                                <TableCell
+                                  className={`text-center font-bold ${
+                                    isChanged ? 'text-primary' : ''
+                                  }`}
+                                >
+                                  +{recommendedVal}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="reorder" className="mt-0">
+                    <div className="flex items-center gap-4 mb-4 p-3 bg-muted/30 rounded-md">
+                      <Label
+                        htmlFor="max-remaps"
+                        className="text-sm font-medium"
+                      >
+                        Maximum remaps:
+                      </Label>
+                      <Select
+                        value={maxRemaps.toString()}
+                        onValueChange={(v) => setMaxRemaps(parseInt(v))}
+                      >
+                        <SelectTrigger id="max-remaps" className="w-[120px]">
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="1">1 remap</SelectItem>
+                          <SelectItem value="2">2 remaps</SelectItem>
+                          <SelectItem value="3">3 remaps</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground italic">
+                        (Recommend 1 for most plans)
+                      </p>
+                    </div>
+
+                    {isReorderResult(opt) && (
+                      <RemapSchedule
+                        remaps={opt.recommended_remaps}
+                        currentAttributes={currentRemap}
+                        optimizedEntries={opt.optimized_entries.map((item) => {
                           const original = entries.find(
-                            (e) => e.entry_id === opt.entry_id
+                            (e) => e.entry_id === item.entry_id
                           );
                           return {
                             ...original,
-                            ...opt,
+                            ...item,
                           } as SkillPlanEntryResponse;
-                        }
-                      )}
-                    />
-                  )}
-                  <div className="mt-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-md text-xs text-blue-600 dark:text-blue-400">
-                    <strong>Note:</strong> Up to {maxRemaps} remap
-                    {maxRemaps > 1 ? 's' : ''} will be automatically scheduled
-                    to match the new skill order.
-                  </div>
-                </TabsContent>
-              </div>
-            ) : null}
+                        })}
+                      />
+                    )}
+                    <div className="mt-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-md text-xs text-blue-600 dark:text-blue-400">
+                      <strong>Note:</strong> Up to {maxRemaps} remap
+                      {maxRemaps > 1 ? 's' : ''} will be automatically scheduled
+                      to match the new skill order.
+                    </div>
+                  </TabsContent>
+                </div>
+              ))
+              .otherwise(() => null)}
           </div>
         </Tabs>
 
