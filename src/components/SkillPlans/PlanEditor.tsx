@@ -7,11 +7,17 @@ import {
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
-import { Copy, Redo2, Undo2 } from 'lucide-react';
+import { ChevronDown, Copy, Download, Redo2, Undo2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -519,22 +525,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
           >
             Import
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportJson}
-            disabled={isExportingJson}
-          >
-            Export JSON
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportText}
-            disabled={isExportingText}
-          >
-            Export Text
-          </Button>
+
           <Button
             variant="outline"
             size="sm"
@@ -544,14 +535,36 @@ export function PlanEditor({ planId }: PlanEditorProps) {
             <Copy className="mr-2 h-4 w-4" />
             Copy Text
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportXml}
-            disabled={isExportingXml}
-          >
-            Export XML
-          </Button>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <Download className="mr-2 h-4 w-4" />
+                Export
+                <ChevronDown className="ml-2 h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={handleExportJson}
+                disabled={isExportingJson}
+              >
+                Export JSON
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportText}
+                disabled={isExportingText}
+              >
+                Export Text
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={handleExportXml}
+                disabled={isExportingXml}
+              >
+                Export XML
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
 
