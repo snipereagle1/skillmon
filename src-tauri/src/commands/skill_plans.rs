@@ -438,7 +438,7 @@ pub async fn add_plan_entry(
         } else {
             // Check if it already exists as Planned
             let existing =
-                db::skill_plans::get_entry_type(&pool, plan_id, node.skill_type_id, node.level)
+                db::skill_plans::get_entry_type(&mut *tx, plan_id, node.skill_type_id, node.level)
                     .await
                     .map_err(|e| format!("DB Error: {}", e))?;
 
@@ -894,7 +894,7 @@ pub async fn import_skill_plan_text(
             "Planned"
         } else {
             let existing =
-                db::skill_plans::get_entry_type(&pool, plan_id, node.skill_type_id, node.level)
+                db::skill_plans::get_entry_type(&mut *tx, plan_id, node.skill_type_id, node.level)
                     .await
                     .map_err(|e| format!("DB Error: {}", e))?;
 
@@ -1076,7 +1076,7 @@ pub async fn import_skill_plan_xml(
             "Planned"
         } else {
             let existing =
-                db::skill_plans::get_entry_type(&pool, plan_id, node.skill_type_id, node.level)
+                db::skill_plans::get_entry_type(&mut *tx, plan_id, node.skill_type_id, node.level)
                     .await
                     .map_err(|e| format!("DB Error: {}", e))?;
 

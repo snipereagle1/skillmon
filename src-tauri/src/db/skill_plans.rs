@@ -244,19 +244,22 @@ pub async fn search_skills(pool: &Pool, query: &str) -> Result<Vec<(i64, String)
     Ok(skills)
 }
 
-pub async fn get_entry_type(
-    pool: &Pool,
+pub async fn get_entry_type<'a, E>(
+    executor: E,
     plan_id: i64,
     skill_id: i64,
     level: i64,
-) -> Result<Option<String>> {
+) -> Result<Option<String>>
+where
+    E: sqlx::Executor<'a, Database = sqlx::Sqlite>,
+{
     let entry_type = sqlx::query_scalar::<_, String>(
         "SELECT entry_type FROM skill_plan_entries WHERE plan_id = ? AND skill_type_id = ? AND planned_level = ?",
     )
     .bind(plan_id)
     .bind(skill_id)
     .bind(level)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await?;
 
     Ok(entry_type)
