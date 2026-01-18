@@ -20,12 +20,7 @@ export function PlanList() {
     name: string;
   } | null>(null);
 
-  const handleDeleteClick = (
-    planId: number,
-    planName: string,
-    e: React.MouseEvent
-  ) => {
-    e.stopPropagation();
+  const handleDeleteClick = (planId: number, planName: string) => {
     setPlanToDelete({ id: planId, name: planName });
     setDeleteDialogOpen(true);
   };
@@ -81,12 +76,10 @@ export function PlanList() {
         ) : (
           <div className="p-2 space-y-1">
             {plans.map((plan) => (
-              <Link
+              <div
                 key={plan.plan_id}
-                to="/plans/$planId"
-                params={{ planId: String(plan.plan_id) }}
                 className={`
-                  block p-3 rounded-md cursor-pointer transition-colors
+                  relative flex items-center rounded-md transition-colors
                   ${
                     selectedPlanId === plan.plan_id
                       ? 'bg-muted text-white'
@@ -94,7 +87,11 @@ export function PlanList() {
                   }
                 `}
               >
-                <div className="flex items-start justify-between gap-2">
+                <Link
+                  to="/plans/$planId"
+                  params={{ planId: String(plan.plan_id) }}
+                  className="flex-1 block p-3 min-w-0"
+                >
                   <div className="flex-1 min-w-0">
                     <h3 className="font-semibold truncate">{plan.name}</h3>
                     {plan.description && (
@@ -109,19 +106,20 @@ export function PlanList() {
                       </p>
                     )}
                   </div>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={(e) =>
-                      handleDeleteClick(plan.plan_id, plan.name, e)
-                    }
-                    disabled={deletePlanMutation.isPending}
-                    className="shrink-0 size-6 p-0"
-                  >
-                    ×
-                  </Button>
-                </div>
-              </Link>
+                </Link>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDeleteClick(plan.plan_id, plan.name)}
+                  disabled={deletePlanMutation.isPending}
+                  className={`
+                    absolute right-2 top-3 shrink-0 size-6 p-0 hover:bg-destructive hover:text-destructive-foreground
+                    ${selectedPlanId === plan.plan_id ? 'text-white/60' : ''}
+                  `}
+                >
+                  ×
+                </Button>
+              </div>
             ))}
           </div>
         )}
