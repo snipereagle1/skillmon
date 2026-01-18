@@ -14,6 +14,7 @@ pub mod characters;
 pub mod clones;
 pub mod locations;
 pub mod notifications;
+pub mod remaps;
 pub mod sde;
 pub mod skill_plans;
 pub mod tokens;

@@ -28,12 +28,20 @@ pub struct SkillmonPlanEntry {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct SkillmonPlanRemap {
+    pub after_skill_type_id: Option<i64>,
+    pub after_skill_level: Option<i64>,
+    pub attributes: Attributes,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct SkillmonPlan {
     pub version: i32,
     pub name: String,
     pub description: Option<String>,
     pub auto_prerequisites: bool,
     pub entries: Vec<SkillmonPlanEntry>,
+    pub remaps: Vec<SkillmonPlanRemap>,
 }
 
 impl SkillmonPlan {

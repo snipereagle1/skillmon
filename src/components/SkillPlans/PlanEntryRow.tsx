@@ -1,6 +1,6 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Pencil, Trash2 } from 'lucide-react';
+import { GripVertical, Pencil, Trash2, Brain } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -14,8 +14,15 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { Textarea } from '@/components/ui/textarea';
 import type { SkillPlanEntryResponse } from '@/generated/types';
+import type { Remap } from '@/hooks/tauri/useRemaps';
 import {
   useAddPlanEntry,
   useDeletePlanEntry,
@@ -32,6 +39,7 @@ interface PlanEntryRowProps {
   totalPlanSP: number;
   offsetPercentage: number;
   validationStatus?: 'error' | 'warning';
+  remapAfter?: Remap;
 }
 
 // eslint-disable-next-line complexity
@@ -40,6 +48,7 @@ export function PlanEntryRow({
   totalPlanSP,
   offsetPercentage,
   validationStatus,
+  remapAfter,
 }: PlanEntryRowProps) {
   const {
     attributes,
@@ -199,6 +208,21 @@ export function PlanEntryRow({
               >
                 {entry.skill_name} {levelRoman}
               </span>
+              {remapAfter && (
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Brain className="h-3 w-3 text-primary inline-block ml-1.5" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p>Neural remap scheduled after this skill</p>
+                      <p className="text-xs font-mono">
+                        I:{remapAfter.intelligence} P:{remapAfter.perception} C:{remapAfter.charisma} W:{remapAfter.willpower} M:{remapAfter.memory}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
               {entry.notes && (
                 <span className="text-xs text-muted-foreground truncate">
                   {entry.notes}

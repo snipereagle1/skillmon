@@ -1,8 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 import { simulateSkillPlan } from '@/generated/commands';
-import type { SimulationProfile } from '@/generated/types';
+import type { SimulationProfile, SkillPlanEntryResponse } from '@/generated/types';
+import { usePlanRemaps, type Remap } from './useRemaps';
+import { useSkillPlanWithEntries } from './useSkillPlans';
 
 export function useSimulation(planId: number, characterId?: number | null) {
   const [profile, setProfile] = useState<SimulationProfile>({
@@ -16,6 +18,45 @@ export function useSimulation(planId: number, characterId?: number | null) {
     remaps: [],
     accelerators: [],
   });
+
+  const { data: planRemaps } = usePlanRemaps(planId);
+  const { data: planWithEntries } = useSkillPlanWithEntries(planId);
+
+  // Initialize profile with plan remaps when they load
+  useEffect(() => {
+    if (planRemaps && planWithEntries && profile.remaps.length === 0) {
+      const mappedRemaps = planRemaps.map((r: Remap) => {
+        let entryIndex = 0;
+        if (r.after_skill_type_id) {
+          const idx = planWithEntries.entries.findIndex(
+            (e: SkillPlanEntryResponse) =>
+              e.skill_type_id === r.after_skill_type_id &&
+              e.planned_level === r.after_skill_level
+          );
+          if (idx !== -1) {
+            entryIndex = idx + 1;
+          }
+        }
+        return {
+          entry_index: entryIndex,
+          attributes: {
+            intelligence: r.intelligence,
+            perception: r.perception,
+            charisma: r.charisma,
+            willpower: r.willpower,
+            memory: r.memory,
+          },
+        };
+      });
+
+      if (mappedRemaps.length > 0) {
+        setProfile((prev) => ({
+          ...prev,
+          remaps: mappedRemaps,
+        }));
+      }
+    }
+  }, [planRemaps, planWithEntries]);
 
   const query = useQuery({
     queryKey: ['skillPlanSimulation', planId, profile, characterId],

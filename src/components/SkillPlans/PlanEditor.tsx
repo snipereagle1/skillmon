@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { exportSkillPlanText, exportSkillPlanXml } from '@/generated/commands';
 import type { ValidationResponse } from '@/generated/types';
+import { usePlanRemaps } from '@/hooks/tauri/useRemaps';
 import {
   useExportSkillPlanJson,
   useReorderPlanEntries,
@@ -33,6 +34,7 @@ import { AddSkillDialog } from './AddSkillDialog';
 import { ImportPlanDialog } from './ImportPlanDialog';
 import { PlanComparisonTab } from './PlanComparisonTab';
 import { PlanEntryRow } from './PlanEntryRow';
+import { PlanRemapsTab } from './PlanRemapsTab';
 import { SimulationTab } from './SimulationTab';
 import { SkillPlanValidationDisplay } from './SkillPlanValidationDisplay';
 
@@ -42,6 +44,7 @@ interface PlanEditorProps {
 
 export function PlanEditor({ planId }: PlanEditorProps) {
   const { data, isLoading, error } = useSkillPlanWithEntries(planId);
+  const { data: planRemaps } = usePlanRemaps(planId);
   const reorderMutation = useReorderPlanEntries();
   const validateReorderMutation = useValidateReorder();
   const updatePlanMutation = useUpdateSkillPlan();
@@ -556,6 +559,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
         <div className="px-4 border-b border-border bg-muted/20">
           <TabsList className="h-10">
             <TabsTrigger value="editor">Plan Editor</TabsTrigger>
+            <TabsTrigger value="remaps">Remaps</TabsTrigger>
             <TabsTrigger value="comparison">Character Comparison</TabsTrigger>
             <TabsTrigger value="simulation">Simulation</TabsTrigger>
           </TabsList>
@@ -595,6 +599,11 @@ export function PlanEditor({ planId }: PlanEditorProps) {
                       const validationStatus = validationMap.get(
                         `${entry.skill_type_id}-${entry.planned_level}`
                       );
+                      const remapAfter = planRemaps?.find(
+                        (r) =>
+                          r.after_skill_type_id === entry.skill_type_id &&
+                          r.after_skill_level === entry.planned_level
+                      );
                       return (
                         <PlanEntryRow
                           key={entry.entry_id}
@@ -602,6 +611,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
                           totalPlanSP={totalSP}
                           offsetPercentage={offsetPercentage}
                           validationStatus={validationStatus}
+                          remapAfter={remapAfter}
                         />
                       );
                     });
@@ -617,6 +627,13 @@ export function PlanEditor({ planId }: PlanEditorProps) {
               isProposed={isDragging}
             />
           </div>
+        </TabsContent>
+
+        <TabsContent
+          value="remaps"
+          className="flex-1 overflow-y-auto min-h-0 mt-0"
+        >
+          <PlanRemapsTab planId={planId} />
         </TabsContent>
 
         <TabsContent

@@ -1,7 +1,9 @@
 import { ArrowRight, Check, Loader2, RefreshCw, Save, Zap } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -40,6 +42,7 @@ import {
   type OptimizationMode,
   useOptimization,
 } from '@/hooks/tauri/useOptimization';
+import { useSaveRemap } from '@/hooks/tauri/useRemaps';
 import {
   useImportSkillPlanJson,
   useReorderPlanEntries,
@@ -90,6 +93,7 @@ export function OptimizationDialog({
   const [open, setOpen] = useState(false);
   const [mode, setMode] = useState<OptimizationMode>('attributes');
   const [maxRemaps, setMaxRemaps] = useState(1);
+  const [persistRemaps, setPersistRemaps] = useState(true);
   const { optimization, isLoading, error } = useOptimization(
     planId,
     implants,
@@ -102,6 +106,7 @@ export function OptimizationDialog({
 
   const reorderMutation = useReorderPlanEntries();
   const importPlanMutation = useImportSkillPlanJson();
+  const saveRemapMutation = useSaveRemap();
   const { trackAction } = useUndoRedo();
 
   const timeSaved = useMemo(() => {
@@ -132,40 +137,68 @@ export function OptimizationDialog({
   const handleApply = async () => {
     if (!optimization) return;
 
-    if (isReorderResult(optimization)) {
-      // Apply the reorder to the actual plan in DB
-      const oldEntryIds = entries.map((e) => e.entry_id);
-      const newEntryIds = optimization.optimized_entries.map((e) => e.entry_id);
+    try {
+      if (isReorderResult(optimization)) {
+        // Apply the reorder to the actual plan in DB
+        const oldEntryIds = entries.map((e) => e.entry_id);
+        const newEntryIds = optimization.optimized_entries.map((e) => e.entry_id);
 
-      await trackAction(
-        'Optimize Plan Order',
-        async () => {
-          await reorderMutation.mutateAsync({
+        await trackAction(
+          'Optimize Plan Order',
+          async () => {
+            await reorderMutation.mutateAsync({
+              planId,
+              entryIds: newEntryIds,
+            });
+
+            if (persistRemaps) {
+              for (const remap of optimization.recommended_remaps) {
+                const entry = optimization.optimized_entries[remap.entry_index];
+                // eslint-disable-next-line no-await-in-loop
+                await saveRemapMutation.mutateAsync({
+                  planId,
+                  attributes: remap.attributes,
+                  afterSkillTypeId: entry?.skill_type_id || null,
+                  afterSkillLevel: entry?.planned_level || null,
+                });
+              }
+            }
+          },
+          async () => {
+            await reorderMutation.mutateAsync({
+              planId,
+              entryIds: oldEntryIds,
+            });
+            // Note: We don't currently have a way to undo remap persistence easily here
+            // without complex state management, but since remaps are additive, it's mostly okay.
+          }
+        );
+
+        // Update local simulation state
+        if (onApplyReorder) {
+          const entryMap = new Map(entries.map((e) => [e.entry_id, e]));
+          const optimizedWithNames = optimization.optimized_entries.map((e) => ({
+            ...entryMap.get(e.entry_id)!,
+          })) as SkillPlanEntryResponse[];
+
+          onApplyReorder(optimizedWithNames, optimization.recommended_remaps);
+        }
+      } else {
+        if (persistRemaps) {
+          await saveRemapMutation.mutateAsync({
             planId,
-            entryIds: newEntryIds,
-          });
-        },
-        async () => {
-          await reorderMutation.mutateAsync({
-            planId,
-            entryIds: oldEntryIds,
+            attributes: optimization.recommended_remap.attributes,
+            afterSkillTypeId: null,
+            afterSkillLevel: null,
           });
         }
-      );
-
-      // Update local simulation state
-      if (onApplyReorder) {
-        const entryMap = new Map(entries.map((e) => [e.entry_id, e]));
-        const optimizedWithNames = optimization.optimized_entries.map((e) => ({
-          ...entryMap.get(e.entry_id)!,
-        })) as SkillPlanEntryResponse[];
-
-        onApplyReorder(optimizedWithNames, optimization.recommended_remaps);
+        onApply(optimization.recommended_remap);
       }
+      toast.success('Optimization applied successfully');
       setOpen(false);
-    } else {
-      onApply(optimization.recommended_remap);
-      setOpen(false);
+    } catch (err) {
+      console.error('Failed to apply optimization:', err);
+      toast.error('Failed to apply optimization');
     }
   };
 
@@ -379,39 +412,64 @@ export function OptimizationDialog({
           </div>
         </Tabs>
 
-        <DialogFooter className="flex flex-col sm:flex-row gap-2">
-          {mode === 'reorder' && (
+        <DialogFooter className="flex flex-col gap-4">
+          <div className="flex items-center space-x-2 px-1">
+            <Checkbox
+              id="persist-remaps"
+              checked={persistRemaps}
+              onCheckedChange={(checked) => setPersistRemaps(checked === true)}
+            />
+            <Label
+              htmlFor="persist-remaps"
+              className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
+            >
+              Persist recommended remaps to skill plan
+            </Label>
+          </div>
+
+          <div className="flex flex-col sm:flex-row gap-2">
+            {mode === 'reorder' && (
+              <Button
+                variant="outline"
+                onClick={handleSaveAsNew}
+                disabled={!optimization || importPlanMutation.isPending}
+                className="flex-1 gap-2"
+              >
+                <Save className="h-4 w-4" />
+                Save as New Plan
+              </Button>
+            )}
             <Button
-              variant="outline"
-              onClick={handleSaveAsNew}
-              disabled={!optimization || importPlanMutation.isPending}
+              onClick={handleApply}
+              disabled={
+                !optimization ||
+                isAlreadyOptimal ||
+                reorderMutation.isPending ||
+                saveRemapMutation.isPending
+              }
               className="flex-1 gap-2"
             >
-              <Save className="h-4 w-4" />
-              Save as New Plan
+              {mode === 'reorder' ? (
+                <>
+                  <RefreshCw
+                    className={`h-4 w-4 ${
+                      reorderMutation.isPending || saveRemapMutation.isPending
+                        ? 'animate-spin'
+                        : ''
+                    }`}
+                  />
+                  Apply to Current Plan
+                </>
+              ) : (
+                <>
+                  <RefreshCw
+                    className={`h-4 w-4 ${saveRemapMutation.isPending ? 'animate-spin' : ''}`}
+                  />
+                  Apply Optimization
+                </>
+              )}
             </Button>
-          )}
-          <Button
-            onClick={handleApply}
-            disabled={
-              !optimization || isAlreadyOptimal || reorderMutation.isPending
-            }
-            className="flex-1 gap-2"
-          >
-            {mode === 'reorder' ? (
-              <>
-                <RefreshCw
-                  className={`h-4 w-4 ${reorderMutation.isPending ? 'animate-spin' : ''}`}
-                />
-                Apply to Current Plan
-              </>
-            ) : (
-              <>
-                <RefreshCw className="h-4 w-4" />
-                Apply Optimization
-              </>
-            )}
-          </Button>
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

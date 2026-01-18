@@ -3,6 +3,7 @@
   "name": "Blops + Repro",
   "description": null,
   "auto_prerequisites": true,
+  "remaps": [],
   "entries": [
     {
       "skill_type_id": 3327,

@@ -37,12 +37,26 @@ pub async fn export_skill_plan_json(
         })
         .collect();
 
+    let remaps = db::remaps::get_plan_remaps(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to get remaps: {}", e))?;
+
+    let json_remaps = remaps
+        .into_iter()
+        .map(|r| crate::skill_plans::SkillmonPlanRemap {
+            after_skill_type_id: r.after_skill_type_id,
+            after_skill_level: r.after_skill_level,
+            attributes: r.attributes(),
+        })
+        .collect();
+
     Ok(SkillmonPlan {
         version: SkillmonPlan::CURRENT_VERSION,
         name: plan.name,
         description: plan.description,
         auto_prerequisites: plan.auto_prerequisites != 0,
         entries: json_entries,
+        remaps: json_remaps,
     })
 }
 
@@ -158,6 +172,19 @@ pub async fn import_skill_plan_json(
         .execute(&mut *tx)
         .await
         .map_err(|e| format!("Failed to insert entry: {}", e))?;
+    }
+
+    for remap in &plan.remaps {
+        db::remaps::save_remap(
+            &mut *tx,
+            None,
+            Some(plan_id),
+            remap.after_skill_type_id,
+            remap.after_skill_level,
+            &remap.attributes,
+        )
+        .await
+        .map_err(|e| format!("Failed to insert remap: {}", e))?;
     }
 
     tx.commit()

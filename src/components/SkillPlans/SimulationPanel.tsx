@@ -1,13 +1,15 @@
-import { Minus, Plus } from 'lucide-react';
+import { Calendar,Minus, Plus, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import type {
   Attributes,
   SimulationProfile,
   SkillPlanEntryResponse,
 } from '@/generated/types';
+import { useDeleteRemap,usePlanRemaps } from '@/hooks/tauri/useRemaps';
 
 import { OptimizationDialog } from './OptimizationDialog';
 
@@ -28,6 +30,9 @@ export function SimulationPanel({
   onProfileChange,
   entries,
 }: SimulationPanelProps) {
+  const { data: savedRemaps } = usePlanRemaps(planId);
+  const deleteRemapMutation = useDeleteRemap();
+
   const handleImplantChange = (attr: keyof Attributes, delta: number) => {
     const currentValue = profile.implants[attr];
     const newValue = Math.max(0, Math.min(5, currentValue + delta));
@@ -81,6 +86,14 @@ export function SimulationPanel({
       ...profile,
       remaps: [{ entry_index: 0, attributes: newAttributes }, ...otherRemaps],
     });
+  };
+
+  const handleDeleteSavedRemap = async (remapId: number) => {
+    try {
+      await deleteRemapMutation.mutateAsync({ remapId, planId });
+    } catch (err) {
+      console.error('Failed to delete remap:', err);
+    }
   };
 
   const currentAcceleratorBonus =
@@ -213,6 +226,44 @@ export function SimulationPanel({
               </div>
             </div>
           ))}
+
+          {savedRemaps && savedRemaps.length > 0 && (
+            <>
+              <Separator className="my-2" />
+              <div className="space-y-3">
+                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                  Saved Plan Remaps
+                </Label>
+                {savedRemaps.map((remap) => {
+                  const skillName = entries.find(e => e.skill_type_id === remap.after_skill_type_id && e.planned_level === remap.after_skill_level)?.skill_name;
+
+                  return (
+                    <div key={remap.remap_id} className="flex items-center justify-between text-xs bg-muted/50 p-2 rounded-md border border-border">
+                      <div className="space-y-1">
+                        <div className="font-medium flex items-center gap-1.5">
+                          <Calendar className="h-3 w-3 text-muted-foreground" />
+                          {remap.after_skill_type_id
+                            ? `After ${skillName} ${remap.after_skill_level}`
+                            : 'At Start'}
+                        </div>
+                        <div className="text-muted-foreground font-mono">
+                          I:{remap.intelligence} P:{remap.perception} C:{remap.charisma} W:{remap.willpower} M:{remap.memory}
+                        </div>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive hover:text-destructive hover:bg-destructive/10"
+                        onClick={() => handleDeleteSavedRemap(remap.remap_id)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
