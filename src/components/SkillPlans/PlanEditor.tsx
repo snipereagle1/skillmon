@@ -468,7 +468,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
               </div>
             )}
           </div>
-          <div className="flex flex-col items-end gap-2 border rounded-md p-3 bg-muted/30">
+          <div className="flex-col items-end gap-2 border rounded-md p-3 bg-muted/30 hidden">
             <div className="flex items-center space-x-2">
               <Switch
                 id="auto-prereqs"
