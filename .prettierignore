@@ -10,7 +10,7 @@ src-tauri/src/esi/types.rs
 src-tauri/src/esi/openapi.json
 src-tauri/target
 src/components/ui/**
-
+src-tauri/gen/schemas/**
 # Build artifacts
 *.log
 pnpm-lock.yaml

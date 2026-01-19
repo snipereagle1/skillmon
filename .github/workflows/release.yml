@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: "Version number (e.g., 1.0.0)"
+        description: 'Version number (e.g., 1.0.0)'
         required: true
         type: string
 
@@ -28,7 +28,7 @@ jobs:
       - name: Install Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "24"
+          node-version: '24'
 
       - name: Install pnpm
         uses: pnpm/action-setup@v4
@@ -129,7 +129,7 @@ jobs:
           EVE_CLIENT_ID: ${{ secrets.EVE_CLIENT_ID }}
         with:
           tagName: v__VERSION__
-          releaseName: "Skillmon v__VERSION__"
-          releaseBody: "See the assets to download this version and install."
+          releaseName: 'Skillmon v__VERSION__'
+          releaseBody: 'See the assets to download this version and install.'
           releaseDraft: true
           prerelease: false

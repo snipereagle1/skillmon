@@ -24,6 +24,9 @@
     "format:check": "prettier --check .",
     "format:rust": "cd src-tauri && cargo fmt",
     "format:check:rust": "cd src-tauri && cargo fmt -- --check",
+    "lint:full": "pnpm lint && pnpm lint:rust",
+    "format:check:all": "pnpm format:check && pnpm format:check:rust",
+    "verify": "pnpm typegen && pnpm lint:full && pnpm format:check:all && pnpm typecheck",
     "prepare": "husky"
   },
   "lint-staged": {
