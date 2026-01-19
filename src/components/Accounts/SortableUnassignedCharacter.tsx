@@ -1,6 +1,10 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Link } from '@tanstack/react-router';
+import {
+  type FileRoutesByPath,
+  Link,
+  useMatches,
+} from '@tanstack/react-router';
 import { GripVertical } from 'lucide-react';
 
 import { Card } from '@/components/ui/card';
@@ -27,6 +31,21 @@ export function SortableUnassignedCharacter({
   queueData,
   isSelected,
 }: SortableUnassignedCharacterProps) {
+  const matches = useMatches();
+
+  // Find the most specific character sub-route if we're currently on one
+  const characterSubRoute = matches
+    .map((m) => m.routeId)
+    .reverse()
+    .find(
+      (id) =>
+        id.startsWith('/characters/$characterId/') &&
+        id !== '/characters/$characterId/'
+    );
+
+  const targetRoute = (characterSubRoute ||
+    '/characters/$characterId') as keyof FileRoutesByPath;
+
   const {
     attributes,
     listeners,
@@ -57,8 +76,9 @@ export function SortableUnassignedCharacter({
       </div>
       <CharacterContextMenu character={character} accounts={accounts}>
         <Link
-          to="/characters/$characterId"
+          to={targetRoute}
           params={{ characterId: String(character.character_id) }}
+          search={true}
           className="block"
         >
           <Card

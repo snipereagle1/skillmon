@@ -658,10 +658,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
           <PlanRemapsTab planId={planId} />
         </TabsContent>
 
-        <TabsContent
-          value="comparison"
-          className="flex-1 overflow-y-auto min-h-0 mt-0"
-        >
+        <TabsContent value="comparison" className="flex-1 min-h-0 mt-0">
           <PlanComparisonTab planId={planId} />
         </TabsContent>
 

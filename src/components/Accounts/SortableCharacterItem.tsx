@@ -1,6 +1,10 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Link } from '@tanstack/react-router';
+import {
+  type FileRoutesByPath,
+  Link,
+  useMatches,
+} from '@tanstack/react-router';
 import { GripVertical } from 'lucide-react';
 
 import type {
@@ -28,6 +32,21 @@ export function SortableCharacterItem({
   isSelected,
   isExpanded,
 }: SortableCharacterItemProps) {
+  const matches = useMatches();
+
+  // Find the most specific character sub-route if we're currently on one
+  const characterSubRoute = matches
+    .map((m) => m.routeId)
+    .reverse()
+    .find(
+      (id) =>
+        id.startsWith('/characters/$characterId/') &&
+        id !== '/characters/$characterId/'
+    );
+
+  const targetRoute = (characterSubRoute ||
+    '/characters/$characterId') as keyof FileRoutesByPath;
+
   const {
     attributes,
     listeners,
@@ -59,8 +78,9 @@ export function SortableCharacterItem({
         </div>
         <CharacterContextMenu character={character} accounts={accounts}>
           <Link
-            to="/characters/$characterId"
+            to={targetRoute}
             params={{ characterId: String(character.character_id) }}
+            search={true}
           >
             <div
               className={cn(
@@ -88,8 +108,9 @@ export function SortableCharacterItem({
     <div ref={setNodeRef} style={style} className="relative group">
       <CharacterContextMenu character={character} accounts={accounts}>
         <Link
-          to="/characters/$characterId"
+          to={targetRoute}
           params={{ characterId: String(character.character_id) }}
+          search={true}
         >
           <div className="cursor-pointer">
             <CharacterPortrait
