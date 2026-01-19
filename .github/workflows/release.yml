@@ -15,6 +15,8 @@ jobs:
     permissions:
       contents: write
     runs-on: windows-latest
+    env:
+      HUSKY: 0
     steps:
       - uses: actions/checkout@v4
         with:
@@ -118,7 +120,7 @@ jobs:
             exit 1
           fi
 
-          git commit -m "chore: bump version to ${{ inputs.version }}" --no-verify
+          git commit -m "chore: bump version to ${{ inputs.version }}"
           git tag -a "v${{ inputs.version }}" -m "Release v${{ inputs.version }}"
           git push origin HEAD
           git push origin "v${{ inputs.version }}"
