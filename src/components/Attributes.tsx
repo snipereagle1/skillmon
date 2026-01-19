@@ -118,23 +118,6 @@ export function Attributes({ characterId }: AttributesProps) {
       <div className="flex flex-wrap gap-4 px-1">
         <div className="flex flex-col gap-1 border rounded-md p-3 bg-muted/20 flex-1 min-w-[200px]">
           <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Bonus Remaps
-          </span>
-          <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold">{data.bonus_remaps ?? 0}</span>
-            {(data.bonus_remaps ?? 0) > 0 && (
-              <Badge
-                variant="secondary"
-                className="bg-green-500/10 text-green-500 border-green-500/20"
-              >
-                Available
-              </Badge>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-1 border rounded-md p-3 bg-muted/20 flex-1 min-w-[200px]">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
             Next Primary Remap
           </span>
           <span className="text-lg font-semibold">
@@ -152,6 +135,23 @@ export function Attributes({ characterId }: AttributesProps) {
                 })
               )}
           </span>
+        </div>
+
+        <div className="flex flex-col gap-1 border rounded-md p-3 bg-muted/20 flex-1 min-w-[200px]">
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
+            Bonus Remaps
+          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-2xl font-bold">{data.bonus_remaps ?? 0}</span>
+            {(data.bonus_remaps ?? 0) > 0 && (
+              <Badge
+                variant="secondary"
+                className="bg-green-500/10 text-green-500 border-green-500/20"
+              >
+                Available
+              </Badge>
+            )}
+          </div>
         </div>
 
         {data.last_remap_date && (
