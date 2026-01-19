@@ -14,6 +14,9 @@ import {
   importSkillPlanJson,
   importSkillPlanText,
   importSkillPlanXml,
+  removeSkill,
+  removeSkillAndPrerequisites,
+  removeSkillLevel,
   reorderPlanEntries,
   updatePlanEntry,
   updateSkillPlan,
@@ -205,6 +208,53 @@ export function useDeletePlanEntry() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['skillPlanWithEntries'] });
       queryClient.invalidateQueries({ queryKey: ['skillPlanValidation'] });
+    },
+  });
+}
+
+export function useRemoveSkillLevel() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (entryId: number) => {
+      return await removeSkillLevel({ entryId });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['skillPlanWithEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['skillPlanValidation'] });
+    },
+  });
+}
+
+export function useRemoveSkill() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { planId: number; skillTypeId: number }) => {
+      return await removeSkill(params);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['skillPlanWithEntries'] });
+      queryClient.invalidateQueries({ queryKey: ['skillPlanValidation'] });
+    },
+  });
+}
+
+export function useRemoveSkillAndPrerequisites() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: { planId: number; skillTypeId: number }) => {
+      return await removeSkillAndPrerequisites(params);
+    },
+    onSuccess: (data, params) => {
+      queryClient.setQueryData(['skillPlanWithEntries', params.planId], data);
+      queryClient.invalidateQueries({
+        queryKey: ['skillPlanWithEntries', params.planId],
+      });
+      queryClient.invalidateQueries({
+        queryKey: ['skillPlanValidation', params.planId],
+      });
     },
   });
 }

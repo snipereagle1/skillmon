@@ -567,6 +567,212 @@ pub struct ValidationResponse {
 }
 
 #[tauri::command]
+pub async fn remove_skill_level(pool: State<'_, db::Pool>, entry_id: i64) -> Result<(), String> {
+    let details = db::skill_plans::get_entry_details_by_id(&pool, entry_id)
+        .await
+        .map_err(|e| format!("Failed to get entry details: {}", e))?
+        .ok_or_else(|| "Entry not found".to_string())?;
+
+    let (plan_id, skill_type_id, planned_level, entry_type) = details;
+
+    let (dag, current_nodes) = PlanDag::build_from_plan(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to build DAG: {}", e))?;
+
+    let node = PlanNode {
+        skill_type_id,
+        level: planned_level,
+    };
+
+    // 1. If it was "Planned", promote the highest lower level of this skill to "Planned"
+    if entry_type == "Planned" {
+        let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+            .await
+            .map_err(|e| format!("Failed to get entries: {}", e))?;
+
+        let mut highest_lower_level_entry: Option<&db::skill_plans::SkillPlanEntry> = None;
+        for entry in &entries {
+            if entry.skill_type_id == skill_type_id
+                && entry.planned_level < planned_level
+                && (highest_lower_level_entry.is_none()
+                    || entry.planned_level > highest_lower_level_entry.unwrap().planned_level)
+            {
+                highest_lower_level_entry = Some(entry);
+            }
+        }
+
+        if let Some(prev_entry) = highest_lower_level_entry {
+            db::skill_plans::update_plan_entry(
+                &pool,
+                prev_entry.entry_id,
+                None,
+                Some("Planned"),
+                None,
+            )
+            .await
+            .map_err(|e| format!("Failed to promote previous level: {}", e))?;
+        }
+    }
+
+    // 2. Check if anything else in the plan depends on this level
+    let mut is_required = false;
+    if let Some(dependents) = dag.dependents.get(&node) {
+        let active_dependents: Vec<_> = dependents
+            .iter()
+            .filter(|d| current_nodes.contains(d) && *d != &node)
+            .collect();
+        if !active_dependents.is_empty() {
+            is_required = true;
+        }
+    }
+
+    // 3. Keep as prerequisite or delete
+    if is_required {
+        db::skill_plans::update_plan_entry(&pool, entry_id, None, Some("Prerequisite"), None)
+            .await
+            .map_err(|e| format!("Failed to demote entry: {}", e))?;
+    } else {
+        db::skill_plans::delete_plan_entry(&pool, entry_id)
+            .await
+            .map_err(|e| format!("Failed to delete entry: {}", e))?;
+    }
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remove_skill(
+    pool: State<'_, db::Pool>,
+    plan_id: i64,
+    skill_type_id: i64,
+) -> Result<(), String> {
+    let (dag, current_nodes) = PlanDag::build_from_plan(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to build DAG: {}", e))?;
+
+    // Find all levels of this skill in the plan
+    let levels: Vec<_> = current_nodes
+        .iter()
+        .filter(|n| n.skill_type_id == skill_type_id)
+        .collect();
+
+    // Check if any level is a prerequisite for something NOT in this skill
+    for &node in &levels {
+        if let Some(dependents) = dag.dependents.get(node) {
+            let external_dependents: Vec<_> = dependents
+                .iter()
+                .filter(|d| d.skill_type_id != skill_type_id && current_nodes.contains(d))
+                .collect();
+
+            if !external_dependents.is_empty() {
+                let skill_names = utils::get_type_names(&pool, &[skill_type_id])
+                    .await
+                    .map_err(|e| e.to_string())?;
+                let skill_name = skill_names
+                    .get(&skill_type_id)
+                    .cloned()
+                    .unwrap_or_else(|| format!("Skill ({})", skill_type_id));
+                return Err(format!(
+                    "Cannot remove {} because it is a prerequisite for other skills in the plan",
+                    skill_name
+                ));
+            }
+        }
+    }
+
+    // Delete all levels
+    db::skill_plans::delete_skill_from_plan(&pool, plan_id, skill_type_id)
+        .await
+        .map_err(|e| format!("Failed to delete skill: {}", e))?;
+
+    Ok(())
+}
+
+#[tauri::command]
+pub async fn remove_skill_and_prerequisites(
+    pool: State<'_, db::Pool>,
+    plan_id: i64,
+    skill_type_id: i64,
+) -> Result<SkillPlanWithEntriesResponse, String> {
+    // 1. Get all current planned entries except the one being removed
+    let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to get entries: {}", e))?;
+
+    let remaining_planned: Vec<_> = entries
+        .into_iter()
+        .filter(|e| e.entry_type == "Planned" && e.skill_type_id != skill_type_id)
+        .collect();
+
+    // 2. Clear all entries for the plan
+    db::skill_plans::clear_plan_entries(&pool, plan_id)
+        .await
+        .map_err(|e| format!("Failed to clear plan: {}", e))?;
+
+    // 3. Re-add remaining planned skills recursively
+    let mut dag = PlanDag::new();
+    let current_nodes = Vec::new();
+
+    for entry in &remaining_planned {
+        let node = PlanNode {
+            skill_type_id: entry.skill_type_id,
+            level: entry.planned_level,
+        };
+        dag.add_recursive(&pool, node)
+            .await
+            .map_err(|e| format!("Failed to add prerequisites: {}", e))?;
+    }
+
+    let sorted_nodes = dag.topological_sort(&current_nodes);
+
+    // 4. Update database
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| format!("Transaction failed: {}", e))?;
+
+    for (index, node) in sorted_nodes.iter().enumerate() {
+        let is_originally_planned = remaining_planned
+            .iter()
+            .any(|e| e.skill_type_id == node.skill_type_id && e.planned_level == node.level);
+
+        let entry_type = if is_originally_planned {
+            "Planned"
+        } else {
+            "Prerequisite"
+        };
+
+        // Preserve notes if they were in remaining_planned
+        let notes = remaining_planned
+            .iter()
+            .find(|e| e.skill_type_id == node.skill_type_id && e.planned_level == node.level)
+            .and_then(|e| e.notes.clone());
+
+        sqlx::query(
+            "INSERT INTO skill_plan_entries (plan_id, skill_type_id, planned_level, sort_order, entry_type, notes)
+             VALUES (?, ?, ?, ?, ?, ?)"
+        )
+        .bind(plan_id)
+        .bind(node.skill_type_id)
+        .bind(node.level)
+        .bind(index as i64)
+        .bind(entry_type)
+        .bind(notes)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Failed to insert entry: {}", e))?;
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| format!("Failed to commit: {}", e))?;
+
+    get_skill_plan_with_entries(pool, plan_id)
+        .await?
+        .ok_or_else(|| "Failed to retrieve updated plan".to_string())
+}
+
+#[tauri::command]
 pub async fn validate_skill_plan(
     pool: State<'_, db::Pool>,
     plan_id: i64,

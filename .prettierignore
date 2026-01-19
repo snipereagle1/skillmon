@@ -2,6 +2,7 @@ node_modules
 dist
 dist-ssr
 *.local
+src-tauri/tauri.conf.json
 
 # Generated files
 src/generated/**
