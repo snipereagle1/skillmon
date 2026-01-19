@@ -256,6 +256,25 @@ where
     Ok(entry_type)
 }
 
+pub async fn delete_skill_from_plan(pool: &Pool, plan_id: i64, skill_type_id: i64) -> Result<()> {
+    sqlx::query("DELETE FROM skill_plan_entries WHERE plan_id = ? AND skill_type_id = ?")
+        .bind(plan_id)
+        .bind(skill_type_id)
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}
+
+pub async fn clear_plan_entries(pool: &Pool, plan_id: i64) -> Result<()> {
+    sqlx::query("DELETE FROM skill_plan_entries WHERE plan_id = ?")
+        .bind(plan_id)
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}
+
 pub async fn get_entry_details_by_id(
     pool: &Pool,
     entry_id: i64,

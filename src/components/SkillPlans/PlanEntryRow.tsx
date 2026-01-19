@@ -1,7 +1,8 @@
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, Pencil, Trash2 } from 'lucide-react';
+import { GripVertical, MoreHorizontal } from 'lucide-react';
 import { useState } from 'react';
+import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
 import {
@@ -12,13 +13,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import type { Remap, SkillPlanEntryResponse } from '@/generated/types';
 import {
   useAddPlanEntry,
-  useDeletePlanEntry,
+  useRemoveSkill,
+  useRemoveSkillAndPrerequisites,
+  useRemoveSkillLevel,
   useUpdatePlanEntry,
 } from '@/hooks/tauri/useSkillPlans';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
@@ -30,6 +38,7 @@ import { LevelIndicator } from '../SkillQueue/LevelIndicator';
 
 interface PlanEntryRowProps {
   entry: SkillPlanEntryResponse;
+  allEntries: SkillPlanEntryResponse[];
   totalPlanSP: number;
   offsetPercentage: number;
   validationStatus?: 'error' | 'warning';
@@ -39,6 +48,7 @@ interface PlanEntryRowProps {
 // eslint-disable-next-line complexity
 export function PlanEntryRow({
   entry,
+  allEntries,
   totalPlanSP,
   offsetPercentage,
   validationStatus,
@@ -59,13 +69,15 @@ export function PlanEntryRow({
     zIndex: isDragging ? 50 : undefined,
   };
 
-  const deleteEntryMutation = useDeletePlanEntry();
   const updateEntryMutation = useUpdatePlanEntry();
   const addEntryMutation = useAddPlanEntry();
+  const removeSkillLevelMutation = useRemoveSkillLevel();
+  const removeSkillMutation = useRemoveSkill();
+  const removeSkillAndPrerequisitesMutation = useRemoveSkillAndPrerequisites();
   const { trackAction } = useUndoRedo();
   const [editDialogOpen, setEditDialogOpen] = useState(false);
-  const [editLevel, setEditLevel] = useState(entry.planned_level);
   const [editNotes, setEditNotes] = useState(entry.notes || '');
+
   const openSkillDetail = useSkillDetailStore(
     (state: {
       openSkillDetail: (skillId: number, characterId: number | null) => void;
@@ -77,53 +89,126 @@ export function PlanEntryRow({
     ['I', 'II', 'III', 'IV', 'V'][entry.planned_level - 1] ||
     entry.planned_level.toString();
 
-  const handleDelete = async () => {
-    if (
-      !window.confirm(
-        `Are you sure you want to remove "${entry.skill_name}" from this plan?`
-      )
-    ) {
-      return;
-    }
-
-    let currentEntryId = entry.entry_id;
-
+  const handleRemoveSkillLevel = async () => {
     try {
       await trackAction(
-        `Delete ${entry.skill_name}`,
+        `Remove ${entry.skill_name} ${levelRoman}`,
         async () => {
-          await deleteEntryMutation.mutateAsync({ entryId: currentEntryId });
+          await removeSkillLevelMutation.mutateAsync(entry.entry_id);
         },
         async () => {
-          const result = await addEntryMutation.mutateAsync({
+          await addEntryMutation.mutateAsync({
             planId: entry.plan_id,
             skillTypeId: entry.skill_type_id,
             plannedLevel: entry.planned_level,
             notes: entry.notes,
           });
-          // Update the ID for next redo/undo
-          const restored = result.entries.find(
-            (e) =>
-              e.skill_type_id === entry.skill_type_id &&
-              e.planned_level === entry.planned_level
-          );
-          if (restored) {
-            currentEntryId = restored.entry_id;
+        }
+      );
+      toast.success(`Removed ${entry.skill_name} ${levelRoman}`);
+    } catch (err) {
+      console.error('Failed to remove skill level:', err);
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to remove skill level'
+      );
+    }
+  };
+
+  const handleRemoveSkill = async () => {
+    // Find the highest level of this skill to restore it later if undo is clicked
+    const skillLevels = allEntries
+      .filter((e) => e.skill_type_id === entry.skill_type_id)
+      .sort((a, b) => b.planned_level - a.planned_level);
+
+    const highestPlanned = skillLevels.find((e) => e.entry_type === 'Planned');
+
+    try {
+      await trackAction(
+        `Remove ${entry.skill_name}`,
+        async () => {
+          await removeSkillMutation.mutateAsync({
+            planId: entry.plan_id,
+            skillTypeId: entry.skill_type_id,
+          });
+        },
+        async () => {
+          // Restoring the highest planned level will bring back prerequisites if auto-prereqs is on
+          if (highestPlanned) {
+            await addEntryMutation.mutateAsync({
+              planId: highestPlanned.plan_id,
+              skillTypeId: highestPlanned.skill_type_id,
+              plannedLevel: highestPlanned.planned_level,
+              notes: highestPlanned.notes,
+            });
+          } else {
+            // Fallback: just restore the level we clicked on
+            await addEntryMutation.mutateAsync({
+              planId: entry.plan_id,
+              skillTypeId: entry.skill_type_id,
+              plannedLevel: entry.planned_level,
+              notes: entry.notes,
+            });
           }
         }
       );
+      toast.success(`Removed ${entry.skill_name}`);
     } catch (err) {
-      console.error('Failed to delete entry:', err);
+      console.error('Failed to remove skill:', err);
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to remove skill'
+      );
+    }
+  };
+
+  const handleRemoveSkillAndPrerequisites = async () => {
+    // Save all planned entries to restore them if undo is clicked
+    const plannedEntries = allEntries
+      .filter((e) => e.entry_type === 'Planned')
+      .map((e) => ({
+        skillTypeId: e.skill_type_id,
+        plannedLevel: e.planned_level,
+        notes: e.notes,
+      }));
+
+    try {
+      await trackAction(
+        `Remove ${entry.skill_name} and Prerequisites`,
+        async () => {
+          await removeSkillAndPrerequisitesMutation.mutateAsync({
+            planId: entry.plan_id,
+            skillTypeId: entry.skill_type_id,
+          });
+        },
+        async () => {
+          // Restore all previously planned entries
+          // We do this sequentially to avoid race conditions in the topological sort
+          for (const e of plannedEntries) {
+            // eslint-disable-next-line no-await-in-loop
+            await addEntryMutation.mutateAsync({
+              planId: entry.plan_id,
+              skillTypeId: e.skillTypeId,
+              plannedLevel: e.plannedLevel,
+              notes: e.notes,
+            });
+          }
+        }
+      );
+      toast.success(`Removed ${entry.skill_name} and unused prerequisites`);
+    } catch (err) {
+      console.error('Failed to remove skill and prerequisites:', err);
+      toast.error(
+        err instanceof Error
+          ? err.message
+          : 'Failed to remove skill and prerequisites'
+      );
     }
   };
 
   const handleSave = async () => {
-    const oldLevel = entry.planned_level;
     const oldNotes = entry.notes;
-    const newLevel = editLevel;
     const newNotes = editNotes.trim() || null;
 
-    if (oldLevel === newLevel && oldNotes === newNotes) {
+    if (oldNotes === newNotes) {
       setEditDialogOpen(false);
       return;
     }
@@ -132,18 +217,16 @@ export function PlanEntryRow({
 
     try {
       await trackAction(
-        `Update ${entry.skill_name}`,
+        `Update notes for ${entry.skill_name}`,
         async () => {
           await updateEntryMutation.mutateAsync({
             entryId: currentEntryId,
-            plannedLevel: newLevel,
             notes: newNotes,
           });
         },
         async () => {
           await updateEntryMutation.mutateAsync({
             entryId: currentEntryId,
-            plannedLevel: oldLevel,
             notes: oldNotes,
           });
         }
@@ -217,27 +300,41 @@ export function PlanEntryRow({
               >
                 {entry.skillpoints_for_level.toLocaleString('en-US')} SP
               </span>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => {
-                  setEditLevel(entry.planned_level);
-                  setEditNotes(entry.notes || '');
-                  setEditDialogOpen(true);
-                }}
-                className="h-8 w-8 p-0"
-              >
-                <Pencil className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleDelete}
-                disabled={deleteEntryMutation.isPending}
-                className="h-8 w-8 p-0"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setEditNotes(entry.notes || '');
+                      setEditDialogOpen(true);
+                    }}
+                  >
+                    Add Note
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleRemoveSkillLevel}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    Remove Skill Level
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleRemoveSkill}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    Remove Skill
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={handleRemoveSkillAndPrerequisites}
+                    className="text-destructive focus:text-destructive"
+                  >
+                    Remove Skill and Prerequisites
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           </div>
           <div className="absolute bottom-0 left-0 right-0 h-0.5 pointer-events-none">
@@ -268,27 +365,12 @@ export function PlanEntryRow({
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Entry</DialogTitle>
+            <DialogTitle>Add Note</DialogTitle>
             <DialogDescription>
-              Update the level and notes for {entry.skill_name}
+              Add or update the note for {entry.skill_name} {levelRoman}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="level">Level</Label>
-              <Input
-                id="level"
-                type="number"
-                min="1"
-                max="5"
-                value={editLevel}
-                onChange={(e) =>
-                  setEditLevel(
-                    Math.max(1, Math.min(5, parseInt(e.target.value) || 1))
-                  )
-                }
-              />
-            </div>
             <div className="space-y-2">
               <Label htmlFor="notes">Notes (optional)</Label>
               <Textarea

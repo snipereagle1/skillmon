@@ -683,6 +683,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
                                   <PlanEntryRow
                                     key={entry.entry_id}
                                     entry={entry}
+                                    allEntries={data.entries}
                                     totalPlanSP={totalSP}
                                     offsetPercentage={offsetPercentage}
                                     validationStatus={validationStatus}
