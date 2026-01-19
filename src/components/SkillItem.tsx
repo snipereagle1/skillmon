@@ -69,7 +69,7 @@ export function SkillItem({
                 <DropdownMenuTrigger asChild>
                   <Button
                     variant="ghost"
-                    size="icon-xs"
+                    size="icon-sm"
                     className="h-6 w-6"
                     onClick={(e) => e.stopPropagation()}
                   >
