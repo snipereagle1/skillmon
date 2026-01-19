@@ -1,7 +1,8 @@
 {
   "name": "skillmon",
-  "private": true,
   "version": "0.8.0",
+  "license": "MIT",
+  "author": "snipereagle1 <me@snipereagle.xyz>",
   "type": "module",
   "scripts": {
     "dev": "vite",

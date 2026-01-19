@@ -1,9 +1,10 @@
 [package]
 name = "skillmon"
 version = "0.8.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "A modern EVE Online skill monitoring and planning application."
+authors = ["snipereagle1 <me@snipereagle.xyz>"]
 edition = "2021"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
