@@ -98,19 +98,15 @@ pub async fn get_character_skills_with_groups(
     };
 
     let mut all_skill_ids = Vec::new();
-    let mut skills_by_group: HashMap<i64, Vec<(i64, String)>> = HashMap::new();
+    let mut skills_by_group: HashMap<i64, Vec<db::SkillInfo>> = HashMap::new();
 
     for group in &skill_groups {
-        let skills_in_group: Vec<(i64, String)> = sqlx::query_as::<_, (i64, String)>(
-            "SELECT type_id, name FROM sde_types WHERE group_id = ? AND published = 1 ORDER BY name",
-        )
-        .bind(group.group_id)
-        .fetch_all(&*pool)
-        .await
-        .map_err(|e| format!("Failed to get skills for group {}: {}", group.group_id, e))?;
+        let skills_in_group = db::get_skills_for_group(&pool, group.group_id)
+            .await
+            .map_err(|e| format!("Failed to get skills for group {}: {}", group.group_id, e))?;
 
-        for (skill_id, _) in &skills_in_group {
-            all_skill_ids.push(*skill_id);
+        for skill in &skills_in_group {
+            all_skill_ids.push(skill.type_id);
         }
         skills_by_group.insert(group.group_id, skills_in_group);
     }
@@ -127,7 +123,9 @@ pub async fn get_character_skills_with_groups(
         let mut trained_levels = 0i64;
         let mut has_trained_skills = false;
 
-        for (skill_id, skill_name) in &skills_in_group {
+        for skill in &skills_in_group {
+            let skill_id = &skill.type_id;
+            let skill_name = &skill.name;
             total_levels += 5;
 
             let char_skill = character_skills_map.get(skill_id);
@@ -170,6 +168,61 @@ pub async fn get_character_skills_with_groups(
 
     Ok(CharacterSkillsResponse {
         character_id,
+        skills: skills_response,
+        groups: groups_response,
+    })
+}
+
+#[tauri::command]
+pub async fn get_sde_skills_with_groups(
+    pool: State<'_, db::Pool>,
+) -> Result<CharacterSkillsResponse, String> {
+    const SKILL_CATEGORY_ID: i64 = 16;
+
+    let skill_groups = db::get_skill_groups_for_category(&pool, SKILL_CATEGORY_ID)
+        .await
+        .map_err(|e| format!("Failed to get skill groups: {}", e))?;
+
+    let mut skills_response = Vec::new();
+    let mut groups_response = Vec::new();
+
+    for group in &skill_groups {
+        let skills_in_group = db::get_skills_for_group(&pool, group.group_id)
+            .await
+            .map_err(|e| format!("Failed to get skills for group {}: {}", group.group_id, e))?;
+
+        let mut total_levels = 0i64;
+
+        for skill in &skills_in_group {
+            let skill_id = &skill.type_id;
+            let skill_name = &skill.name;
+            total_levels += 5;
+
+            skills_response.push(CharacterSkillResponse {
+                skill_id: *skill_id,
+                skill_name: skill_name.clone(),
+                group_id: group.group_id,
+                group_name: group.group_name.clone(),
+                trained_skill_level: 0,
+                active_skill_level: 0,
+                skillpoints_in_skill: 0,
+                is_in_queue: false,
+                queue_level: None,
+                is_injected: false,
+            });
+        }
+
+        groups_response.push(SkillGroupResponse {
+            group_id: group.group_id,
+            group_name: group.group_name.clone(),
+            total_levels,
+            trained_levels: 0,
+            has_trained_skills: false,
+        });
+    }
+
+    Ok(CharacterSkillsResponse {
+        character_id: 0,
         skills: skills_response,
         groups: groups_response,
     })
