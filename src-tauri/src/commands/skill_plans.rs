@@ -592,12 +592,12 @@ pub async fn remove_skill_level(pool: State<'_, db::Pool>, entry_id: i64) -> Res
 
         let mut highest_lower_level_entry: Option<&db::skill_plans::SkillPlanEntry> = None;
         for entry in &entries {
-            if entry.skill_type_id == skill_type_id && entry.planned_level < planned_level {
-                if highest_lower_level_entry.is_none()
-                    || entry.planned_level > highest_lower_level_entry.unwrap().planned_level
-                {
-                    highest_lower_level_entry = Some(entry);
-                }
+            if entry.skill_type_id == skill_type_id
+                && entry.planned_level < planned_level
+                && (highest_lower_level_entry.is_none()
+                    || entry.planned_level > highest_lower_level_entry.unwrap().planned_level)
+            {
+                highest_lower_level_entry = Some(entry);
             }
         }
 
