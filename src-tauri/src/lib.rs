@@ -35,6 +35,8 @@ async fn is_startup_complete(
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    let _ = dotenvy::dotenv();
+
     tauri::Builder::default()
         .setup(|app| {
             tauri::async_runtime::block_on(async {
