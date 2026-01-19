@@ -45,7 +45,6 @@ import { useSortableList } from '@/hooks/useSortableList';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 
 import { RemapRow } from '../Remaps/RemapRow';
-import { AddSkillDialog } from './AddSkillDialog';
 import { ImportPlanDialog } from './ImportPlanDialog';
 import { PlanComparisonTab } from './PlanComparisonTab';
 import { PlanEntryRow } from './PlanEntryRow';
@@ -78,7 +77,6 @@ export function PlanEditor({ planId }: PlanEditorProps) {
   const [isEditingDescription, setIsEditingDescription] = useState(false);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
-  const [addSkillDialogOpen, setAddSkillDialogOpen] = useState(false);
   const [importDialogOpen, setImportDialogOpen] = useState(false);
   const [isExportingText, setIsExportingText] = useState(false);
   const [isExportingXml, setIsExportingXml] = useState(false);
@@ -564,13 +562,6 @@ export function PlanEditor({ planId }: PlanEditorProps) {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setAddSkillDialogOpen(true)}
-          >
-            Add Skill
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
             onClick={() => setImportDialogOpen(true)}
           >
             Import
@@ -736,11 +727,6 @@ export function PlanEditor({ planId }: PlanEditorProps) {
         </TabsContent>
       </Tabs>
 
-      <AddSkillDialog
-        open={addSkillDialogOpen}
-        onOpenChange={setAddSkillDialogOpen}
-        planId={planId}
-      />
       <ImportPlanDialog
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
