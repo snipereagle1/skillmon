@@ -7,11 +7,12 @@
 Skillmon is a desktop application for monitoring and planning character training in EVE Online.
 
 # DISCLAIMER
+
 This project is not yet in a stable state, no support will be provided yet. Your skill queues might be haunted.
+
 <p align="center">
   <img src="https://media1.tenor.com/m/fI5ECURBfGgAAAAC/john-cena-the-bear.gif" alt="haunted" width="320" />
 </p>
-
 
 ## Major Features
 
@@ -63,21 +64,24 @@ EVE_CLIENT_ID=your_client_id_here
 EVE_CALLBACK_URL=http://localhost:1421/callback
 ```
 
-*Note: Ensure your EVE Developer App has the correct callback URL configured.*
+_Note: Ensure your EVE Developer App has the correct callback URL configured._
 
 ### Development Commands
 
 1. **Install dependencies**:
+
    ```bash
    pnpm install
    ```
 
 2. **Generate ESI Client**:
+
    ```bash
    ./scripts/generate-esi.sh
    ```
 
 3. **Run in development mode**:
+
    ```bash
    pnpm tauri dev
    ```
@@ -108,4 +112,4 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ---
 
-*Disclaimer: EVE Online and the EVE logo are the registered trademarks of CCP hf. All rights are reserved worldwide. All other trademarks are the property of their respective owners. CCP hf. has granted permission to use EVE Online and all associated logos and designs for promotional and information purposes on its website but does not endorse, and is not in any way affiliated with, skillmon. CCP is not responsible for the content, functional, or operational aspects of this website and application.*
+_Disclaimer: EVE Online and the EVE logo are the registered trademarks of CCP hf. All rights are reserved worldwide. All other trademarks are the property of their respective owners. CCP hf. has granted permission to use EVE Online and all associated logos and designs for promotional and information purposes on its website but does not endorse, and is not in any way affiliated with, skillmon. CCP is not responsible for the content, functional, or operational aspects of this website and application._
