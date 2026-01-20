@@ -4,12 +4,19 @@
 
 # skillmon
 
-Skillmon is a desktop application for monitoring and planning character training in EVE Online. Built with Tauri, it offers a fast, local-first experience with a powerful suite of planning tools.
+Skillmon is a desktop application for monitoring and planning character training in EVE Online.
+
+# DISCLAIMER
+This project is not yet in a stable state, no support will be provided yet. Your skill queues might be haunted.
+<p align="center">
+  <img src="https://media1.tenor.com/m/fI5ECURBfGgAAAAC/john-cena-the-bear.gif" alt="haunted" width="320" />
+</p>
+
 
 ## Major Features
 
 - **Multi-Character Support**: Manage and monitor all your EVE Online characters in one place.
-- **Account Grouping**: Organize your characters into custom accounts for better overview.
+- **Account Grouping**: Organize your characters into custom accounts.
 - **Skill Queue Monitoring**: Real-time tracking of skill queues.
 - **Advanced Skill Planning**:
   - Create, edit, and manage complex skill plans.
