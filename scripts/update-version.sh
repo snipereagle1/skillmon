@@ -28,5 +28,14 @@ echo "Updated src-tauri/tauri.conf.json"
 node -e "const fs = require('fs'); const content = fs.readFileSync('src-tauri/Cargo.toml', 'utf8'); const updated = content.replace(/^version = \".*\"/m, 'version = \"$VERSION\"'); fs.writeFileSync('src-tauri/Cargo.toml', updated);"
 echo "Updated src-tauri/Cargo.toml"
 
+# Update Cargo.lock if cargo is available
+if command -v cargo &> /dev/null; then
+  echo "Updating Cargo.lock..."
+  (cd src-tauri && cargo update -p skillmon --offline || cargo update -p skillmon)
+  echo "Updated src-tauri/Cargo.lock"
+else
+  echo "Warning: cargo command not found, Cargo.lock was not updated."
+fi
+
 echo "Version update complete!"
 

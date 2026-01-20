@@ -1,9 +1,10 @@
 [package]
 name = "skillmon"
 version = "0.8.0"
-description = "A Tauri App"
-authors = ["you"]
+description = "A modern EVE Online skill monitoring and planning application."
+authors = ["snipereagle1 <me@snipereagle.xyz>"]
 edition = "2021"
+license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
@@ -54,3 +55,5 @@ oas3-gen-support = "0.22"
 serde_plain = "1"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
 quick-xml = "0.37"
+dotenvy = "0.15.7"
+tauri-plugin-updater = "2"

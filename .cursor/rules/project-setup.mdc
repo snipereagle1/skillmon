@@ -6,8 +6,16 @@ alwaysApply: true
 
 ## Environment Variables
 
+The application reads environment variables from the system environment or a `.env` file in the project root.
+
 - **EVE_CLIENT_ID** (required): EVE Online SSO client ID for OAuth authentication
 - **EVE_CALLBACK_URL** (optional): OAuth callback URL, defaults to `http://localhost:1421/callback` for development
+
+Example `.env` file:
+```env
+EVE_CLIENT_ID=your_client_id_here
+EVE_CALLBACK_URL=http://localhost:1421/callback
+```
 
 ## Development Commands
 

@@ -1,7 +1,8 @@
 {
   "name": "skillmon",
-  "private": true,
   "version": "0.8.0",
+  "license": "MIT",
+  "author": "snipereagle1 <me@snipereagle.xyz>",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -37,6 +38,9 @@
     "src-tauri/**/*.rs": [
       "sh -c 'cd src-tauri && cargo clippy -- -D warnings'",
       "sh -c 'cd src-tauri && cargo fmt -- --check'"
+    ],
+    "*.md": [
+      "prettier --write"
     ]
   },
   "dependencies": {
@@ -68,6 +72,8 @@
     "@tauri-apps/plugin-dialog": "^2",
     "@tauri-apps/plugin-fs": "^2",
     "@tauri-apps/plugin-opener": "^2",
+    "@tauri-apps/plugin-process": "^2.3.1",
+    "@tauri-apps/plugin-updater": "^2.9.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

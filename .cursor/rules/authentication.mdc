@@ -75,8 +75,8 @@ Frontend listens to these events in `src/App.tsx` to update UI and refresh data.
 
 ## Environment Variables
 
-- **EVE_CLIENT_ID** (required): OAuth client ID from EVE Developers portal
-- **EVE_CALLBACK_URL** (optional): Override default callback URL
+- **EVE_CLIENT_ID** (required): OAuth client ID from EVE Developers portal. Can be set in a `.env` file in the project root.
+- **EVE_CALLBACK_URL** (optional): Override default callback URL. Can be set in a `.env` file in the project root.
 
 ## Security Considerations
 
