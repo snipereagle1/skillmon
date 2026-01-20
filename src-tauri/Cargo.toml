@@ -56,3 +56,4 @@ serde_plain = "1"
 zip = { version = "0.6", default-features = false, features = ["deflate"] }
 quick-xml = "0.37"
 dotenvy = "0.15.7"
+tauri-plugin-updater = "2"

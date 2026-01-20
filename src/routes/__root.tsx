@@ -1,6 +1,8 @@
 import { useIsFetching } from '@tanstack/react-query';
-import { createRootRoute, Outlet } from '@tanstack/react-router';
-import { useState } from 'react';
+import { createRootRoute, Link, Outlet } from '@tanstack/react-router';
+import { check } from '@tauri-apps/plugin-updater';
+import { Download } from 'lucide-react';
+import { useEffect, useState } from 'react';
 
 import { AddCharacterDialog } from '@/components/AddCharacterDialog';
 import { NotificationBell } from '@/components/NotificationBell';
@@ -14,6 +16,7 @@ import { useAuthEvents } from '@/hooks/tauri/useAuthEvents';
 import { useStartupState } from '@/hooks/tauri/useStartupState';
 import { cn } from '@/lib/utils';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
+import { useUpdateStore } from '@/stores/updateStore';
 
 function RootComponent() {
   useAuthEvents();
@@ -23,6 +26,22 @@ function RootComponent() {
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const { open, skillId, characterId, closeSkillDetail } =
     useSkillDetailStore();
+  const { updateAvailable, setUpdate } = useUpdateStore();
+
+  useEffect(() => {
+    const checkForUpdates = async () => {
+      try {
+        const update = await check();
+        if (update) {
+          setUpdate(update);
+        }
+      } catch (error) {
+        console.error('Failed to check for updates:', error);
+      }
+    };
+
+    checkForUpdates();
+  }, [setUpdate]);
 
   if (isStartingUp) {
     return (
@@ -49,6 +68,18 @@ function RootComponent() {
           ]}
         />
         <div className="flex items-center gap-2">
+          {updateAvailable && (
+            <Link to="/about">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-green-500 hover:text-green-600 hover:bg-green-100/50"
+                title="Update available"
+              >
+                <Download className="h-5 w-5" />
+              </Button>
+            </Link>
+          )}
           <Spinner
             className={cn(
               'transition-opacity duration-1000',
