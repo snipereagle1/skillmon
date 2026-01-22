@@ -12,6 +12,8 @@
     "dialog:allow-save",
     "dialog:default",
     "fs:allow-write-text-file",
-    "fs:default"
+    "fs:default",
+    "updater:default",
+    "notification:default"
   ]
 }
