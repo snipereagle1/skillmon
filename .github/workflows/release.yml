@@ -9,6 +9,10 @@ on:
         description: 'Version number (e.g., 1.0.0)'
         required: true
         type: string
+      release-body:
+        description: 'Release body'
+        required: true
+        type: string
 
 jobs:
   prepare:
@@ -174,7 +178,34 @@ jobs:
         with:
           tagName: v${{ needs.prepare.outputs.version }}
           releaseName: 'Skillmon v${{ needs.prepare.outputs.version }}'
-          releaseBody: 'See the assets to download this version and install.'
+          releaseBody: ${{ inputs.release-body }}
           releaseDraft: true
           prerelease: false
           includeUpdaterJson: true
+
+  notify:
+    needs: [prepare, build]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Discord notification (Success)
+        if: ${{ needs.prepare.result == 'success' && needs.build.result == 'success' }}
+        uses: cabrera-evil/discord-notify-action@v1.0.2
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK }}
+          title: '🚀 Skillmon v${{ inputs.version }} is ready!'
+          description: "A new release has been built and is ready for publication.\n\nPublish the release here: https://github.com/snipereagle1/skillmon/releases"
+          username: 'Skillmon Release Bot'
+          color: '#42b883'
+          status: 'success'
+
+      - name: Discord notification (Failure)
+        if: ${{ needs.prepare.result == 'failure' || needs.build.result == 'failure' }}
+        uses: cabrera-evil/discord-notify-action@v1.0.2
+        with:
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK }}
+          title: '❌ Skillmon v${{ inputs.version }} Release Failed'
+          description: 'The release workflow failed. Check the Actions tab for details: https://github.com/snipereagle1/skillmon/actions'
+          username: 'Skillmon Release Bot'
+          color: '#e74c3c'
+          status: 'failure'

@@ -1,0 +1,37 @@
+name: Release Published Notification
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Truncate release body
+        id: truncate
+        env:
+          RELEASE_BODY: ${{ github.event.release.body }}
+        shell: bash
+        run: |
+          if [ ${#RELEASE_BODY} -gt 4000 ]; then
+            CONTENT="${RELEASE_BODY:0:4000}..."
+          else
+            CONTENT="$RELEASE_BODY"
+          fi
+          {
+            echo "description<<EOF"
+            echo "$CONTENT"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Discord notification
+        uses: cabrera-evil/discord-notify-action@v1.0.2
+        with:
+          webhook_url: ${{ secrets.DISCORD_ANNOUNCEMENTS_WEBHOOK }}
+          title: 'New Skillmon Release: ${{ github.event.release.tag_name }}'
+          description: '${{ steps.truncate.outputs.description }}'
+          url: ${{ github.event.release.html_url }}
+          username: 'Skillmon'
+          color: '#42b883'
+          status: 'success'
