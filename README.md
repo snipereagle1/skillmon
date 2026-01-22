@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="skillmon.svg" alt="skillmon logo" width="128" />
+  <img src="public/skillmon.svg" alt="skillmon logo" width="128" />
 </p>
 
 # skillmon
