@@ -33,12 +33,6 @@ pub async fn count_training_characters(
         {
             let is_training = queue_data.iter().any(|item: &serde_json::Value| {
                 if let Some(obj) = item.as_object() {
-                    if let Some(queue_pos) = obj.get("queue_position").and_then(|v| v.as_i64()) {
-                        if queue_pos == 0 {
-                            return true;
-                        }
-                    }
-
                     if let (Some(start_str), Some(finish_str)) = (
                         obj.get("start_date").and_then(|v| v.as_str()),
                         obj.get("finish_date").and_then(|v| v.as_str()),
