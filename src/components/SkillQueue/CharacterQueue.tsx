@@ -10,6 +10,7 @@ import type { CharacterSkillQueue, SkillmonPlan } from '@/generated/types';
 import { useForceRefreshSkillQueue } from '@/hooks/tauri/useForceRefreshSkillQueue';
 import { useCharacterRemaps } from '@/hooks/tauri/useRemaps';
 import { useImportSkillPlanJson } from '@/hooks/tauri/useSkillPlans';
+import { formatDate, formatNumber } from '@/lib/utils';
 
 import { RemapRow } from '../Remaps/RemapRow';
 import { SkillQueueEntry } from './SkillQueueEntry';
@@ -37,7 +38,7 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
     const plan: SkillmonPlan = {
       version: 1,
       name: `${queue.character_name} Queue Plan`,
-      description: `Imported from training queue on ${new Date().toLocaleDateString()}`,
+      description: `Imported from training queue on ${formatDate(new Date())}`,
       auto_prerequisites: true,
       entries: queue.skill_queue.map((item) => ({
         skill_type_id: item.skill_id,
@@ -209,7 +210,7 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
           id="bottom-bar"
         >
           <div className="text-sm text-green-400">
-            {unallocatedSP.toLocaleString('en-US')} unallocated skill points
+            {formatNumber(unallocatedSP)} unallocated skill points
           </div>
 
           <div className="space-y-2">
@@ -228,7 +229,7 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
             </div>
 
             <div className="text-sm text-muted-foreground">
-              {totalSP.toLocaleString('en-US')} skill points in queue
+              {formatNumber(totalSP)} skill points in queue
             </div>
           </div>
         </div>

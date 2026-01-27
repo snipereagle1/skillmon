@@ -22,6 +22,7 @@ import type { Attributes } from '@/generated/types';
 import { useSaveRemap } from '@/hooks/tauri/useRemaps';
 import { useSkillPlanWithEntries } from '@/hooks/tauri/useSkillPlans';
 import { useSkillQueue } from '@/hooks/tauri/useSkillQueue';
+import { formatAttributeBonus } from '@/lib/utils';
 
 interface AddRemapDialogProps {
   open: boolean;
@@ -206,7 +207,7 @@ export function AddRemapDialog({
                     <Minus className="h-4 w-4" />
                   </Button>
                   <div className="w-10 text-center font-mono font-bold">
-                    +{attributes[attr]}
+                    {formatAttributeBonus(attributes[attr])}
                   </div>
                   <Button
                     variant="outline"

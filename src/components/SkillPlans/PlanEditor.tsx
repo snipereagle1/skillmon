@@ -43,6 +43,7 @@ import {
 } from '@/hooks/tauri/useSkillPlans';
 import { useSortableList } from '@/hooks/useSortableList';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
+import { formatNumber } from '@/lib/utils';
 
 import { RemapRow } from '../Remaps/RemapRow';
 import { ImportPlanDialog } from './ImportPlanDialog';
@@ -535,7 +536,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
         {sortedEntries.length > 0 && (
           <div className="text-sm text-foreground">
             <span className="font-medium">Total Skillpoints: </span>
-            <span>{totalSP.toLocaleString('en-US')}</span>
+            <span>{formatNumber(totalSP)}</span>
           </div>
         )}
         <div className="flex gap-2">

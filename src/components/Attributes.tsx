@@ -1,3 +1,4 @@
+import { isPast, parseISO } from 'date-fns';
 import { Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { match, P } from 'ts-pattern';
@@ -15,6 +16,7 @@ import {
 import type { AttributeBreakdown } from '@/generated/types';
 import { useAttributes } from '@/hooks/tauri/useAttributes';
 import { useCharacterRemaps, useDeleteRemap } from '@/hooks/tauri/useRemaps';
+import { formatAttributeBonus, formatDate } from '@/lib/utils';
 
 import { AddRemapDialog } from './Remaps/AddRemapDialog';
 
@@ -69,11 +71,6 @@ export function Attributes({ characterId }: AttributesProps) {
     );
   }
 
-  const formatBonus = (value: number): string => {
-    if (value === 0) return '—';
-    return value > 0 ? `+${value}` : `${value}`;
-  };
-
   const handleDeleteRemap = async (remapId: number) => {
     try {
       await deleteRemapMutation.mutateAsync({ remapId, characterId });
@@ -104,9 +101,11 @@ export function Attributes({ characterId }: AttributesProps) {
                 <TableRow key={key}>
                   <TableCell className="font-medium">{label}</TableCell>
                   <TableCell>{attr.base}</TableCell>
-                  <TableCell>{formatBonus(attr.implants)}</TableCell>
-                  <TableCell>{formatBonus(attr.remap)}</TableCell>
-                  <TableCell>{formatBonus(attr.accelerator)}</TableCell>
+                  <TableCell>{formatAttributeBonus(attr.implants)}</TableCell>
+                  <TableCell>{formatAttributeBonus(attr.remap)}</TableCell>
+                  <TableCell>
+                    {formatAttributeBonus(attr.accelerator)}
+                  </TableCell>
                   <TableCell className="font-semibold">{attr.total}</TableCell>
                 </TableRow>
               );
@@ -124,16 +123,10 @@ export function Attributes({ characterId }: AttributesProps) {
             {match(data.accrued_remap_cooldown_date)
               .with(P.nullish, () => 'Available Now')
               .with(
-                P.when((d) => !d || new Date(d) <= new Date()),
+                P.when((d) => !d || isPast(parseISO(d))),
                 () => 'Available Now'
               )
-              .otherwise((d) =>
-                new Date(d).toLocaleDateString(undefined, {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                })
-              )}
+              .otherwise((d) => formatDate(d, 'PPP'))}
           </span>
         </div>
 
@@ -160,11 +153,7 @@ export function Attributes({ characterId }: AttributesProps) {
               Last Remap
             </span>
             <span className="text-lg font-semibold">
-              {new Date(data.last_remap_date).toLocaleDateString(undefined, {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric',
-              })}
+              {formatDate(data.last_remap_date, 'PPP')}
             </span>
           </div>
         )}

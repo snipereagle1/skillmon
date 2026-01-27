@@ -30,7 +30,7 @@ import {
   useUpdatePlanEntry,
 } from '@/hooks/tauri/useSkillPlans';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
-import { cn } from '@/lib/utils';
+import { cn, formatNumber, toRoman } from '@/lib/utils';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
 import { RemapRow } from '../Remaps/RemapRow';
@@ -85,9 +85,7 @@ export function PlanEntryRow({
   );
 
   const isPrerequisite = entry.entry_type === 'Prerequisite';
-  const levelRoman =
-    ['I', 'II', 'III', 'IV', 'V'][entry.planned_level - 1] ||
-    entry.planned_level.toString();
+  const levelRoman = toRoman(entry.planned_level);
 
   const handleRemoveSkillLevel = async () => {
     try {
@@ -298,7 +296,7 @@ export function PlanEntryRow({
                   isPrerequisite ? 'text-muted-foreground' : 'text-foreground'
                 )}
               >
-                {entry.skillpoints_for_level.toLocaleString('en-US')} SP
+                {formatNumber(entry.skillpoints_for_level)} SP
               </span>
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

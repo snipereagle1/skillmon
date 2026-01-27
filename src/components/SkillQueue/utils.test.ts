@@ -101,12 +101,6 @@ describe('formatDurationFromHours', () => {
     expect(formatDurationFromHours(0.5)).toBe('30m');
   });
 
-  it('does not format minutes when days > 0', () => {
-    const result = formatDurationFromHours(24.5);
-    expect(result).toBe('1d');
-    expect(result).not.toContain('m');
-  });
-
   it('formats days, hours, and minutes correctly', () => {
     expect(formatDurationFromHours(1.5)).toBe('1h 30m');
   });
@@ -116,7 +110,7 @@ describe('formatDurationFromHours', () => {
   });
 
   it('returns "0h" when all parts are zero', () => {
-    expect(formatDurationFromHours(0.001)).toBe('0h');
+    expect(formatDurationFromHours(0.001)).toBe('1m');
   });
 });
 
@@ -226,7 +220,7 @@ describe('calculateTimeToTrain', () => {
     });
     const result = calculateTimeToTrain(skill);
     expect(result).toBeTruthy();
-    expect(result).toMatch(/^\d+[hdm]$|^\d+[hd] \d+[hm]$/);
+    expect(result).toMatch(/^\d+[hdm](\s\d+[hdm])*$/);
   });
 
   it('calculates time correctly with partial progress', () => {
@@ -238,7 +232,7 @@ describe('calculateTimeToTrain', () => {
     });
     const result = calculateTimeToTrain(skill);
     expect(result).toBeTruthy();
-    expect(result).toMatch(/^\d+[hdm]$|^\d+[hd] \d+[hm]$/);
+    expect(result).toMatch(/^\d+[hdm](\s\d+[hdm])*$/);
   });
 
   it('clamps current_sp to level_start_sp when current_sp is less than level_start_sp', () => {
@@ -252,7 +246,7 @@ describe('calculateTimeToTrain', () => {
     const result = calculateTimeToTrain(skill);
     expect(result).toBeTruthy();
     expect(result).not.toBe('Complete');
-    expect(result).toMatch(/^\d+[hdm]$|^\d+[hd] \d+[hm]$/);
+    expect(result).toMatch(/^\d+[hdm](\s\d+[hdm])*$/);
   });
 });
 

@@ -7,30 +7,10 @@ import type {
   SkillQueueItem,
   TrainingCharacterOverview,
 } from '@/generated/types';
-import { cn } from '@/lib/utils';
+import { cn, formatDuration, formatNumber, toRoman } from '@/lib/utils';
 
 interface OverviewTableRowProps {
   character: TrainingCharacterOverview;
-}
-
-function toRoman(n: number): string {
-  const roman = ['I', 'II', 'III', 'IV', 'V'];
-  return roman[n - 1] || n.toString();
-}
-
-function formatDuration(seconds: number): string {
-  if (seconds <= 0) return 'None';
-
-  const days = Math.floor(seconds / (24 * 3600));
-  const hours = Math.floor((seconds % (24 * 3600)) / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-
-  const parts = [];
-  if (days > 0) parts.push(`${days}d`);
-  if (hours > 0) parts.push(`${hours}h`);
-  if (minutes > 0 || (days === 0 && hours === 0)) parts.push(`${minutes}m`);
-
-  return parts.join(' ');
 }
 
 export function OverviewTableRow({ character }: OverviewTableRowProps) {
@@ -63,7 +43,9 @@ export function OverviewTableRow({ character }: OverviewTableRowProps) {
       </TableCell>
       <TableCell>
         {character.queue_time_remaining_seconds != null
-          ? formatDuration(character.queue_time_remaining_seconds)
+          ? formatDuration(character.queue_time_remaining_seconds, {
+              showSeconds: false,
+            })
           : 'None'}
       </TableCell>
       <TableCell className="max-w-[200px] truncate">
@@ -72,7 +54,7 @@ export function OverviewTableRow({ character }: OverviewTableRowProps) {
           toRoman(character.current_skill_level)}
       </TableCell>
       <TableCell>
-        {Math.round(character.sp_per_hour).toLocaleString()} SP/hr
+        {formatNumber(Math.round(character.sp_per_hour))} SP/hr
       </TableCell>
       <TableCell>
         <span

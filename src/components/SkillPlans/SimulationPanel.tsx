@@ -10,6 +10,7 @@ import type {
   SkillPlanEntryResponse,
 } from '@/generated/types';
 import { useDeleteRemap, usePlanRemaps } from '@/hooks/tauri/useRemaps';
+import { formatAttributeBonus } from '@/lib/utils';
 
 import { OptimizationDialog } from './OptimizationDialog';
 
@@ -212,7 +213,7 @@ export function SimulationPanel({
                   <Minus className="h-4 w-4" />
                 </Button>
                 <div className="w-10 text-center font-mono">
-                  +{initialRemap[attr]}
+                  {formatAttributeBonus(initialRemap[attr])}
                 </div>
                 <Button
                   variant="outline"
@@ -295,7 +296,7 @@ export function SimulationPanel({
                 <Minus className="h-4 w-4" />
               </Button>
               <div className="w-10 text-center font-mono">
-                +{currentAcceleratorBonus}
+                {formatAttributeBonus(currentAcceleratorBonus)}
               </div>
               <Button
                 variant="outline"

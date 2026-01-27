@@ -6,6 +6,7 @@ import { NavigationTabs } from '@/components/ui/navigation-tabs';
 import { useAccountsAndCharacters } from '@/hooks/tauri/useAccountsAndCharacters';
 import { useCharacterSkills } from '@/hooks/tauri/useCharacterSkills';
 import { useSkillQueue } from '@/hooks/tauri/useSkillQueue';
+import { formatNumber } from '@/lib/utils';
 
 function CharacterDetailLayout() {
   const { characterId } = Route.useParams();
@@ -126,7 +127,7 @@ function CharacterDetailLayout() {
           />
           {totalSkillpoints !== null && (
             <span className="text-sm text-muted-foreground">
-              {totalSkillpoints.toLocaleString('en-US')} total skillpoints
+              {formatNumber(totalSkillpoints)} total skillpoints
             </span>
           )}
         </div>

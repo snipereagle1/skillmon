@@ -7,7 +7,7 @@ import { useEffect, useState } from 'react';
 import { toast } from 'sonner';
 
 import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 import { useUpdateStore } from '@/stores/updateStore';
 
 function AboutPage() {
@@ -130,7 +130,7 @@ function AboutPage() {
                   New Version Available: v{update.version}
                 </h3>
                 <p className="text-sm text-muted-foreground">
-                  Released on {new Date(update.date || '').toLocaleDateString()}
+                  Released on {formatDate(update.date || '')}
                 </p>
               </div>
               <Button

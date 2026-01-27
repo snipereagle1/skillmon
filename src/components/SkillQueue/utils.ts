@@ -1,65 +1,35 @@
-import { intervalToDuration, isAfter, isBefore, isEqual } from 'date-fns';
+import {
+  differenceInSeconds,
+  isAfter,
+  isBefore,
+  isEqual,
+  isFuture,
+  parseISO,
+} from 'date-fns';
 
 import type { SkillQueueItem } from '@/generated/types';
+import { formatDuration, formatDurationFromHours } from '@/lib/utils';
+
+export { formatDurationFromHours };
 
 export function formatTimeRemaining(
   finishDate: string | null | undefined
 ): string {
   if (!finishDate) return 'Paused';
 
-  const finish = new Date(finishDate);
-  const now = new Date();
+  const finish = parseISO(finishDate);
 
-  if (finish <= now) return 'Complete';
+  if (!isFuture(finish)) return 'Complete';
 
-  const duration = intervalToDuration({ start: now, end: finish });
+  const durationInSeconds = Math.max(
+    0,
+    differenceInSeconds(finish, new Date())
+  );
 
-  const parts: string[] = [];
-
-  if (duration.days && duration.days > 0) {
-    parts.push(`${duration.days}d`);
-  }
-  if (duration.hours && duration.hours > 0) {
-    parts.push(`${duration.hours}h`);
-  }
-  if (duration.minutes && duration.minutes > 0) {
-    parts.push(`${duration.minutes}m`);
-  }
-  if (duration.seconds && duration.seconds > 0 && parts.length === 0) {
-    parts.push(`${duration.seconds}s`);
-  }
-
-  if (parts.length === 0) {
-    return '0s';
-  }
-
-  return parts.join(' ');
-}
-
-export function formatDurationFromHours(hours: number): string {
-  if (hours <= 0) return '0h';
-
-  const days = Math.floor(hours / 24);
-  const remainingHours = Math.floor(hours % 24);
-  const minutes = Math.floor((hours % 1) * 60);
-
-  const parts: string[] = [];
-
-  if (days > 0) {
-    parts.push(`${days}d`);
-  }
-  if (remainingHours > 0) {
-    parts.push(`${remainingHours}h`);
-  }
-  if (minutes > 0 && days === 0) {
-    parts.push(`${minutes}m`);
-  }
-
-  if (parts.length === 0) {
-    return '0h';
-  }
-
-  return parts.join(' ');
+  return formatDuration(durationInSeconds, {
+    showSeconds: true,
+    zeroLabel: '0s',
+  });
 }
 
 export function calculateTimeToTrain(skill: SkillQueueItem): string | null {
@@ -151,8 +121,8 @@ export function isCurrentlyTraining(skill: SkillQueueItem): boolean {
   if (skill.start_date != null && skill.finish_date != null) {
     try {
       const now = new Date();
-      const startDate = new Date(skill.start_date);
-      const finishDate = new Date(skill.finish_date);
+      const startDate = parseISO(skill.start_date);
+      const finishDate = parseISO(skill.finish_date);
 
       const isAfterOrEqualStart =
         isAfter(now, startDate) || isEqual(now, startDate);

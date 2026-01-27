@@ -4,7 +4,7 @@ import { match, P } from 'ts-pattern';
 import type { PlanComparisonEntry } from '@/generated/types';
 import { usePlanComparison } from '@/hooks/tauri/usePlanComparison';
 import { useSkillPlans } from '@/hooks/tauri/useSkillPlans';
-import { cn } from '@/lib/utils';
+import { cn, formatSkillpoints, toRoman } from '@/lib/utils';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
 import { LevelIndicator } from './SkillQueue/LevelIndicator';
@@ -17,16 +17,6 @@ interface CharacterPlanComparisonProps {
   onPlanChange: (planId: number | null) => void;
 }
 
-function formatSkillpoints(sp: number): string {
-  if (sp >= 1_000_000) {
-    return `${(sp / 1_000_000).toFixed(2)}M SP`;
-  }
-  if (sp >= 1_000) {
-    return `${(sp / 1_000).toFixed(1)}K SP`;
-  }
-  return `${sp.toLocaleString('en-US')} SP`;
-}
-
 function ComparisonEntryRow({
   entry,
   characterId,
@@ -34,9 +24,7 @@ function ComparisonEntryRow({
   entry: PlanComparisonEntry;
   characterId: number | null;
 }) {
-  const levelRoman =
-    ['I', 'II', 'III', 'IV', 'V'][entry.planned_level - 1] ||
-    entry.planned_level.toString();
+  const levelRoman = toRoman(entry.planned_level);
   const isPrerequisite = entry.entry_type === 'Prerequisite';
   const openSkillDetail = useSkillDetailStore(
     (state: {
