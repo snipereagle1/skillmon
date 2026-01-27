@@ -4,6 +4,7 @@ pub mod auth;
 pub mod characters;
 pub mod clones;
 pub mod notifications;
+pub mod overview;
 pub mod rate_limits;
 pub mod remaps;
 pub mod sde;

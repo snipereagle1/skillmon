@@ -1,4 +1,4 @@
-import { isAfter, isBefore, isEqual } from 'date-fns';
+import { isAfter, isBefore, isEqual, parseISO } from 'date-fns';
 
 import { Card } from '@/components/ui/card';
 import type { Character, SkillQueueItem } from '@/generated/types';
@@ -38,8 +38,8 @@ function getTrainingStatus(
     // Backend logic: now >= start_utc && now < finish_utc (inclusive start, exclusive end)
     if (item.start_date != null && item.finish_date != null) {
       try {
-        const startDate = new Date(item.start_date);
-        const finishDate = new Date(item.finish_date);
+        const startDate = parseISO(item.start_date);
+        const finishDate = parseISO(item.finish_date);
 
         const isAfterOrEqualStart =
           isAfter(now, startDate) || isEqual(now, startDate);

@@ -24,6 +24,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { usePlanComparisonAll } from '@/hooks/tauri/usePlanComparisonAll';
+import { formatDuration, formatNumber } from '@/lib/utils';
 
 interface PlanComparisonTabProps {
   planId: number;
@@ -69,20 +70,6 @@ export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
     setExcludedCharacterIds(
       new Set(data.comparisons.map((c) => c.character_id))
     );
-  };
-
-  const formatDuration = (seconds: number) => {
-    if (seconds === 0) return 'Complete';
-    const days = Math.floor(seconds / (24 * 3600));
-    const hours = Math.floor((seconds % (24 * 3600)) / 3600);
-    const mins = Math.floor((seconds % 3600) / 60);
-
-    const parts = [];
-    if (days > 0) parts.push(`${days}d`);
-    if (hours > 0) parts.push(`${hours}h`);
-    if (mins > 0) parts.push(`${mins}m`);
-
-    return parts.join(' ') || '< 1m';
   };
 
   if (isLoading) {
@@ -193,13 +180,17 @@ export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
                     {c.character_name}
                   </TableCell>
                   <TableCell className="text-right">
-                    {c.completed_sp.toLocaleString('en-US')}
+                    {formatNumber(c.completed_sp)}
                   </TableCell>
                   <TableCell className="text-right">
-                    {c.missing_sp.toLocaleString('en-US')}
+                    {formatNumber(c.missing_sp)}
                   </TableCell>
                   <TableCell className="text-right">
-                    {formatDuration(c.time_to_completion_seconds)}
+                    {formatDuration(c.time_to_completion_seconds, {
+                      showSeconds: false,
+                      zeroLabel: 'Complete',
+                      minLabel: '< 1m',
+                    })}
                   </TableCell>
                   <TableCell>
                     <div className="flex gap-2">

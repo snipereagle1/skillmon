@@ -42,10 +42,6 @@ pub struct CharacterSkillQueue {
 }
 
 pub fn is_skill_actively_training(skill: &SkillQueueItem) -> bool {
-    if skill.queue_position == 0 {
-        return true;
-    }
-
     if let (Some(start_str), Some(finish_str)) = (&skill.start_date, &skill.finish_date) {
         if let (Ok(start), Ok(finish)) = (
             chrono::DateTime::parse_from_rfc3339(start_str),
@@ -277,25 +273,7 @@ pub async fn get_skill_queues(
             let known_sp = skill_known_sp.get(&skill_item.skill_id).copied();
             let current_tracker = skill_progress_map.get(&skill_item.skill_id).copied();
 
-            let is_currently_training = skill_item.queue_position == 0 || {
-                let now = chrono::Utc::now();
-                if let (Some(start_str), Some(finish_str)) =
-                    (&skill_item.start_date, &skill_item.finish_date)
-                {
-                    if let (Ok(start), Ok(finish)) = (
-                        chrono::DateTime::parse_from_rfc3339(start_str),
-                        chrono::DateTime::parse_from_rfc3339(finish_str),
-                    ) {
-                        let start_utc = start.with_timezone(&chrono::Utc);
-                        let finish_utc = finish.with_timezone(&chrono::Utc);
-                        now >= start_utc && now < finish_utc
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            };
+            let is_currently_training = is_skill_actively_training(skill_item);
 
             let mut progress_sp = if is_currently_training {
                 let base_sp = known_sp

@@ -1,3 +1,4 @@
+use futures_util::future::join_all;
 use std::collections::HashMap;
 
 use anyhow::Result;
@@ -11,7 +12,9 @@ use crate::esi_helpers;
 use crate::utils;
 
 use crate::commands::attributes::CharacterAttributesResponse;
-use crate::commands::skill_queues::{CharacterSkillQueue, SkillQueueItem};
+use crate::commands::skill_queues::{
+    is_skill_actively_training, CharacterSkillQueue, SkillQueueItem,
+};
 
 #[allow(dead_code)]
 pub async fn refresh_all_skill_queues(
@@ -27,16 +30,21 @@ pub async fn refresh_all_skill_queues(
         }
     };
 
+    let mut tasks = Vec::new();
     for character in characters {
-        let _ = build_character_skill_queue(
-            app,
-            pool,
-            rate_limits,
-            character.character_id,
-            &character.character_name,
-        )
-        .await;
+        let app = app.clone();
+        let pool = pool.clone();
+        let rate_limits = rate_limits.clone();
+        let char_id = character.character_id;
+        let char_name = character.character_name.clone();
+
+        tasks.push(tokio::spawn(async move {
+            let _ =
+                build_character_skill_queue(&app, &pool, &rate_limits, char_id, &char_name).await;
+        }));
     }
+
+    join_all(tasks).await;
 }
 
 pub async fn build_character_skill_queue(
@@ -140,16 +148,11 @@ pub async fn build_character_skill_queue(
         Ok(Some(data)) => {
             let should_refresh = data.iter().any(|item: &serde_json::Value| {
                 if let Some(obj) = item.as_object() {
-                    if let (Some(queue_pos), Some(finish_str)) = (
-                        obj.get("queue_position").and_then(|v| v.as_i64()),
-                        obj.get("finish_date").and_then(|v| v.as_str()),
-                    ) {
-                        if queue_pos == 0 {
-                            if let Ok(finish) = chrono::DateTime::parse_from_rfc3339(finish_str) {
-                                let finish_utc = finish.with_timezone(&chrono::Utc);
-                                let now = chrono::Utc::now();
-                                return now >= finish_utc;
-                            }
+                    if let Some(finish_str) = obj.get("finish_date").and_then(|v| v.as_str()) {
+                        if let Ok(finish) = chrono::DateTime::parse_from_rfc3339(finish_str) {
+                            let finish_utc = finish.with_timezone(&chrono::Utc);
+                            let now = chrono::Utc::now();
+                            return now >= finish_utc;
                         }
                     }
                 }
@@ -259,25 +262,7 @@ pub async fn build_character_skill_queue(
         let known_sp = skill_sp_map.get(&skill_item.skill_id).copied();
         let current_tracker = skill_progress_map.get(&skill_item.skill_id).copied();
 
-        let is_currently_training = skill_item.queue_position == 0 || {
-            let now = chrono::Utc::now();
-            if let (Some(start_str), Some(finish_str)) =
-                (&skill_item.start_date, &skill_item.finish_date)
-            {
-                if let (Ok(start), Ok(finish)) = (
-                    chrono::DateTime::parse_from_rfc3339(start_str),
-                    chrono::DateTime::parse_from_rfc3339(finish_str),
-                ) {
-                    let start_utc = start.with_timezone(&chrono::Utc);
-                    let finish_utc = finish.with_timezone(&chrono::Utc);
-                    now >= start_utc && now < finish_utc
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        };
+        let is_currently_training = is_skill_actively_training(skill_item);
 
         let mut progress_sp = if is_currently_training {
             let base_sp = known_sp
