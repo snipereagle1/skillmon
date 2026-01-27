@@ -18,6 +18,7 @@ interface FormatDurationOptions {
   minLabel?: string;
 }
 
+// eslint-disable-next-line complexity
 export function formatDuration(
   seconds: number,
   options: FormatDurationOptions = {}
@@ -28,6 +29,8 @@ export function formatDuration(
 
   const duration = intervalToDuration({ start: 0, end: seconds * 1000 });
   const {
+    years = 0,
+    months = 0,
     days = 0,
     hours = 0,
     minutes = 0,
@@ -35,6 +38,8 @@ export function formatDuration(
   } = duration;
 
   const parts = [];
+  if (years > 0) parts.push(`${years}y`);
+  if (months > 0) parts.push(`${months}mo`);
   if (days > 0) parts.push(`${days}d`);
   if (hours > 0) parts.push(`${hours}h`);
   if (minutes > 0) parts.push(`${minutes}m`);

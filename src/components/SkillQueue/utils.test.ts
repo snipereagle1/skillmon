@@ -68,6 +68,20 @@ describe('formatTimeRemaining', () => {
     expect(result).toMatch(/^\d+d \d+h \d+m$/);
   });
 
+  it('formats long duration correctly (years and months)', () => {
+    const futureDate = new Date();
+    // Move 1 year, 2 months, 3 days ahead
+    futureDate.setFullYear(futureDate.getFullYear() + 1);
+    futureDate.setMonth(futureDate.getMonth() + 2);
+    futureDate.setDate(futureDate.getDate() + 3);
+
+    const result = formatTimeRemaining(futureDate.toISOString());
+    // result should contain y and mo
+    expect(result).toContain('1y');
+    expect(result).toContain('2mo');
+    expect(result).toMatch(/1y 2mo \d+d/);
+  });
+
   it('returns "0s" for zero duration', () => {
     const now = new Date();
     now.setMilliseconds(now.getMilliseconds() + 1);
@@ -103,6 +117,16 @@ describe('formatDurationFromHours', () => {
 
   it('formats days, hours, and minutes correctly', () => {
     expect(formatDurationFromHours(1.5)).toBe('1h 30m');
+  });
+
+  it('formats months and years correctly from hours', () => {
+    // 1 year = 8760 hours (approx)
+    // 1 month = 730 hours (approx)
+    // Let's use exact numbers based on 1970 calendar used by formatDuration internally
+    // 31 days (Jan) = 744 hours
+    expect(formatDurationFromHours(744)).toBe('1mo');
+    // 365 days = 8760 hours
+    expect(formatDurationFromHours(8760)).toBe('1y');
   });
 
   it('handles fractional hours correctly', () => {
@@ -220,7 +244,7 @@ describe('calculateTimeToTrain', () => {
     });
     const result = calculateTimeToTrain(skill);
     expect(result).toBeTruthy();
-    expect(result).toMatch(/^\d+[hdm](\s\d+[hdm])*$/);
+    expect(result).toMatch(/^\d+(y|mo|[hdm])(\s\d+(y|mo|[hdm]))*$/);
   });
 
   it('calculates time correctly with partial progress', () => {
@@ -232,7 +256,7 @@ describe('calculateTimeToTrain', () => {
     });
     const result = calculateTimeToTrain(skill);
     expect(result).toBeTruthy();
-    expect(result).toMatch(/^\d+[hdm](\s\d+[hdm])*$/);
+    expect(result).toMatch(/^\d+(y|mo|[hdm])(\s\d+(y|mo|[hdm]))*$/);
   });
 
   it('clamps current_sp to level_start_sp when current_sp is less than level_start_sp', () => {
@@ -246,7 +270,7 @@ describe('calculateTimeToTrain', () => {
     const result = calculateTimeToTrain(skill);
     expect(result).toBeTruthy();
     expect(result).not.toBe('Complete');
-    expect(result).toMatch(/^\d+[hdm](\s\d+[hdm])*$/);
+    expect(result).toMatch(/^\d+(y|mo|[hdm])(\s\d+(y|mo|[hdm]))*$/);
   });
 });
 
