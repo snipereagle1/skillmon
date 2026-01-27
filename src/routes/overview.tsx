@@ -1,9 +1,11 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { OverviewTable } from '@/components/OverviewTable';
+
 function OverviewPage() {
   return (
-    <div className="flex items-center justify-center h-full p-4">
-      <p className="text-muted-foreground">Overview content coming soon...</p>
+    <div className="container mx-auto p-4 space-y-6">
+      <OverviewTable />
     </div>
   );
 }

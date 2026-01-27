@@ -290,6 +290,7 @@ pub fn run() {
             commands::skill_queues::get_training_characters_count,
             commands::skill_queues::get_skill_queue_for_character,
             commands::skill_queues::force_refresh_skill_queue,
+            commands::overview::get_training_characters_overview,
             commands::skills::get_character_skills_with_groups,
             commands::skills::get_sde_skills_with_groups,
             commands::skills::get_skill_details,
