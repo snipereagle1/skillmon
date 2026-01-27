@@ -1,3 +1,4 @@
+use futures_util::future::join_all;
 use std::collections::HashMap;
 
 use anyhow::Result;
@@ -29,16 +30,21 @@ pub async fn refresh_all_skill_queues(
         }
     };
 
+    let mut tasks = Vec::new();
     for character in characters {
-        let _ = build_character_skill_queue(
-            app,
-            pool,
-            rate_limits,
-            character.character_id,
-            &character.character_name,
-        )
-        .await;
+        let app = app.clone();
+        let pool = pool.clone();
+        let rate_limits = rate_limits.clone();
+        let char_id = character.character_id;
+        let char_name = character.character_name.clone();
+
+        tasks.push(tokio::spawn(async move {
+            let _ =
+                build_character_skill_queue(&app, &pool, &rate_limits, char_id, &char_name).await;
+        }));
     }
+
+    join_all(tasks).await;
 }
 
 pub async fn build_character_skill_queue(
