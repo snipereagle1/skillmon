@@ -52,7 +52,7 @@ export function OverviewTable() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Currently Training</CardTitle>
+        <CardTitle>Currently Training ({trainingCharacters.length})</CardTitle>
       </CardHeader>
       <CardContent>
         <Table>
