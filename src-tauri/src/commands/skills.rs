@@ -70,26 +70,15 @@ pub async fn get_character_skills_with_groups(
                 {
                     let now = chrono::Utc::now();
                     for item in queue_data {
-                        if let Some(obj) = item.as_object() {
-                            if let (Some(skill_id), Some(finished_level), finish_date_opt) = (
-                                obj.get("skill_id").and_then(|v| v.as_i64()),
-                                obj.get("finished_level").and_then(|v| v.as_i64()),
-                                obj.get("finish_date").and_then(|v| v.as_str()),
-                            ) {
-                                if let Some(finish_str) = finish_date_opt {
-                                    if let Ok(finish) =
-                                        chrono::DateTime::parse_from_rfc3339(finish_str)
-                                    {
-                                        let finish_utc = finish.with_timezone(&chrono::Utc);
-                                        if now >= finish_utc {
-                                            trained.insert(skill_id, finished_level);
-                                            continue;
-                                        }
-                                    }
-                                }
-                                queued.insert(skill_id, finished_level);
+                        let skill_id = item.skill_id;
+                        let finished_level = item.finished_level;
+                        if let Some(finish_utc) = item.finish_date {
+                            if now >= finish_utc {
+                                trained.insert(skill_id, finished_level);
+                                continue;
                             }
                         }
+                        queued.insert(skill_id, finished_level);
                     }
                 }
             }

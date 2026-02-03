@@ -31,23 +31,11 @@ pub async fn count_training_characters(
             esi_helpers::get_cached_skill_queue(pool, &client, character.character_id, rate_limits)
                 .await
         {
-            let is_training = queue_data.iter().any(|item: &serde_json::Value| {
-                if let Some(obj) = item.as_object() {
-                    if let (Some(start_str), Some(finish_str)) = (
-                        obj.get("start_date").and_then(|v| v.as_str()),
-                        obj.get("finish_date").and_then(|v| v.as_str()),
-                    ) {
-                        if let (Ok(start), Ok(finish)) = (
-                            chrono::DateTime::parse_from_rfc3339(start_str),
-                            chrono::DateTime::parse_from_rfc3339(finish_str),
-                        ) {
-                            let start_utc = start.with_timezone(&chrono::Utc);
-                            let finish_utc = finish.with_timezone(&chrono::Utc);
-                            let now = chrono::Utc::now();
-                            if now >= start_utc && now < finish_utc {
-                                return true;
-                            }
-                        }
+            let is_training = queue_data.iter().any(|item| {
+                if let (Some(start_utc), Some(finish_utc)) = (item.start_date, item.finish_date) {
+                    let now = chrono::Utc::now();
+                    if now >= start_utc && now < finish_utc {
+                        return true;
                     }
                 }
                 false

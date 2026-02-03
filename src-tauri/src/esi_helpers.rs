@@ -22,10 +22,10 @@ pub async fn get_cached_skill_queue(
     client: &reqwest::Client,
     character_id: i64,
     rate_limits: &esi::RateLimitStore,
-) -> Result<Option<esi::CharactersCharacterIdSkillqueueGet>> {
+) -> Result<Option<Vec<esi::CharactersSkillqueueSkill>>> {
     let endpoint_path = format!("characters/{}/skillqueue", character_id);
     let cache_key = cache::build_cache_key(&endpoint_path, character_id);
-    esi::fetch_cached(
+    esi::fetch_cached::<Vec<esi::CharactersSkillqueueSkill>>(
         pool,
         client,
         &endpoint_path,
@@ -82,11 +82,11 @@ pub async fn get_cached_character_skills(
     client: &reqwest::Client,
     character_id: i64,
     rate_limits: &esi::RateLimitStore,
-) -> Result<Option<esi::CharactersCharacterIdSkillsGet>> {
+) -> Result<Option<esi::CharactersSkills>> {
     let endpoint_path = format!("characters/{}/skills", character_id);
     let cache_key = cache::build_cache_key(&endpoint_path, character_id);
 
-    if let Some(data) = esi::fetch_cached::<esi::CharactersCharacterIdSkillsGet>(
+    if let Some(data) = esi::fetch_cached::<esi::CharactersSkills>(
         pool,
         client,
         &endpoint_path,
@@ -99,14 +99,13 @@ pub async fn get_cached_character_skills(
         let skills_data: Vec<(i64, i64, i64, i64)> = data
             .skills
             .iter()
-            .filter_map(|skill: &serde_json::Value| {
-                let obj = skill.as_object()?;
-                Some((
-                    obj.get("skill_id")?.as_i64()?,
-                    obj.get("active_skill_level")?.as_i64()?,
-                    obj.get("skillpoints_in_skill")?.as_i64()?,
-                    obj.get("trained_skill_level")?.as_i64()?,
-                ))
+            .map(|skill| {
+                (
+                    skill.skill_id,
+                    skill.active_skill_level,
+                    skill.skillpoints_in_skill,
+                    skill.trained_skill_level,
+                )
             })
             .collect();
         db::set_character_skills(pool, character_id, &skills_data)
