@@ -173,17 +173,13 @@ pub async fn get_skill_queues(
                 let now = chrono::Utc::now();
                 let skill_queue: Vec<SkillQueueItem> = queue_data
                     .into_iter()
-                    .filter_map(|item: serde_json::Value| {
-                        let obj = item.as_object()?;
-                        let skill_id = obj.get("skill_id")?.as_i64()?;
-                        let queue_pos = obj.get("queue_position")?.as_i64()? as i32;
+                    .filter_map(|item| {
+                        let skill_id = item.skill_id;
+                        let queue_pos = item.queue_position as i32;
 
-                        if let Some(finish_str) = obj.get("finish_date").and_then(|v| v.as_str()) {
-                            if let Ok(finish) = chrono::DateTime::parse_from_rfc3339(finish_str) {
-                                let finish_utc = finish.with_timezone(&chrono::Utc);
-                                if now >= finish_utc {
-                                    return None;
-                                }
+                        if let Some(finish_utc) = item.finish_date {
+                            if now >= finish_utc {
+                                return None;
                             }
                         }
 
@@ -192,20 +188,12 @@ pub async fn get_skill_queues(
                             skill_id,
                             skill_name: None,
                             queue_position: queue_pos,
-                            finished_level: obj.get("finished_level")?.as_i64()? as i32,
-                            start_date: obj
-                                .get("start_date")
-                                .and_then(|v| v.as_str())
-                                .map(String::from),
-                            finish_date: obj
-                                .get("finish_date")
-                                .and_then(|v| v.as_str())
-                                .map(String::from),
-                            training_start_sp: obj
-                                .get("training_start_sp")
-                                .and_then(|v| v.as_i64()),
-                            level_start_sp: obj.get("level_start_sp").and_then(|v| v.as_i64()),
-                            level_end_sp: obj.get("level_end_sp").and_then(|v| v.as_i64()),
+                            finished_level: item.finished_level as i32,
+                            start_date: item.start_date.map(|d| d.to_rfc3339()),
+                            finish_date: item.finish_date.map(|d| d.to_rfc3339()),
+                            training_start_sp: item.training_start_sp,
+                            level_start_sp: item.level_start_sp,
+                            level_end_sp: item.level_end_sp,
                             current_sp: None,
                             sp_per_minute: None,
                             primary_attribute: None,
