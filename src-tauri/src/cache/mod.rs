@@ -6,32 +6,31 @@ use sqlx::FromRow;
 use super::db::Pool;
 
 #[derive(Debug, FromRow)]
-struct CacheEntry {
-    etag: Option<String>,
-    #[allow(dead_code)]
-    expires_at: i64,
-    response_body: String,
+pub struct CacheEntry {
+    pub etag: Option<String>,
+    pub expires_at: i64,
+    pub response_body: String,
+}
+
+impl CacheEntry {
+    pub fn is_expired(&self) -> bool {
+        self.expires_at <= Utc::now().timestamp()
+    }
 }
 
 pub fn build_cache_key(endpoint: &str, character_id: i64) -> String {
     format!("{}:{}", endpoint, character_id)
 }
 
-pub async fn get_cached_response(
-    pool: &Pool,
-    cache_key: &str,
-) -> Result<Option<(String, Option<String>)>> {
-    let now = Utc::now().timestamp();
-
+pub async fn get_cached_response(pool: &Pool, cache_key: &str) -> Result<Option<CacheEntry>> {
     let entry = sqlx::query_as::<_, CacheEntry>(
-        "SELECT etag, expires_at, response_body FROM esi_cache WHERE cache_key = ? AND expires_at > ?",
+        "SELECT etag, expires_at, response_body FROM esi_cache WHERE cache_key = ?",
     )
     .bind(cache_key)
-    .bind(now)
     .fetch_optional(pool)
     .await?;
 
-    Ok(entry.map(|e| (e.response_body, e.etag)))
+    Ok(entry)
 }
 
 pub async fn set_cached_response(
@@ -54,6 +53,16 @@ pub async fn set_cached_response(
     Ok(())
 }
 
+pub async fn update_cache_expiration(pool: &Pool, cache_key: &str, expires_at: i64) -> Result<()> {
+    sqlx::query("UPDATE esi_cache SET expires_at = ? WHERE cache_key = ?")
+        .bind(expires_at)
+        .bind(cache_key)
+        .execute(pool)
+        .await?;
+
+    Ok(())
+}
+
 pub fn extract_etag(headers: &HeaderMap) -> Option<String> {
     headers
         .get("etag")
@@ -63,28 +72,28 @@ pub fn extract_etag(headers: &HeaderMap) -> Option<String> {
 
 pub fn extract_expires(headers: &HeaderMap) -> i64 {
     headers
-        .get("expires")
+        .get("cache-control")
         .and_then(|v| v.to_str().ok())
-        .and_then(|s| {
-            chrono::DateTime::parse_from_rfc2822(s)
-                .ok()
-                .map(|dt| dt.timestamp())
+        .and_then(|cache_control| {
+            cache_control.split(',').find_map(|part| {
+                let part = part.trim();
+                if part.starts_with("max-age=") {
+                    part.strip_prefix("max-age=")
+                        .and_then(|s| s.parse::<i64>().ok())
+                        .map(|max_age| Utc::now().timestamp() + max_age)
+                } else {
+                    None
+                }
+            })
         })
         .or_else(|| {
             headers
-                .get("cache-control")
+                .get("expires")
                 .and_then(|v| v.to_str().ok())
-                .and_then(|cache_control| {
-                    cache_control.split(',').find_map(|part| {
-                        let part = part.trim();
-                        if part.starts_with("max-age=") {
-                            part.strip_prefix("max-age=")
-                                .and_then(|s| s.parse::<i64>().ok())
-                                .map(|max_age| Utc::now().timestamp() + max_age)
-                        } else {
-                            None
-                        }
-                    })
+                .and_then(|s| {
+                    chrono::DateTime::parse_from_rfc2822(s)
+                        .ok()
+                        .map(|dt| dt.timestamp())
                 })
         })
         .unwrap_or_else(|| Utc::now().timestamp() + 300)

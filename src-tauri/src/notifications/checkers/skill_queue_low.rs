@@ -198,7 +198,7 @@ async fn get_cached_queue_hours(pool: &db::Pool, character_id: i64) -> Result<Op
     let cache_key = cache::build_cache_key(&endpoint_path, character_id);
 
     let queue_data = match cache::get_cached_response(pool, &cache_key).await? {
-        Some((body, _etag)) => serde_json::from_str::<Vec<serde_json::Value>>(&body)?,
+        Some(entry) => serde_json::from_str::<Vec<serde_json::Value>>(&entry.response_body)?,
         None => return Ok(None), // No cache = skip notification check (can't determine queue state reliably)
     };
 

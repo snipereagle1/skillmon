@@ -66,10 +66,13 @@ pub async fn fetch_cached<T: serde::de::DeserializeOwned>(
 ) -> Result<Option<T>> {
     let cached_entry = cache::get_cached_response(pool, cache_key).await?;
 
-    if let Some((cached_body, _)) = &cached_entry {
-        let data: T =
-            serde_json::from_str(cached_body).context("Failed to deserialize cached response")?;
-        return Ok(Some(data));
+    // If we have a valid cache entry that isn't expired, use it
+    if let Some(entry) = &cached_entry {
+        if !entry.is_expired() {
+            let data: T = serde_json::from_str(&entry.response_body)
+                .context("Failed to deserialize cached response")?;
+            return Ok(Some(data));
+        }
     }
 
     let url = super::BASE_URL
@@ -83,9 +86,12 @@ pub async fn fetch_cached<T: serde::de::DeserializeOwned>(
     req_builder = req_builder.header("x-compatibility-date", "2020-01-01");
     req_builder = req_builder.header("x-tenant", "tranquility");
 
-    if let Some((_, Some(etag))) = &cached_entry {
-        let header_value = HeaderValue::from_str(etag.as_str())?;
-        req_builder = req_builder.header(IF_NONE_MATCH, header_value);
+    // If we have an ETag (even if expired), use it for conditional request
+    if let Some(entry) = &cached_entry {
+        if let Some(etag) = &entry.etag {
+            let header_value = HeaderValue::from_str(etag.as_str())?;
+            req_builder = req_builder.header(IF_NONE_MATCH, header_value);
+        }
     }
 
     let response = req_builder.send().await?;
@@ -100,14 +106,18 @@ pub async fn fetch_cached<T: serde::de::DeserializeOwned>(
             .insert(info.group.clone(), info);
     }
 
+    // 304 Not Modified: Cache is still valid, update expiration and return cached data
     if status.as_u16() == 304 {
-        if let Some((cached_body, _)) = cache::get_cached_response(pool, cache_key).await? {
-            let data: T = serde_json::from_str(&cached_body)
+        if let Some(entry) = cached_entry {
+            let expires_at = cache::extract_expires(&headers);
+            cache::update_cache_expiration(pool, cache_key, expires_at).await?;
+            let data: T = serde_json::from_str(&entry.response_body)
                 .context("Failed to deserialize cached response")?;
             return Ok(Some(data));
         }
     }
 
+    // 200 OK: New data, update cache and return
     if status.is_success() {
         let body_bytes = response.bytes().await?;
         let body_str = String::from_utf8_lossy(&body_bytes);
