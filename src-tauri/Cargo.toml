@@ -1,6 +1,6 @@
 [package]
 name = "skillmon"
-version = "0.10.2"
+version = "0.10.3"
 description = "A modern EVE Online skill monitoring and planning application."
 authors = ["snipereagle1 <me@snipereagle.xyz>"]
 edition = "2021"
