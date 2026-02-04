@@ -2,6 +2,7 @@ import { Link } from '@tanstack/react-router';
 import { UserPlus, Zap } from 'lucide-react';
 
 import { CharacterPortrait } from '@/components/Accounts/CharacterPortrait';
+import { AlphaIcon } from '@/components/AlphaIcon';
 import { TableCell, TableRow } from '@/components/ui/table';
 import type {
   SkillQueueItem,
@@ -28,6 +29,7 @@ export function OverviewTableRow({ character }: OverviewTableRowProps) {
               character_name: character.character_name,
               unallocated_sp: 0,
               sort_order: 0,
+              is_omega: false,
             }}
             skillQueue={[
               {
@@ -54,7 +56,14 @@ export function OverviewTableRow({ character }: OverviewTableRowProps) {
           toRoman(character.current_skill_level)}
       </TableCell>
       <TableCell>
-        {formatNumber(Math.round(character.sp_per_hour))} SP/hr
+        <div className="flex items-center gap-1.5">
+          <span>{formatNumber(Math.round(character.sp_per_hour))} SP/hr</span>
+          {!character.is_omega && (
+            <span title="Alpha Clone">
+              <AlphaIcon className="h-4 w-4 text-white" />
+            </span>
+          )}
+        </div>
       </TableCell>
       <TableCell>
         <span

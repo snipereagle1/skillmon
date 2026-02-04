@@ -31,7 +31,7 @@ pub use character_attributes::{
 pub use character_skills::{get_character_skills, set_character_skills, CharacterSkill};
 pub use characters::{
     add_character, delete_character, get_all_characters, get_character,
-    set_character_unallocated_sp, update_character, Character,
+    set_character_unallocated_sp, update_character, update_character_omega_status, Character,
 };
 pub use clones::{
     find_clone_by_implants, get_character_clones, get_clone_implants,

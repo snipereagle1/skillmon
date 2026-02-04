@@ -131,7 +131,7 @@ pub async fn simulate(
 
             let primary_val = get_attr_value(&effective_attrs, skill_attr.primary_attribute);
             let secondary_val = get_attr_value(&effective_attrs, skill_attr.secondary_attribute);
-            let sp_per_min = utils::calculate_sp_per_minute(primary_val, secondary_val);
+            let sp_per_min = utils::calculate_sp_per_minute(primary_val, secondary_val, true);
             let sp_per_sec = sp_per_min / 60.0;
 
             // Determine how long this segment lasts

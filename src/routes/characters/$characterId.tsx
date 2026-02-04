@@ -2,6 +2,7 @@ import { createFileRoute, Outlet } from '@tanstack/react-router';
 import { useMemo } from 'react';
 
 import { AccountSidebar } from '@/components/Accounts/AccountSidebar';
+import { AlphaIcon } from '@/components/AlphaIcon';
 import { NavigationTabs } from '@/components/ui/navigation-tabs';
 import { useAccountsAndCharacters } from '@/hooks/tauri/useAccountsAndCharacters';
 import { useCharacterSkills } from '@/hooks/tauri/useCharacterSkills';
@@ -126,9 +127,14 @@ function CharacterDetailLayout() {
             ]}
           />
           {totalSkillpoints !== null && (
-            <span className="text-sm text-muted-foreground">
-              {formatNumber(totalSkillpoints)} total skillpoints
-            </span>
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <span>{formatNumber(totalSkillpoints)} total skillpoints</span>
+              {!selectedCharacter.is_omega && (
+                <span title="Alpha Clone">
+                  <AlphaIcon className="h-4 w-4 text-white" />
+                </span>
+              )}
+            </div>
           )}
         </div>
         <div className="flex-1 overflow-hidden">

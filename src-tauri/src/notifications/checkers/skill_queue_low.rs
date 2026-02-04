@@ -125,6 +125,7 @@ fn calculate_hours_from_sp(
     skill_sp_map: &HashMap<i64, i64>,
     skill_attributes: &HashMap<i64, utils::SkillAttributes>,
     char_attrs: Option<&db::CharacterAttributes>,
+    is_omega: bool,
 ) -> Option<f64> {
     let mut total_hours = 0.0;
     let mut has_skills = false;
@@ -175,7 +176,8 @@ fn calculate_hours_from_sp(
                         168 => attrs.willpower,
                         _ => continue,
                     };
-                    let sp_per_min = utils::calculate_sp_per_minute(primary_value, secondary_value);
+                    let sp_per_min =
+                        utils::calculate_sp_per_minute(primary_value, secondary_value, is_omega);
                     if sp_per_min > 0.0 {
                         let sp_per_hour = sp_per_min * 60.0;
                         total_hours += remaining_sp as f64 / sp_per_hour;
@@ -201,6 +203,12 @@ async fn get_cached_queue_hours(pool: &db::Pool, character_id: i64) -> Result<Op
         Some(entry) => serde_json::from_str::<Vec<serde_json::Value>>(&entry.response_body)?,
         None => return Ok(None), // No cache = skip notification check (can't determine queue state reliably)
     };
+
+    // Get character record for is_omega status
+    let character = db::get_character(pool, character_id)
+        .await?
+        .ok_or_else(|| anyhow::anyhow!("Character {} not found in database", character_id))?;
+    let is_omega = character.is_omega;
 
     // Get character attributes
     let char_attrs = db::get_character_attributes(pool, character_id)
@@ -232,5 +240,6 @@ async fn get_cached_queue_hours(pool: &db::Pool, character_id: i64) -> Result<Op
         &skill_sp_map,
         &skill_attributes,
         char_attrs.as_ref(),
+        is_omega,
     ))
 }

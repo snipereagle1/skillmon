@@ -1775,7 +1775,7 @@ pub async fn compare_skill_plan_with_all_characters(
                                     168 => attr.willpower,
                                     _ => 17, // default base
                                 };
-                                let sp_per_min = utils::calculate_sp_per_minute(p_val, s_val);
+                                let sp_per_min = utils::calculate_sp_per_minute(p_val, s_val, true);
                                 if sp_per_min > 0.0 {
                                     total_time_seconds += (missing as f64 / sp_per_min) * 60.0;
                                 }
