@@ -39,6 +39,7 @@ pub struct CharacterSkillQueue {
     pub attributes: Option<CharacterAttributesResponse>,
     pub unallocated_sp: i64,
     pub is_paused: bool,
+    pub is_omega: bool,
 }
 
 pub fn is_skill_actively_training(skill: &SkillQueueItem) -> bool {
@@ -165,6 +166,7 @@ pub async fn get_skill_queues(
                 unallocated_sp: 0,
                 account_id: None,
                 sort_order: 0,
+                is_omega: true,
             });
 
         match esi_helpers::get_cached_skill_queue(&pool, &client, character_id, &rate_limits).await
@@ -216,6 +218,7 @@ pub async fn get_skill_queues(
                     attributes: character_attributes,
                     unallocated_sp: updated_character.unallocated_sp,
                     is_paused,
+                    is_omega: updated_character.is_omega,
                 });
             }
             Ok(None) => {
@@ -385,8 +388,11 @@ pub async fn get_skill_queues(
                                 0
                             }
                         };
-                        let sp_per_min =
-                            utils::calculate_sp_per_minute(primary_value, secondary_value);
+                        let sp_per_min = utils::calculate_sp_per_minute(
+                            primary_value,
+                            secondary_value,
+                            result.is_omega,
+                        );
                         skill_item.sp_per_minute = Some(sp_per_min);
                     }
                 }

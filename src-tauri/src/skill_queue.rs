@@ -119,10 +119,12 @@ pub async fn build_character_skill_queue(
         .await
         .ok();
     let mut skill_sp_map: HashMap<i64, i64> = HashMap::new();
-    if let Ok(skills) = db::get_character_skills(pool, character_id).await {
-        for skill in skills {
-            skill_sp_map.insert(skill.skill_id, skill.skillpoints_in_skill);
-        }
+    let character_skills = db::get_character_skills(pool, character_id)
+        .await
+        .unwrap_or_default();
+
+    for skill in &character_skills {
+        skill_sp_map.insert(skill.skill_id, skill.skillpoints_in_skill);
     }
 
     let updated_character = db::get_character(pool, character_id)
@@ -135,7 +137,19 @@ pub async fn build_character_skill_queue(
             unallocated_sp: 0,
             account_id: None,
             sort_order: 0,
+            is_omega: true,
         });
+
+    let mut is_omega = updated_character.is_omega;
+
+    // Inference Method B: Lapsed Status (Active < Trained)
+    if is_omega
+        && character_skills
+            .iter()
+            .any(|s| s.active_skill_level < s.trained_skill_level)
+    {
+        is_omega = false;
+    }
 
     let queue_data = match esi_helpers::get_cached_skill_queue(
         pool,
@@ -236,7 +250,65 @@ pub async fn build_character_skill_queue(
         .await
         .map_err(|e| format!("Failed to get skill attributes: {}", e))?;
 
-    let char_attrs = &character_attributes;
+    // Inference Method A: Active Training Rate comparison
+    if is_omega {
+        if let Some(currently_training) = skill_queue.iter().find(|s| is_skill_actively_training(s))
+        {
+            if let (Some(start_str), Some(finish_str), Some(start_sp), Some(end_sp)) = (
+                &currently_training.start_date,
+                &currently_training.finish_date,
+                currently_training.training_start_sp,
+                currently_training.level_end_sp,
+            ) {
+                if let (Ok(start), Ok(finish)) = (
+                    chrono::DateTime::parse_from_rfc3339(start_str),
+                    chrono::DateTime::parse_from_rfc3339(finish_str),
+                ) {
+                    let duration_mins = (finish - start).num_minutes() as f64;
+                    if duration_mins > 0.0 {
+                        let actual_rate = (end_sp - start_sp) as f64 / duration_mins;
+                        if let (Some(attrs), Some(skill_attr)) = (
+                            character_attributes.as_ref(),
+                            skill_attributes.get(&currently_training.skill_id),
+                        ) {
+                            if let (Some(p_id), Some(s_id)) =
+                                (skill_attr.primary_attribute, skill_attr.secondary_attribute)
+                            {
+                                let p_val = match p_id {
+                                    164 => attrs.charisma,
+                                    165 => attrs.intelligence,
+                                    166 => attrs.memory,
+                                    167 => attrs.perception,
+                                    168 => attrs.willpower,
+                                    _ => 0,
+                                };
+                                let s_val = match s_id {
+                                    164 => attrs.charisma,
+                                    165 => attrs.intelligence,
+                                    166 => attrs.memory,
+                                    167 => attrs.perception,
+                                    168 => attrs.willpower,
+                                    _ => 0,
+                                };
+                                let expected_omega_rate = (p_val as f64) + (s_val as f64 / 2.0);
+                                // If actual rate is significantly lower than expected Omega rate (e.g., < 75%)
+                                if actual_rate < expected_omega_rate * 0.75 {
+                                    is_omega = false;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    if is_omega != updated_character.is_omega {
+        db::update_character_omega_status(pool, character_id, is_omega)
+            .await
+            .ok();
+    }
+
     let mut skill_progress_map: HashMap<i64, i64> = HashMap::new();
 
     for skill_item in &mut skill_queue {
@@ -338,7 +410,7 @@ pub async fn build_character_skill_queue(
             skill_item.secondary_attribute = skill_attr.secondary_attribute;
             skill_item.rank = skill_attr.rank;
 
-            if let Some(attrs) = char_attrs {
+            if let Some(attrs) = character_attributes.as_ref() {
                 if let (Some(primary_attr_id), Some(secondary_attr_id)) =
                     (skill_attr.primary_attribute, skill_attr.secondary_attribute)
                 {
@@ -370,7 +442,8 @@ pub async fn build_character_skill_queue(
                             0
                         }
                     };
-                    let sp_per_min = utils::calculate_sp_per_minute(primary_value, secondary_value);
+                    let sp_per_min =
+                        utils::calculate_sp_per_minute(primary_value, secondary_value, is_omega);
                     skill_item.sp_per_minute = Some(sp_per_min);
                 }
             }
@@ -390,6 +463,7 @@ pub async fn build_character_skill_queue(
         attributes: character_attributes,
         unallocated_sp: updated_character.unallocated_sp,
         is_paused,
+        is_omega,
     };
 
     let _ = app.emit(

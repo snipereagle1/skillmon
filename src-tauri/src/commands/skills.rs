@@ -458,7 +458,16 @@ pub async fn get_skill_details(
                     168 => char_attrs.willpower,
                     _ => 0,
                 };
-                let sp_per_minute = utils::calculate_sp_per_minute(primary_value, secondary_value);
+                let character = db::get_character(&pool, char_id)
+                    .await
+                    .map_err(|e| format!("Failed to get character: {}", e))?
+                    .ok_or_else(|| format!("Character {} not found", char_id))?;
+
+                let sp_per_minute = utils::calculate_sp_per_minute(
+                    primary_value,
+                    secondary_value,
+                    character.is_omega,
+                );
                 Some(sp_per_minute * 60.0)
             } else {
                 None

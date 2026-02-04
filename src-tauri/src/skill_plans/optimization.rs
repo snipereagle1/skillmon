@@ -275,7 +275,7 @@ pub async fn optimize_plan_reordering(
                 accelerator_bonus,
                 demand.secondary,
             );
-            let sp_per_min = utils::calculate_sp_per_minute(p_val, s_val);
+            let sp_per_min = utils::calculate_sp_per_minute(p_val, s_val, true);
             if sp_per_min > 0.0 {
                 baseline_entry_times.push((demand.sp_to_train as f64 / sp_per_min) * 60.0);
             } else {
@@ -323,7 +323,7 @@ pub async fn optimize_plan_reordering(
             for ((p, s), sp) in &segment_demand {
                 let p_val = get_effective_attr_value(dist, implants, accelerator_bonus, *p);
                 let s_val = get_effective_attr_value(dist, implants, accelerator_bonus, *s);
-                let sp_per_min = utils::calculate_sp_per_minute(p_val, s_val);
+                let sp_per_min = utils::calculate_sp_per_minute(p_val, s_val, true);
                 if sp_per_min > 0.0 {
                     total_seconds += (*sp as f64 / sp_per_min) * 60.0;
                 }
@@ -540,7 +540,7 @@ async fn optimize_plan_attributes_internal(
         for ((primary_id, secondary_id), sp) in &demand_map {
             let p_val = get_effective_attr_value(&dist, implants, accelerator_bonus, *primary_id);
             let s_val = get_effective_attr_value(&dist, implants, accelerator_bonus, *secondary_id);
-            let sp_per_min = utils::calculate_sp_per_minute(p_val, s_val);
+            let sp_per_min = utils::calculate_sp_per_minute(p_val, s_val, true);
             if sp_per_min > 0.0 {
                 total_seconds += (*sp as f64 / sp_per_min) * 60.0;
             }
@@ -559,7 +559,7 @@ async fn optimize_plan_attributes_internal(
             get_effective_attr_value(baseline_remap, implants, accelerator_bonus, *primary_id);
         let s_val =
             get_effective_attr_value(baseline_remap, implants, accelerator_bonus, *secondary_id);
-        let sp_per_min = utils::calculate_sp_per_minute(p_val, s_val);
+        let sp_per_min = utils::calculate_sp_per_minute(p_val, s_val, true);
         if sp_per_min > 0.0 {
             original_seconds += (*sp as f64 / sp_per_min) * 60.0;
         }
@@ -643,11 +643,11 @@ fn calculate_ratio(
 
     let p_base = get_effective_attr_value(baseline_remap, implants, accelerator_bonus, p);
     let s_base = get_effective_attr_value(baseline_remap, implants, accelerator_bonus, s);
-    let speed_base = utils::calculate_sp_per_minute(p_base, s_base);
+    let speed_base = utils::calculate_sp_per_minute(p_base, s_base, true);
 
     let p_ideal = get_effective_attr_value(ideal_attr, implants, accelerator_bonus, p);
     let s_ideal = get_effective_attr_value(ideal_attr, implants, accelerator_bonus, s);
-    let speed_ideal = utils::calculate_sp_per_minute(p_ideal, s_ideal);
+    let speed_ideal = utils::calculate_sp_per_minute(p_ideal, s_ideal, true);
 
     if speed_ideal > 0.0 {
         speed_base / speed_ideal
@@ -865,7 +865,7 @@ mod tests {
                     0,
                     attr.secondary_attribute,
                 );
-                let sp_per_min = utils::calculate_sp_per_minute(p_val, s_val);
+                let sp_per_min = utils::calculate_sp_per_minute(p_val, s_val, true);
                 let sp_per_hour = sp_per_min * 60.0;
                 let seconds = (needed as f64 / sp_per_min) * 60.0;
 

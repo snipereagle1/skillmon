@@ -10,6 +10,7 @@ pub struct Character {
     pub unallocated_sp: i64,
     pub account_id: Option<i64>,
     pub sort_order: i64,
+    pub is_omega: bool,
 }
 
 impl From<db::Character> for Character {
@@ -20,6 +21,7 @@ impl From<db::Character> for Character {
             unallocated_sp: c.unallocated_sp,
             account_id: c.account_id,
             sort_order: c.sort_order,
+            is_omega: c.is_omega,
         }
     }
 }

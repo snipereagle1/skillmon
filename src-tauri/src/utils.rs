@@ -102,8 +102,13 @@ pub async fn get_skill_attributes(
     Ok(skill_attrs)
 }
 
-pub fn calculate_sp_per_minute(primary: i64, secondary: i64) -> f64 {
-    primary as f64 + (secondary as f64 / 2.0)
+pub fn calculate_sp_per_minute(primary: i64, secondary: i64, is_omega: bool) -> f64 {
+    let base_rate = primary as f64 + (secondary as f64 / 2.0);
+    if is_omega {
+        base_rate
+    } else {
+        base_rate * 0.5
+    }
 }
 
 #[allow(dead_code)]

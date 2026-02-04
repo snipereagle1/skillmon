@@ -18,6 +18,7 @@ pub struct TrainingCharacterOverview {
     pub sp_per_hour: f64,
     pub has_implants: bool,
     pub has_booster: bool,
+    pub is_omega: bool,
 }
 
 #[tauri::command]
@@ -158,6 +159,7 @@ pub async fn get_training_characters_overview(
                         sp_per_hour: skill.sp_per_minute.unwrap_or(0.0) * 60.0,
                         has_implants,
                         has_booster,
+                        is_omega: queue.is_omega,
                     }));
                 }
             }

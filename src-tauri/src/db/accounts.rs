@@ -162,7 +162,7 @@ pub async fn reorder_unassigned_characters(pool: &Pool, character_ids: &[i64]) -
 
 pub async fn get_characters_for_account(pool: &Pool, account_id: i64) -> Result<Vec<Character>> {
     let characters = sqlx::query_as::<_, Character>(
-        "SELECT character_id, character_name, unallocated_sp, account_id, sort_order
+        "SELECT character_id, character_name, unallocated_sp, account_id, sort_order, is_omega
          FROM characters
          WHERE account_id = ?
          ORDER BY sort_order, character_name",
@@ -176,7 +176,7 @@ pub async fn get_characters_for_account(pool: &Pool, account_id: i64) -> Result<
 
 pub async fn get_unassigned_characters(pool: &Pool) -> Result<Vec<Character>> {
     let characters = sqlx::query_as::<_, Character>(
-        "SELECT character_id, character_name, unallocated_sp, account_id, sort_order
+        "SELECT character_id, character_name, unallocated_sp, account_id, sort_order, is_omega
          FROM characters
          WHERE account_id IS NULL
          ORDER BY sort_order, character_name",
