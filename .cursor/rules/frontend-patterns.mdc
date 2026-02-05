@@ -47,7 +47,7 @@ const characters = await getCharacters();
 await logoutCharacter({ characterId: 123 });
 ```
 
-Commands are defined in `src-tauri/src/commands/` directory, organized by domain. TypeScript bindings are auto-generated during build via `tauri-typegen` (see `src-tauri/build.rs`).
+Commands are defined in `src-tauri/src/commands/` directory, organized by domain. TypeScript bindings are auto-generated during build via `tauri-typegen` (see `src-tauri/build.rs`). Use `pnpm typegen` to refresh them manually without a full build.
 
 ## Custom Hooks
 
@@ -95,7 +95,7 @@ export function useMyMutation() {
 
 ## Type Definitions
 
-TypeScript types are auto-generated from Rust structs in `src/generated/types.ts`. These are generated during build via `tauri-typegen` and should not be edited manually.
+TypeScript types are auto-generated from Rust structs in `src/generated/types.ts`. These are generated during build via `tauri-typegen` and should not be edited manually. Use `pnpm typegen` to refresh them manually.
 
 Import types from the generated module:
 

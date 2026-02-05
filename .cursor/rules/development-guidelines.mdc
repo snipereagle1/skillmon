@@ -111,3 +111,4 @@ See the `tauri-commands` rule for detailed patterns and examples.
 10. Keep components and functions focused and small
 11. Use auto-generated TypeScript types from `@/generated/types`
 12. Handle errors gracefully with clear messages
+13. Use `pnpm typegen` to regenerate frontend bindings; do not run a full build only for bindings

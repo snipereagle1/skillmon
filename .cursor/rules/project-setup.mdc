@@ -23,6 +23,7 @@ EVE_CALLBACK_URL=http://localhost:1421/callback
 - `pnpm tauri dev` - Start full Tauri application with hot reload
 - `pnpm build` - Build frontend for production
 - `pnpm tauri build` - Build Tauri application
+- `pnpm typegen` - Regenerate TypeScript command/type bindings (fast, no full build)
 
 ## ESI Client Generation
 
@@ -39,7 +40,7 @@ TypeScript bindings for Tauri commands and types are auto-generated during the b
 - `src/generated/types.ts` - TypeScript type definitions
 - `src/generated/index.ts` - Module exports
 
-**Note**: These files are generated automatically and should not be edited manually. They are regenerated on every build. If you need to regenerate them manually, run `cargo build` in the `src-tauri` directory.
+**Note**: These files are generated automatically and should not be edited manually. They are regenerated on every build (`pnpm tauri dev` or `pnpm tauri build`). To regenerate them manually without a full build, run `pnpm typegen`. **Do not run a full build solely to regenerate frontend bindings.**
 
 ## Database
 

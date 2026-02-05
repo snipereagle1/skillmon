@@ -124,11 +124,11 @@ async fn my_command(pool: State<'_, db::Pool>) -> Result<MyType, String> {
 2. Add the command function with `#[tauri::command]` attribute to the appropriate file in `src-tauri/src/commands/` (or create a new domain file if needed)
 3. Ensure the command module is exported in `commands/mod.rs`
 4. Add it to the `invoke_handler![]` macro in `lib.rs` using the `commands::` namespace (e.g., `commands::domain::command_name`)
-5. TypeScript types and command bindings are auto-generated during build (see `src-tauri/build.rs`)
+5. TypeScript types and command bindings are auto-generated during build (see `src-tauri/build.rs`). To regenerate them manually without a full build, run `pnpm typegen`.
 6. Create a custom hook in `src/hooks/tauri/` if it's a data-fetching command
 7. Use the hook in components
 
-**Note**: TypeScript bindings are generated automatically via `tauri-typegen` during the build process. No manual type definitions needed.
+**Note**: TypeScript bindings are generated automatically via `tauri-typegen` during the build process. You can also use `pnpm typegen` to refresh them manually. No manual type definitions needed.
 
 ## Best Practices
 
