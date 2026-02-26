@@ -161,6 +161,74 @@ pub async fn get_cached_character_implants(
     .await
 }
 
+pub async fn get_cached_character_location(
+    pool: &db::Pool,
+    client: &reqwest::Client,
+    character_id: i64,
+    rate_limits: &esi::RateLimitStore,
+) -> Result<Option<esi::CharactersCharacterIdLocationGet>> {
+    let endpoint_path = format!("characters/{}/location", character_id);
+    let cache_key = cache::build_cache_key(&endpoint_path, character_id);
+    esi::fetch_cached(
+        pool,
+        client,
+        &endpoint_path,
+        &cache_key,
+        rate_limits,
+        character_id,
+    )
+    .await
+}
+
+pub async fn get_cached_character_ship(
+    pool: &db::Pool,
+    client: &reqwest::Client,
+    character_id: i64,
+    rate_limits: &esi::RateLimitStore,
+) -> Result<Option<esi::CharactersCharacterIdShipGet>> {
+    let endpoint_path = format!("characters/{}/ship", character_id);
+    let cache_key = cache::build_cache_key(&endpoint_path, character_id);
+    esi::fetch_cached(
+        pool,
+        client,
+        &endpoint_path,
+        &cache_key,
+        rate_limits,
+        character_id,
+    )
+    .await
+}
+
+pub async fn get_cached_character_online(
+    pool: &db::Pool,
+    client: &reqwest::Client,
+    character_id: i64,
+    rate_limits: &esi::RateLimitStore,
+) -> Result<Option<esi::CharactersCharacterIdOnlineGet>> {
+    let endpoint_path = format!("characters/{}/online", character_id);
+    let cache_key = cache::build_cache_key(&endpoint_path, character_id);
+    esi::fetch_cached(
+        pool,
+        client,
+        &endpoint_path,
+        &cache_key,
+        rate_limits,
+        character_id,
+    )
+    .await
+}
+
+pub async fn get_cached_solar_system_info(
+    pool: &db::Pool,
+    client: &reqwest::Client,
+    solar_system_id: i64,
+    rate_limits: &esi::RateLimitStore,
+) -> Result<Option<esi::UniverseSystemsSystemIdGet>> {
+    let endpoint_path = format!("universe/systems/{}", solar_system_id);
+    let cache_key = format!("{}:0", endpoint_path);
+    esi::fetch_cached(pool, client, &endpoint_path, &cache_key, rate_limits, 0).await
+}
+
 pub async fn get_cached_station_info(
     pool: &db::Pool,
     client: &reqwest::Client,

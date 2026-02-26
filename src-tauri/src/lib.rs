@@ -277,6 +277,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::auth::start_eve_login,
             is_startup_complete,
+            commands::location::get_character_location,
             commands::characters::logout_character,
             commands::accounts::get_accounts_and_characters,
             commands::accounts::create_account,
