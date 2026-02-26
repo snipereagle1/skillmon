@@ -12,6 +12,7 @@ pub mod character_attributes;
 pub mod character_skills;
 pub mod characters;
 pub mod clones;
+pub mod enabled_features;
 pub mod locations;
 pub mod notifications;
 pub mod remaps;
@@ -33,6 +34,7 @@ pub use characters::{
     add_character, delete_character, get_all_characters, get_character,
     set_character_unallocated_sp, update_character, update_character_omega_status, Character,
 };
+pub use enabled_features::{get_enabled_features, set_feature_enabled};
 pub use clones::{
     find_clone_by_implants, get_character_clones, get_clone_implants,
     get_implant_attribute_bonuses, set_character_clones, update_clone_name,
