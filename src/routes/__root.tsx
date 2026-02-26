@@ -64,6 +64,7 @@ function RootComponent() {
             { to: '/overview', label: 'Overview' },
             { to: '/characters', label: 'Characters' },
             { to: '/plans', label: 'Plans' },
+            { to: '/settings', label: 'Settings' },
             { to: '/about', label: 'About' },
           ]}
         />
