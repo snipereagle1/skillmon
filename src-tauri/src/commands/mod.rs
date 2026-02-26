@@ -8,6 +8,7 @@ pub mod overview;
 pub mod rate_limits;
 pub mod remaps;
 pub mod sde;
+pub mod settings;
 pub mod skill_plans;
 pub mod skill_queues;
 pub mod skills;

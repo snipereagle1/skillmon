@@ -11,6 +11,7 @@ mod commands;
 mod db;
 mod esi;
 mod esi_helpers;
+mod features;
 mod notifications;
 mod sde;
 mod skill_plans;
@@ -334,7 +335,10 @@ pub fn run() {
             commands::remaps::save_remap,
             commands::remaps::get_plan_remaps,
             commands::remaps::get_character_remaps,
-            commands::remaps::delete_remap
+            commands::remaps::delete_remap,
+            commands::settings::get_enabled_features,
+            commands::settings::set_feature_enabled,
+            commands::settings::get_optional_features
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
