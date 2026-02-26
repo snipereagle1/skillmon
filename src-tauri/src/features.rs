@@ -44,7 +44,8 @@ pub fn get_optional_features() -> Vec<OptionalFeature> {
         OptionalFeature {
             id: FeatureId::Locations,
             name: "Locations".to_string(),
-            description: "View your character's current solar system, ship, and online status.".to_string(),
+            description: "View your character's current solar system, ship, and online status."
+                .to_string(),
             scopes: vec![
                 EsiScope::ReadLocationV1,
                 EsiScope::ReadOnlineV1,
