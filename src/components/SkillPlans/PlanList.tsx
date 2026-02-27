@@ -1,10 +1,18 @@
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
+import { ChevronDown } from 'lucide-react';
 import { useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useDeleteSkillPlan, useSkillPlans } from '@/hooks/tauri/useSkillPlans';
 
 import { CreatePlanDialog } from './CreatePlanDialog';
+import { CreatePlanFromCharacterDialog } from './CreatePlanFromCharacterDialog';
 import { DeletePlanDialog } from './DeletePlanDialog';
 
 export function PlanList() {
@@ -14,6 +22,8 @@ export function PlanList() {
   const { data: plans, isLoading, error } = useSkillPlans();
   const deletePlanMutation = useDeleteSkillPlan();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
+  const [createFromCharacterDialogOpen, setCreateFromCharacterDialogOpen] =
+    useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [planToDelete, setPlanToDelete] = useState<{
     id: number;
@@ -62,9 +72,32 @@ export function PlanList() {
   return (
     <>
       <div className="p-4 border-b border-border">
-        <Button onClick={() => setCreateDialogOpen(true)} className="w-full">
-          Create Plan
-        </Button>
+        <div className="flex w-full">
+          <Button
+            onClick={() => setCreateDialogOpen(true)}
+            className="flex-1 rounded-r-none"
+          >
+            Create Plan
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="default"
+                size="default"
+                className="rounded-l-none border-l px-2"
+              >
+                <ChevronDown className="size-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={() => setCreateFromCharacterDialogOpen(true)}
+              >
+                Create Plan from Character
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
       <div className="flex-1 overflow-y-auto">
         {!plans || plans.length === 0 ? (
@@ -129,6 +162,17 @@ export function PlanList() {
         onOpenChange={setCreateDialogOpen}
         onSuccess={(planId) => {
           setCreateDialogOpen(false);
+          navigate({
+            to: '/plans/$planId',
+            params: { planId: String(planId) },
+          });
+        }}
+      />
+      <CreatePlanFromCharacterDialog
+        open={createFromCharacterDialogOpen}
+        onOpenChange={setCreateFromCharacterDialogOpen}
+        onSuccess={(planId) => {
+          setCreateFromCharacterDialogOpen(false);
           navigate({
             to: '/plans/$planId',
             params: { planId: String(planId) },

@@ -9,6 +9,7 @@ use tauri::State;
 use crate::db;
 use crate::skill_plans::graph::{PlanDag, PlanNode};
 use crate::skill_plans::optimization::{self, OptimizationResult, ReorderOptimizationResult};
+use crate::skill_plans::plan_from_character::{self, PreviewPlanFromCharacterGroup};
 use crate::skill_plans::simulation::{self, SimulationProfile, SimulationResult};
 use crate::skill_plans::{Attributes, SkillmonPlan, SkillmonPlanEntry};
 use crate::utils;
@@ -275,6 +276,96 @@ pub async fn create_skill_plan(
     db::skill_plans::create_skill_plan(&pool, &name, description.as_deref(), true)
         .await
         .map_err(|e| format!("Failed to create skill plan: {}", e))
+}
+
+#[derive(Debug, Clone, Serialize)]
+pub struct PreviewPlanFromCharacterResponse {
+    pub skill_count: usize,
+    pub estimated_sp: i64,
+    pub groups: Vec<PreviewPlanFromCharacterGroup>,
+}
+
+#[tauri::command]
+pub async fn preview_plan_from_character(
+    pool: State<'_, db::Pool>,
+    character_id: i64,
+    included_group_ids: Vec<i64>,
+) -> Result<PreviewPlanFromCharacterResponse, String> {
+    let result =
+        plan_from_character::build_plan_from_character(&pool, character_id, &included_group_ids)
+            .await
+            .map_err(|e| format!("Failed to preview plan: {}", e))?;
+
+    Ok(PreviewPlanFromCharacterResponse {
+        skill_count: result.nodes.len(),
+        estimated_sp: result.estimated_sp,
+        groups: result.groups,
+    })
+}
+
+#[tauri::command]
+pub async fn create_plan_from_character(
+    pool: State<'_, db::Pool>,
+    character_id: i64,
+    plan_name: String,
+    description: Option<String>,
+    included_group_ids: Vec<i64>,
+) -> Result<i64, String> {
+    if plan_name.trim().is_empty() {
+        return Err("Plan name is required".to_string());
+    }
+    if included_group_ids.is_empty() {
+        return Err("At least one skill group must be included".to_string());
+    }
+
+    let result =
+        plan_from_character::build_plan_from_character(&pool, character_id, &included_group_ids)
+            .await
+            .map_err(|e| format!("Failed to build plan from character: {}", e))?;
+
+    let plan_id = db::skill_plans::create_skill_plan(
+        &pool,
+        plan_name.trim(),
+        description
+            .as_deref()
+            .map(|s| s.trim())
+            .filter(|s| !s.is_empty()),
+        true,
+    )
+    .await
+    .map_err(|e| format!("Failed to create plan: {}", e))?;
+
+    let mut tx = pool
+        .begin()
+        .await
+        .map_err(|e| format!("Transaction failed: {}", e))?;
+
+    for (index, (node, is_planned)) in result.nodes.iter().enumerate() {
+        let entry_type = if *is_planned {
+            db::skill_plans::ENTRY_TYPE_PLANNED
+        } else {
+            db::skill_plans::ENTRY_TYPE_PREREQUISITE
+        };
+
+        sqlx::query(
+            "INSERT INTO skill_plan_entries (plan_id, skill_type_id, planned_level, sort_order, entry_type, notes)
+             VALUES (?, ?, ?, ?, ?, NULL)",
+        )
+        .bind(plan_id)
+        .bind(node.skill_type_id)
+        .bind(node.level)
+        .bind(index as i64)
+        .bind(entry_type)
+        .execute(&mut *tx)
+        .await
+        .map_err(|e| format!("Failed to insert entry: {}", e))?;
+    }
+
+    tx.commit()
+        .await
+        .map_err(|e| format!("Failed to commit: {}", e))?;
+
+    Ok(plan_id)
 }
 
 #[tauri::command]

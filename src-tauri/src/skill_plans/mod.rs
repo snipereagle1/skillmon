@@ -1,5 +1,6 @@
 pub mod graph;
 pub mod optimization;
+pub mod plan_from_character;
 pub mod simulation;
 
 use serde::{Deserialize, Serialize};

@@ -41,3 +41,13 @@ pub async fn get_skills_for_group(pool: &Pool, group_id: i64) -> Result<Vec<Skil
 
     Ok(skills)
 }
+
+pub async fn get_skill_group_id(pool: &Pool, type_id: i64) -> Result<Option<i64>> {
+    let group_id: Option<i64> =
+        sqlx::query_scalar("SELECT group_id FROM sde_types WHERE type_id = ? AND published = 1")
+            .bind(type_id)
+            .fetch_optional(pool)
+            .await?;
+
+    Ok(group_id)
+}

@@ -2,6 +2,15 @@ export const queryKeys = {
   accountsAndCharacters: () => ['accountsAndCharacters'] as const,
 
   skillPlans: () => ['skillPlans'] as const,
+  planFromCharacterPreview: (
+    characterId: number | null,
+    includedGroupIds: number[]
+  ) =>
+    [
+      'planFromCharacterPreview',
+      characterId,
+      [...includedGroupIds].sort((a, b) => a - b),
+    ] as const,
   skillPlan: (planId: number | null) => ['skillPlan', planId] as const,
   skillPlanWithEntries: (planId: number | null) =>
     ['skillPlanWithEntries', planId] as const,

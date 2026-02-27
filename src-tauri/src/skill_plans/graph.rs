@@ -235,4 +235,51 @@ impl PlanDag {
 
         Ok(())
     }
+
+    pub async fn add_node_from_set(
+        &mut self,
+        pool: &db::Pool,
+        node: PlanNode,
+        node_set: &HashSet<PlanNode>,
+    ) -> anyhow::Result<()> {
+        if !node_set.contains(&node) {
+            return Ok(());
+        }
+        if self.nodes.contains(&node) {
+            return Ok(());
+        }
+
+        self.nodes.insert(node);
+
+        if node.level > 1 {
+            let prev = PlanNode {
+                skill_type_id: node.skill_type_id,
+                level: node.level - 1,
+            };
+            if node_set.contains(&prev) {
+                self.add_edge(prev, node);
+            }
+        }
+
+        let reqs: Vec<(i64, i64)> = sqlx::query_as::<_, (i64, i64)>(
+            "SELECT required_skill_id, required_level
+             FROM sde_skill_requirements
+             WHERE skill_type_id = ?",
+        )
+        .bind(node.skill_type_id)
+        .fetch_all(pool)
+        .await?;
+
+        for (req_id, req_level) in reqs {
+            let prereq_node = PlanNode {
+                skill_type_id: req_id,
+                level: req_level,
+            };
+            if node_set.contains(&prereq_node) {
+                self.add_edge(prereq_node, node);
+            }
+        }
+
+        Ok(())
+    }
 }

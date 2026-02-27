@@ -4,6 +4,9 @@ use sqlx::FromRow;
 
 use super::Pool;
 
+pub const ENTRY_TYPE_PLANNED: &str = "Planned";
+pub const ENTRY_TYPE_PREREQUISITE: &str = "Prerequisite";
+
 #[derive(Debug, Clone, Serialize, FromRow)]
 pub struct SkillPlan {
     pub plan_id: i64,

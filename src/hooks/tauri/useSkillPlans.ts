@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   addPlanEntry,
+  createPlanFromCharacter,
   createSkillPlan,
   deletePlanEntry,
   deleteSkillPlan,
@@ -14,6 +15,7 @@ import {
   importSkillPlanJson,
   importSkillPlanText,
   importSkillPlanXml,
+  previewPlanFromCharacter,
   removeSkill,
   removeSkillAndPrerequisites,
   removeSkillLevel,
@@ -25,6 +27,7 @@ import {
 } from '@/generated/commands';
 import type {
   AddPlanEntryParams,
+  CreatePlanFromCharacterParams,
   CreateSkillPlanParams,
   DeletePlanEntryParams,
   DeleteSkillPlanParams,
@@ -434,6 +437,38 @@ export function useImportSkillPlanJson() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.skillPlanValidationAll(),
       });
+    },
+  });
+}
+
+export function usePreviewPlanFromCharacter(
+  characterId: number | null,
+  includedGroupIds: number[]
+) {
+  return useQuery({
+    queryKey: queryKeys.planFromCharacterPreview(characterId, includedGroupIds),
+    queryFn: async () => {
+      if (characterId === null) {
+        throw new Error('Character ID is required');
+      }
+      return await previewPlanFromCharacter({
+        characterId,
+        includedGroupIds,
+      });
+    },
+    enabled: characterId !== null && includedGroupIds.length > 0,
+  });
+}
+
+export function useCreatePlanFromCharacter() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: CreatePlanFromCharacterParams) => {
+      return await createPlanFromCharacter(params);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.skillPlans() });
     },
   });
 }
