@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use anyhow::Result;
+use chrono::{DateTime, Utc};
 use tauri_plugin_notification::NotificationExt;
 
 use crate::cache;
@@ -204,6 +205,22 @@ async fn get_cached_queue_hours(pool: &db::Pool, character_id: i64) -> Result<Op
         None => return Ok(None), // No cache = skip notification check (can't determine queue state reliably)
     };
 
+    let now = Utc::now();
+    let filtered: Vec<serde_json::Value> = queue_data
+        .into_iter()
+        .filter(|item| {
+            if let Some(finish_str) = item.get("finish_date").and_then(|v| v.as_str()) {
+                if let Ok(finish_dt) = DateTime::parse_from_rfc3339(finish_str) {
+                    let finish_utc = finish_dt.with_timezone(&Utc);
+                    if now >= finish_utc {
+                        return false;
+                    }
+                }
+            }
+            true
+        })
+        .collect();
+
     // Get character record for is_omega status
     let character = db::get_character(pool, character_id)
         .await?
@@ -224,8 +241,8 @@ async fn get_cached_queue_hours(pool: &db::Pool, character_id: i64) -> Result<Op
         }
     }
 
-    // Get skill IDs from queue
-    let skill_ids: Vec<i64> = queue_data
+    // Get skill IDs from filtered queue
+    let skill_ids: Vec<i64> = filtered
         .iter()
         .filter_map(|item| item.get("skill_id")?.as_i64())
         .collect();
@@ -236,7 +253,7 @@ async fn get_cached_queue_hours(pool: &db::Pool, character_id: i64) -> Result<Op
         .unwrap_or_default();
 
     Ok(calculate_hours_from_sp(
-        &queue_data,
+        &filtered,
         &skill_sp_map,
         &skill_attributes,
         char_attrs.as_ref(),
