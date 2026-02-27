@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use chrono::Utc;
+use serde::Serialize;
 use tauri::{Emitter, Manager, State};
 
 use crate::auth;
@@ -7,6 +8,11 @@ use crate::cache;
 use crate::db;
 
 pub type AuthStateMap = std::sync::Mutex<std::collections::HashMap<String, auth::AuthState>>;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BaseScopeStrings {
+    pub scopes: Vec<String>,
+}
 
 pub fn get_eve_client_id() -> Result<String> {
     if let Some(compile_time_id) = option_env!("EVE_CLIENT_ID") {
@@ -16,11 +22,13 @@ pub fn get_eve_client_id() -> Result<String> {
 }
 
 #[tauri::command]
-pub fn get_base_scope_strings() -> Vec<String> {
-    crate::esi::BASE_SCOPES
-        .iter()
-        .map(|s| s.as_str().to_string())
-        .collect()
+pub fn get_base_scope_strings() -> BaseScopeStrings {
+    BaseScopeStrings {
+        scopes: crate::esi::BASE_SCOPES
+            .iter()
+            .map(|s| s.as_str().to_string())
+            .collect(),
+    }
 }
 
 #[tauri::command]

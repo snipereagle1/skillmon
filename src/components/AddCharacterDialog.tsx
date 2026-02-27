@@ -107,7 +107,7 @@ export function AddCharacterDialog({
               These permissions are always required for core functionality:
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {baseScopeStrings?.map((scope) => (
+              {(baseScopeStrings?.scopes ?? []).map((scope) => (
                 <code
                   key={scope}
                   className="text-[10px] bg-muted px-1.5 py-0.5 rounded"

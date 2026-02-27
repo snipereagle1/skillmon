@@ -8,13 +8,14 @@ import {
   setFeatureEnabled,
 } from '@/generated/commands';
 import type {
+  BaseScopeStrings,
   CharacterFeatureScopeStatus,
   FeatureId,
   OptionalFeature,
 } from '@/generated/types';
 
 export function useBaseScopeStrings() {
-  return useQuery<string[]>({
+  return useQuery<BaseScopeStrings>({
     queryKey: ['base-scope-strings'],
     queryFn: async () => {
       return await getBaseScopeStrings();
