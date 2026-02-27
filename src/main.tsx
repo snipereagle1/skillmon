@@ -1,6 +1,10 @@
 import './index.css';
 
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  QueryClient,
+  QueryClientProvider,
+} from '@tanstack/react-query';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
 import React from 'react';
 import ReactDOM from 'react-dom/client';
@@ -12,7 +16,7 @@ const queryClient = new QueryClient({
     queries: {
       staleTime: 60 * 1000,
       gcTime: 12 * 60 * 60 * 1000,
-      placeholderData: 'keepPrevious',
+      placeholderData: keepPreviousData,
     },
   },
 });
