@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 pub enum FeatureId {
     Contracts,
     Locations,
+    Waypoints,
 }
 
 impl FeatureId {
@@ -13,6 +14,7 @@ impl FeatureId {
         match self {
             FeatureId::Contracts => "contracts",
             FeatureId::Locations => "locations",
+            FeatureId::Waypoints => "waypoints",
         }
     }
 }
@@ -51,6 +53,12 @@ pub fn get_optional_features() -> Vec<OptionalFeature> {
                 EsiScope::ReadOnlineV1,
                 EsiScope::ReadShipTypeV1,
             ],
+        },
+        OptionalFeature {
+            id: FeatureId::Waypoints,
+            name: "Waypoints".to_string(),
+            description: "Set waypoints in the EVE client".to_string(),
+            scopes: vec![EsiScope::WriteWaypointV1],
         },
     ]
 }
