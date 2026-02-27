@@ -339,7 +339,8 @@ pub fn run() {
             commands::remaps::delete_remap,
             commands::settings::get_enabled_features,
             commands::settings::set_feature_enabled,
-            commands::settings::get_optional_features
+            commands::settings::get_optional_features,
+            commands::settings::get_character_feature_scope_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

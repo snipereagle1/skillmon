@@ -1,11 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
+  getCharacterFeatureScopeStatus,
   getEnabledFeatures,
   getOptionalFeatures,
   setFeatureEnabled,
 } from '@/generated/commands';
-import type { FeatureId, OptionalFeature } from '@/generated/types';
+import type {
+  CharacterFeatureScopeStatus,
+  FeatureId,
+  OptionalFeature,
+} from '@/generated/types';
 
 export function useEnabledFeatures() {
   return useQuery<FeatureId[]>({
@@ -40,6 +45,18 @@ export function useSetFeatureEnabled() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['enabled-features'] });
+      queryClient.invalidateQueries({
+        queryKey: ['character-feature-scope-status'],
+      });
+    },
+  });
+}
+
+export function useCharacterFeatureScopeStatus() {
+  return useQuery<CharacterFeatureScopeStatus[]>({
+    queryKey: ['character-feature-scope-status'],
+    queryFn: async () => {
+      return await getCharacterFeatureScopeStatus();
     },
   });
 }

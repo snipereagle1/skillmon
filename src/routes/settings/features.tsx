@@ -1,18 +1,25 @@
 import { createFileRoute } from '@tanstack/react-router';
-import { InfoIcon, RefreshCw } from 'lucide-react';
+import { CircleCheck, CircleSlash, InfoIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import type { FeatureId } from '@/generated/types';
 import {
+  useCharacterFeatureScopeStatus,
   useEnabledFeatures,
   useOptionalFeatures,
   useSetFeatureEnabled,
 } from '@/hooks/tauri/useSettings';
-import { useStartEveLogin } from '@/hooks/tauri/useStartEveLogin';
 
 export const Route = createFileRoute('/settings/features')({
   component: FeaturesPage,
@@ -23,10 +30,11 @@ function FeaturesPage() {
     useOptionalFeatures();
   const { data: enabledFeatures, isLoading: loadingEnabled } =
     useEnabledFeatures();
+  const { data: scopeStatusData, isLoading: loadingScopeStatus } =
+    useCharacterFeatureScopeStatus();
   const setFeatureEnabled = useSetFeatureEnabled();
-  const { mutate: startLogin, isPending: loggingIn } = useStartEveLogin();
 
-  const isLoading = loadingOptional || loadingEnabled;
+  const isLoading = loadingOptional || loadingEnabled || loadingScopeStatus;
 
   if (isLoading) {
     return <div className="p-4 text-muted-foreground">Loading features...</div>;
@@ -48,12 +56,8 @@ function FeaturesPage() {
     );
   };
 
-  const handleReauth = () => {
-    startLogin();
-  };
-
   return (
-    <div className="max-w-3xl space-y-6">
+    <div className="max-w-7xl space-y-6">
       <div>
         <h2 className="text-2xl font-bold mb-1">Optional Features</h2>
         <p className="text-muted-foreground">
@@ -72,11 +76,11 @@ function FeaturesPage() {
         </AlertDescription>
       </Alert>
 
-      <div className="space-y-4">
+      <div className="grid grid-cols-2 gap-4">
         {optionalFeatures?.map((feature) => (
           <div
             key={feature.id}
-            className="flex items-start justify-between p-4 border rounded-lg bg-card hover:bg-accent/5 transition-colors"
+            className="flex items-start justify-between p-4 border rounded-lg bg-card"
           >
             <div className="space-y-1 pr-8">
               <Label
@@ -109,21 +113,56 @@ function FeaturesPage() {
         ))}
       </div>
 
-      <div className="pt-4 border-t">
-        <Button
-          variant="outline"
-          onClick={handleReauth}
-          disabled={loggingIn}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className={`h-4 w-4 ${loggingIn ? 'animate-spin' : ''}`} />
-          Re-authenticate Character
-        </Button>
-        <p className="text-xs text-muted-foreground mt-2">
-          Click this to sign in again and update permissions for an existing
-          character or add a new one.
-        </p>
-      </div>
+      {enabledFeatures && enabledFeatures.length > 0 && (
+        <div className="pt-4 border-t">
+          <h3 className="text-lg font-semibold mb-4">Feature Availability</h3>
+          {scopeStatusData && scopeStatusData.length > 0 ? (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Character</TableHead>
+                  {enabledFeatures.map((featureId) => {
+                    const feature = optionalFeatures?.find(
+                      (f) => f.id === featureId
+                    );
+                    return (
+                      <TableHead key={featureId} className="text-center">
+                        {feature?.name ?? featureId}
+                      </TableHead>
+                    );
+                  })}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {scopeStatusData.map((character) => (
+                  <TableRow key={character.character_id}>
+                    <TableCell className="font-medium">
+                      {character.character_name}
+                    </TableCell>
+                    {enabledFeatures.map((featureId) => {
+                      const scopeEntry = character.feature_has_scopes.find(
+                        ([id]) => id === featureId
+                      );
+                      const hasScopes = scopeEntry?.[1] ?? false;
+                      return (
+                        <TableCell key={featureId} className="text-center">
+                          {hasScopes ? (
+                            <CircleCheck className="h-5 w-5 text-green-500 mx-auto" />
+                          ) : (
+                            <CircleSlash className="h-5 w-5 text-muted-foreground mx-auto" />
+                          )}
+                        </TableCell>
+                      );
+                    })}
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          ) : (
+            <p className="text-muted-foreground">No characters available.</p>
+          )}
+        </div>
+      )}
     </div>
   );
 }

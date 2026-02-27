@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -8,6 +9,10 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  useEnabledFeatures,
+  useOptionalFeatures,
+} from '@/hooks/tauri/useSettings';
 import { useStartEveLogin } from '@/hooks/tauri/useStartEveLogin';
 
 interface AddCharacterDialogProps {
@@ -16,6 +21,14 @@ interface AddCharacterDialogProps {
   onSuccess?: () => void;
 }
 
+const BASE_SCOPES = [
+  'esi-skills.read_skills.v1',
+  'esi-skills.read_skillqueue.v1',
+  'esi-clones.read_clones.v1',
+  'esi-clones.read_implants.v1',
+  'esi-universe.read_structures.v1',
+];
+
 export function AddCharacterDialog({
   open,
   onOpenChange,
@@ -23,6 +36,8 @@ export function AddCharacterDialog({
 }: AddCharacterDialogProps) {
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const loginMutation = useStartEveLogin();
+  const { data: optionalFeatures } = useOptionalFeatures();
+  const { data: enabledFeatures } = useEnabledFeatures();
 
   useEffect(() => {
     if (!open) return;
@@ -79,23 +94,109 @@ export function AddCharacterDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Add Character</DialogTitle>
           <DialogDescription>
-            Authenticate with EVE Online to add a character to your account.
+            Authenticate with EVE Online to add a character to your account. The
+            following permissions will be requested:
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-4">
-          <Button
-            onClick={handleLogin}
-            disabled={loginMutation.isPending}
-            className="w-full"
-          >
-            {loginMutation.isPending
-              ? 'Opening browser...'
-              : 'Login with EVE Online'}
-          </Button>
+
+        <div className="space-y-6">
+          {/* Base Scopes Section */}
+          <div className="space-y-2">
+            <h3 className="text-sm font-semibold text-foreground">
+              Base Permissions
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              These permissions are always required for core functionality:
+            </p>
+            <div className="flex flex-wrap gap-1.5">
+              {BASE_SCOPES.map((scope) => (
+                <code
+                  key={scope}
+                  className="text-[10px] bg-muted px-1.5 py-0.5 rounded"
+                >
+                  {scope}
+                </code>
+              ))}
+            </div>
+          </div>
+
+          {/* Optional Features Section */}
+          {optionalFeatures && optionalFeatures.length > 0 && (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">
+                    Optional Features
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    {enabledFeatures && enabledFeatures.length > 0
+                      ? `${enabledFeatures.length} feature${enabledFeatures.length > 1 ? 's' : ''} enabled`
+                      : 'No optional features enabled'}
+                  </p>
+                </div>
+                <Link
+                  to="/settings/features"
+                  className="text-sm text-primary hover:underline"
+                  onClick={() => onOpenChange(false)}
+                >
+                  Manage in Settings
+                </Link>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                {optionalFeatures.map((feature) => {
+                  const isEnabled = enabledFeatures?.includes(feature.id);
+                  return (
+                    <div
+                      key={feature.id}
+                      className={`p-3 border rounded-lg ${isEnabled ? 'bg-card' : 'bg-muted/30 opacity-60'}`}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {feature.name}
+                          </span>
+                          {isEnabled && (
+                            <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded">
+                              Enabled
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {feature.description}
+                        </p>
+                        {isEnabled && (
+                          <div className="flex flex-wrap gap-1.5 mt-1.5">
+                            {feature.scopes.map((scope) => (
+                              <code
+                                key={scope}
+                                className="text-[10px] bg-muted px-1.5 py-0.5 rounded"
+                              >
+                                {scope}
+                              </code>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Login Button */}
+          <div className="pt-2 border-t flex justify-center">
+            <Button onClick={handleLogin} disabled={loginMutation.isPending}>
+              {loginMutation.isPending
+                ? 'Opening browser...'
+                : 'Login with EVE Online'}
+            </Button>
+          </div>
+
           {loginMutation.isError && (
             <p className="text-sm text-destructive">
               {loginMutation.error instanceof Error
@@ -103,6 +204,7 @@ export function AddCharacterDialog({
                 : 'Failed to start login'}
             </p>
           )}
+
           {authUrl && (
             <div className="space-y-2 p-4 bg-muted rounded-md">
               <p className="text-sm font-semibold">Authentication URL:</p>
