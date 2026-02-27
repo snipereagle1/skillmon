@@ -3,12 +3,14 @@ import { useQuery } from '@tanstack/react-query';
 import { getSkillDetails } from '@/generated/commands';
 import type { SkillDetailsResponse } from '@/generated/types';
 
+import { queryKeys } from './queryKeys';
+
 export function useSkillDetails(
   skillId: number | null,
   characterId: number | null
 ) {
   return useQuery<SkillDetailsResponse>({
-    queryKey: ['skillDetails', skillId, characterId],
+    queryKey: queryKeys.skillDetails(skillId, characterId),
     queryFn: async () => {
       if (skillId === null) {
         throw new Error('Skill ID is required');

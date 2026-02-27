@@ -32,6 +32,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { exportSkillPlanText, exportSkillPlanXml } from '@/generated/commands';
 import type { ValidationResponse } from '@/generated/types';
+import { queryKeys } from '@/hooks/tauri/queryKeys';
 import { usePlanRemaps } from '@/hooks/tauri/useRemaps';
 import {
   useAddPlanEntry,
@@ -135,7 +136,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
             // This is simplified, real undo would need more logic
             // but the addEntryMutation handles most of it via query invalidation
             queryClient.invalidateQueries({
-              queryKey: ['skillPlanWithEntries', planId],
+              queryKey: queryKeys.skillPlanWithEntries(planId),
             });
           }
         );

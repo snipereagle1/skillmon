@@ -7,7 +7,9 @@ import type {
   SimulationProfile,
   SkillPlanEntryResponse,
 } from '@/generated/types';
+import { stableStringify } from '@/lib/utils';
 
+import { queryKeys } from './queryKeys';
 import { usePlanRemaps } from './useRemaps';
 import { useSkillPlanWithEntries } from './useSkillPlans';
 
@@ -67,7 +69,11 @@ export function useSimulation(planId: number, characterId?: number | null) {
   }
 
   const query = useQuery({
-    queryKey: ['skillPlanSimulation', planId, profile, characterId],
+    queryKey: queryKeys.skillPlanSimulationQuery(
+      planId,
+      stableStringify(profile),
+      characterId
+    ),
     queryFn: () =>
       simulateSkillPlan({
         planId,

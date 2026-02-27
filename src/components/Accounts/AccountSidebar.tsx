@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { getSkillQueueForCharacter } from '@/generated/commands';
 import type { CharacterSkillQueue, SkillQueueItem } from '@/generated/types';
+import { queryKeys } from '@/hooks/tauri/queryKeys';
 import {
   useAccountsAndCharacters,
   useReorderAccounts,
@@ -75,7 +76,7 @@ export function AccountSidebar() {
   const skillQueueQueriesConfig = useMemo(
     () =>
       allCharacters.map((character) => ({
-        queryKey: ['skillQueue', character.character_id] as const,
+        queryKey: queryKeys.skillQueue(character.character_id),
         queryFn: async (): Promise<CharacterSkillQueue> => {
           return await getSkillQueueForCharacter({
             characterId: character.character_id,

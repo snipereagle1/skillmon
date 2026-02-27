@@ -9,6 +9,9 @@ import type {
   OptimizationResult,
   ReorderOptimizationResult,
 } from '@/generated/types';
+import { stableStringify } from '@/lib/utils';
+
+import { queryKeys } from './queryKeys';
 
 export type OptimizationMode = 'attributes' | 'reorder';
 
@@ -23,16 +26,15 @@ export function useOptimization(
 ) {
   const query = useQuery<OptimizationResult | ReorderOptimizationResult, Error>(
     {
-      queryKey: [
-        'skillPlanOptimization',
+      queryKey: queryKeys.skillPlanOptimizationQuery(
         planId,
-        implants,
-        baselineRemap,
+        stableStringify(implants),
+        stableStringify(baselineRemap),
         acceleratorBonus,
         characterId,
         mode,
-        maxRemaps,
-      ],
+        maxRemaps
+      ),
       queryFn: async () => {
         if (mode === 'reorder') {
           return await optimizePlanReordering({

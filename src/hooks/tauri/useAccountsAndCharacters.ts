@@ -23,9 +23,11 @@ import type {
   UpdateAccountNameParams,
 } from '@/generated/types';
 
+import { queryKeys } from './queryKeys';
+
 export function useAccountsAndCharacters() {
   return useQuery<AccountsAndCharactersResponse>({
-    queryKey: ['accountsAndCharacters'],
+    queryKey: queryKeys.accountsAndCharacters(),
     queryFn: async () => {
       return await getAccountsAndCharacters();
     },
@@ -40,7 +42,9 @@ export function useCreateAccount() {
       return await createAccount(params);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accountsAndCharacters'] });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.accountsAndCharacters(),
+      });
     },
   });
 }
@@ -53,7 +57,9 @@ export function useUpdateAccountName() {
       return await updateAccountName(params);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accountsAndCharacters'] });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.accountsAndCharacters(),
+      });
     },
   });
 }
@@ -66,7 +72,9 @@ export function useDeleteAccount() {
       return await deleteAccount(params);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accountsAndCharacters'] });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.accountsAndCharacters(),
+      });
     },
   });
 }
@@ -79,7 +87,9 @@ export function useAddCharacterToAccount() {
       return await addCharacterToAccount(params);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accountsAndCharacters'] });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.accountsAndCharacters(),
+      });
     },
   });
 }
@@ -92,7 +102,9 @@ export function useRemoveCharacterFromAccount() {
       return await removeCharacterFromAccount(params);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['accountsAndCharacters'] });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.accountsAndCharacters(),
+      });
     },
   });
 }
@@ -106,13 +118,13 @@ export function useReorderAccounts() {
     },
     onMutate: async (params) => {
       const previousData =
-        queryClient.getQueryData<AccountsAndCharactersResponse>([
-          'accountsAndCharacters',
-        ]);
+        queryClient.getQueryData<AccountsAndCharactersResponse>(
+          queryKeys.accountsAndCharacters()
+        );
 
       if (previousData) {
         queryClient.setQueryData<AccountsAndCharactersResponse>(
-          ['accountsAndCharacters'],
+          queryKeys.accountsAndCharacters(),
           (old) => {
             if (!old) return old;
             const accountIds = params.accountIds;
@@ -126,20 +138,24 @@ export function useReorderAccounts() {
         );
       }
 
-      await queryClient.cancelQueries({ queryKey: ['accountsAndCharacters'] });
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.accountsAndCharacters(),
+      });
 
       return { previousData };
     },
     onError: (_err, _newOrder, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(
-          ['accountsAndCharacters'],
+          queryKeys.accountsAndCharacters(),
           context.previousData
         );
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['accountsAndCharacters'] });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.accountsAndCharacters(),
+      });
     },
   });
 }
@@ -153,13 +169,13 @@ export function useReorderCharactersInAccount() {
     },
     onMutate: async (params) => {
       const previousData =
-        queryClient.getQueryData<AccountsAndCharactersResponse>([
-          'accountsAndCharacters',
-        ]);
+        queryClient.getQueryData<AccountsAndCharactersResponse>(
+          queryKeys.accountsAndCharacters()
+        );
 
       if (previousData) {
         queryClient.setQueryData<AccountsAndCharactersResponse>(
-          ['accountsAndCharacters'],
+          queryKeys.accountsAndCharacters(),
           (old) => {
             if (!old) return old;
             const newAccounts = old.accounts.map((acc) => {
@@ -179,20 +195,24 @@ export function useReorderCharactersInAccount() {
         );
       }
 
-      await queryClient.cancelQueries({ queryKey: ['accountsAndCharacters'] });
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.accountsAndCharacters(),
+      });
 
       return { previousData };
     },
     onError: (_err, _params, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(
-          ['accountsAndCharacters'],
+          queryKeys.accountsAndCharacters(),
           context.previousData
         );
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['accountsAndCharacters'] });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.accountsAndCharacters(),
+      });
     },
   });
 }
@@ -206,13 +226,13 @@ export function useReorderUnassignedCharacters() {
     },
     onMutate: async (params) => {
       const previousData =
-        queryClient.getQueryData<AccountsAndCharactersResponse>([
-          'accountsAndCharacters',
-        ]);
+        queryClient.getQueryData<AccountsAndCharactersResponse>(
+          queryKeys.accountsAndCharacters()
+        );
 
       if (previousData) {
         queryClient.setQueryData<AccountsAndCharactersResponse>(
-          ['accountsAndCharacters'],
+          queryKeys.accountsAndCharacters(),
           (old) => {
             if (!old) return old;
             const characterIds = params.characterIds;
@@ -228,20 +248,24 @@ export function useReorderUnassignedCharacters() {
         );
       }
 
-      await queryClient.cancelQueries({ queryKey: ['accountsAndCharacters'] });
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.accountsAndCharacters(),
+      });
 
       return { previousData };
     },
     onError: (_err, _params, context) => {
       if (context?.previousData) {
         queryClient.setQueryData(
-          ['accountsAndCharacters'],
+          queryKeys.accountsAndCharacters(),
           context.previousData
         );
       }
     },
     onSettled: () => {
-      queryClient.invalidateQueries({ queryKey: ['accountsAndCharacters'] });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.accountsAndCharacters(),
+      });
     },
   });
 }

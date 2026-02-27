@@ -92,7 +92,10 @@ export function PlanEntryRow({
       await trackAction(
         `Remove ${entry.skill_name} ${levelRoman}`,
         async () => {
-          await removeSkillLevelMutation.mutateAsync(entry.entry_id);
+          await removeSkillLevelMutation.mutateAsync({
+            entryId: entry.entry_id,
+            planId: entry.plan_id,
+          });
         },
         async () => {
           await addEntryMutation.mutateAsync({
