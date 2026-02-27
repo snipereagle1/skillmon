@@ -1,7 +1,26 @@
 use super::Pool;
-use crate::features::FeatureId;
+use crate::features::{get_optional_features, FeatureId};
 use anyhow::Result;
 use std::str::FromStr;
+
+pub async fn ensure_default_enabled_features(pool: &Pool) -> Result<()> {
+    let features_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM enabled_features")
+        .fetch_one(pool)
+        .await?;
+    if features_count.0 > 0 {
+        return Ok(());
+    }
+    let tokens_count: (i64,) = sqlx::query_as("SELECT COUNT(*) FROM tokens")
+        .fetch_one(pool)
+        .await?;
+    if tokens_count.0 > 0 {
+        return Ok(());
+    }
+    for feature in get_optional_features() {
+        set_feature_enabled(pool, feature.id, true).await?;
+    }
+    Ok(())
+}
 
 pub async fn get_enabled_features(pool: &Pool) -> Result<Vec<FeatureId>> {
     let features = sqlx::query_scalar::<_, String>("SELECT feature_id FROM enabled_features")
