@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 #[serde(rename_all = "kebab-case")]
 pub enum FeatureId {
     Contracts,
+    Industry,
     Locations,
     Waypoints,
 }
@@ -13,6 +14,7 @@ impl FeatureId {
     pub fn as_str(&self) -> &'static str {
         match self {
             FeatureId::Contracts => "contracts",
+            FeatureId::Industry => "industry",
             FeatureId::Locations => "locations",
             FeatureId::Waypoints => "waypoints",
         }
@@ -42,6 +44,13 @@ pub fn get_optional_features() -> Vec<OptionalFeature> {
             name: "Contracts".to_string(),
             description: "View your character's contracts and their details.".to_string(),
             scopes: vec![EsiScope::ReadCharacterContractsV1],
+        },
+        OptionalFeature {
+            id: FeatureId::Industry,
+            name: "Industry".to_string(),
+            description: "View your character's industry jobs (manufacturing, research, etc.)."
+                .to_string(),
+            scopes: vec![EsiScope::ReadCharacterIndustryJobsV1],
         },
         OptionalFeature {
             id: FeatureId::Locations,
