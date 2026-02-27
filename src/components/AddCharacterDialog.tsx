@@ -10,6 +10,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import {
+  useBaseScopeStrings,
   useEnabledFeatures,
   useOptionalFeatures,
 } from '@/hooks/tauri/useSettings';
@@ -21,14 +22,6 @@ interface AddCharacterDialogProps {
   onSuccess?: () => void;
 }
 
-const BASE_SCOPES = [
-  'esi-skills.read_skills.v1',
-  'esi-skills.read_skillqueue.v1',
-  'esi-clones.read_clones.v1',
-  'esi-clones.read_implants.v1',
-  'esi-universe.read_structures.v1',
-];
-
 export function AddCharacterDialog({
   open,
   onOpenChange,
@@ -36,6 +29,7 @@ export function AddCharacterDialog({
 }: AddCharacterDialogProps) {
   const [authUrl, setAuthUrl] = useState<string | null>(null);
   const loginMutation = useStartEveLogin();
+  const { data: baseScopeStrings } = useBaseScopeStrings();
   const { data: optionalFeatures } = useOptionalFeatures();
   const { data: enabledFeatures } = useEnabledFeatures();
 
@@ -113,7 +107,7 @@ export function AddCharacterDialog({
               These permissions are always required for core functionality:
             </p>
             <div className="flex flex-wrap gap-1.5">
-              {BASE_SCOPES.map((scope) => (
+              {baseScopeStrings?.map((scope) => (
                 <code
                   key={scope}
                   className="text-[10px] bg-muted px-1.5 py-0.5 rounded"

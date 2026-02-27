@@ -16,6 +16,14 @@ pub fn get_eve_client_id() -> Result<String> {
 }
 
 #[tauri::command]
+pub fn get_base_scope_strings() -> Vec<String> {
+    crate::esi::BASE_SCOPES
+        .iter()
+        .map(|s| s.as_str().to_string())
+        .collect()
+}
+
+#[tauri::command]
 pub async fn start_eve_login(
     app: tauri::AppHandle,
     auth_states: State<'_, AuthStateMap>,

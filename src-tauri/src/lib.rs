@@ -275,6 +275,7 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            commands::auth::get_base_scope_strings,
             commands::auth::start_eve_login,
             is_startup_complete,
             commands::location::get_character_location,

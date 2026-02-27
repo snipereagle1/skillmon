@@ -32,7 +32,7 @@ export function LocationDemo({ characterId }: { characterId: number }) {
   }
 
   const isMissingScope =
-    error instanceof Error && error.message.includes('MISSING_SCOPE');
+    error instanceof Error && error.message.includes('missing ESI scopes');
 
   return (
     <div className="p-4 border rounded-lg space-y-4">

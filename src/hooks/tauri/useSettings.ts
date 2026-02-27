@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
+  getBaseScopeStrings,
   getCharacterFeatureScopeStatus,
   getEnabledFeatures,
   getOptionalFeatures,
@@ -11,6 +12,15 @@ import type {
   FeatureId,
   OptionalFeature,
 } from '@/generated/types';
+
+export function useBaseScopeStrings() {
+  return useQuery<string[]>({
+    queryKey: ['base-scope-strings'],
+    queryFn: async () => {
+      return await getBaseScopeStrings();
+    },
+  });
+}
 
 export function useEnabledFeatures() {
   return useQuery<FeatureId[]>({

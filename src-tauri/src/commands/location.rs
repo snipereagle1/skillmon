@@ -39,7 +39,7 @@ pub async fn get_character_location(
         .map_err(|e| format!("Auth error: {}", e))?;
 
     if !missing_scopes.is_empty() {
-        return Err(format!("MISSING_SCOPE: {}", missing_scopes[0].as_str()));
+        return Err("Character is missing ESI scopes for Locations.".to_string());
     }
 
     let access_token = auth::ensure_valid_access_token(&pool, character_id)
