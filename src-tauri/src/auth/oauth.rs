@@ -7,6 +7,7 @@ use std::collections::HashSet;
 use super::pkce::generate_pkce_pair;
 use super::types::{CharacterInfo, TokenResponse};
 use crate::db::{self, Pool};
+use crate::esi::EsiScope;
 
 #[allow(dead_code)]
 const EVE_SSO_BASE_URL: &str = "https://login.eveonline.com/v2/oauth";
@@ -20,13 +21,17 @@ pub struct AuthState {
 
 pub fn generate_auth_url(
     client_id: &str,
-    scopes: &[&str],
+    scopes: &[EsiScope],
     callback_url: &str,
 ) -> (String, AuthState) {
     let pkce = generate_pkce_pair();
     let state = super::pkce::generate_state();
 
-    let scope_string = scopes.join(" ");
+    let scope_string = scopes
+        .iter()
+        .map(|s| s.as_str())
+        .collect::<Vec<_>>()
+        .join(" ");
 
     let url = format!(
         "{}?response_type=code&redirect_uri={}&client_id={}&scope={}&code_challenge={}&code_challenge_method=S256&state={}",
@@ -256,7 +261,7 @@ pub fn extract_character_from_jwt(access_token: &str) -> Result<CharacterInfo> {
 pub async fn check_token_scopes(
     pool: &Pool,
     character_id: i64,
-    required_scopes: &[&str],
+    required_scopes: &[EsiScope],
 ) -> Result<Vec<String>> {
     let tokens = db::get_tokens(pool, character_id)
         .await
@@ -274,8 +279,10 @@ pub async fn check_token_scopes(
     };
 
     let token_scopes_set: HashSet<String> = token_scopes.iter().cloned().collect();
-    let required_scopes_set: HashSet<String> =
-        required_scopes.iter().map(|s| s.to_string()).collect();
+    let required_scopes_set: HashSet<String> = required_scopes
+        .iter()
+        .map(|s| s.as_str().to_string())
+        .collect();
 
     let missing_scopes: Vec<String> = required_scopes_set
         .difference(&token_scopes_set)

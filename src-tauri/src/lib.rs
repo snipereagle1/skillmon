@@ -11,6 +11,7 @@ mod commands;
 mod db;
 mod esi;
 mod esi_helpers;
+mod features;
 mod notifications;
 mod sde;
 mod skill_plans;
@@ -274,8 +275,10 @@ pub fn run() {
             }
         })
         .invoke_handler(tauri::generate_handler![
+            commands::auth::get_base_scope_strings,
             commands::auth::start_eve_login,
             is_startup_complete,
+            commands::location::get_character_location,
             commands::characters::logout_character,
             commands::accounts::get_accounts_and_characters,
             commands::accounts::create_account,
@@ -334,7 +337,11 @@ pub fn run() {
             commands::remaps::save_remap,
             commands::remaps::get_plan_remaps,
             commands::remaps::get_character_remaps,
-            commands::remaps::delete_remap
+            commands::remaps::delete_remap,
+            commands::settings::get_enabled_features,
+            commands::settings::set_feature_enabled,
+            commands::settings::get_optional_features,
+            commands::settings::get_character_feature_scope_status
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

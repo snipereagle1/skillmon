@@ -1,0 +1,67 @@
+---
+description: Optional features and ESI scope management
+alwaysApply: false
+---
+
+# Optional Features
+
+## Overview
+
+Optional features let users enable extra app capabilities that require additional EVE Online ESI scopes. When a feature is enabled, its scopes are included in the OAuth flow on the next login. Core functionality (skills, skillqueue, clones, implants, structures) always uses `esi::BASE_SCOPES`; optional features add more scopes on top.
+
+## Backend
+
+### Feature Definitions
+
+- **Location**: `src-tauri/src/features.rs`
+- **`FeatureId`**: Enum of optional feature identifiers (`Contracts`, `Locations`). Serializes as kebab-case strings (e.g. `"contracts"`, `"locations"`). Implements `FromStr` for DB/frontend round-trip.
+- **`OptionalFeature`**: `id` (FeatureId), `name`, `description`, `scopes` (Vec<EsiScope>).
+- **`get_optional_features()`**: Returns the list of all optional features and their ESI scopes. Add new features here.
+
+### ESI Scopes
+
+- **Location**: `src-tauri/src/esi/scopes.rs`
+- **`EsiScope`**: Enum of all ESI scope strings; each variant has `#[serde(rename = "...")]` for the official scope name.
+- **`BASE_SCOPES`**: Scopes always requested (skills, skillqueue, clones, implants, structures). Do not add optional-feature scopes here.
+
+### OAuth Scope Building
+
+In `commands/auth.rs`, `start_eve_login`:
+
+1. Starts with `esi::BASE_SCOPES`.
+2. Loads enabled feature IDs from `db::get_enabled_features`.
+3. For each enabled ID, finds the `OptionalFeature` and appends its `scopes` (deduplicated).
+4. Passes the combined scopes to `auth::generate_auth_url`.
+
+Users must re-authenticate after enabling a new feature so EVE SSO can grant the new scopes.
+
+## Database
+
+- **Table**: `enabled_features` (migration `017_enabled_features.sql`)
+  - `feature_id TEXT PRIMARY KEY` — stores `FeatureId::as_str()` (e.g. `"contracts"`).
+- **Location**: `src-tauri/src/db/enabled_features.rs`
+- **`get_enabled_features(pool)`**: Returns `Vec<FeatureId>`. Rows that don’t parse as a known `FeatureId` are skipped.
+- **`set_feature_enabled(pool, feature_id, enabled)`**: INSERT for enable, DELETE for disable. Uses `INSERT OR IGNORE` for enable.
+
+## Tauri Commands
+
+- **Location**: `src-tauri/src/commands/settings.rs`
+- **`get_enabled_features`**: Returns enabled `FeatureId`s (needs `db::Pool` state).
+- **`set_feature_enabled`**: Takes `feature_id: FeatureId`, `enabled: bool` (needs `db::Pool` state).
+- **`get_optional_features`**: Returns full list of `OptionalFeature` (no state; from `features::get_optional_features()`).
+
+## Frontend
+
+- **Settings page**: `src/routes/settings/features.tsx` — lists optional features with toggle switches and shows each feature’s scopes. Includes “Re-authenticate Character” to refresh tokens with new scopes.
+- **Hooks**: `src/hooks/tauri/useSettings.ts`
+  - **`useEnabledFeatures()`**: Query key `['enabled-features']`, returns `FeatureId[]`.
+  - **`useOptionalFeatures()`**: Query key `['optional-features']`, returns `OptionalFeature[]`.
+  - **`useSetFeatureEnabled()`**: Mutation; invalidates `['enabled-features']` on success.
+- **Types**: Use `FeatureId` and `OptionalFeature` from `@/generated/types` (tauri-typegen from Rust).
+
+## Adding a New Optional Feature
+
+1. Add a variant to `FeatureId` in `src-tauri/src/features.rs` (and implement `as_str` / `FromStr` if needed for new value).
+2. Add the feature to the `get_optional_features()` vec with the correct `EsiScope`s from `esi/scopes.rs` (add new `EsiScope` variants if the scope isn’t there yet).
+3. Run `pnpm typegen` so the frontend gets the new `FeatureId` and any new types.
+4. No migration is needed for `enabled_features` — it stores any `feature_id` string; only parsing in `get_enabled_features` needs to recognize the new id.

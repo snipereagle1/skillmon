@@ -12,6 +12,7 @@ pub mod character_attributes;
 pub mod character_skills;
 pub mod characters;
 pub mod clones;
+pub mod enabled_features;
 pub mod locations;
 pub mod notifications;
 pub mod remaps;
@@ -36,6 +37,9 @@ pub use characters::{
 pub use clones::{
     find_clone_by_implants, get_character_clones, get_clone_implants,
     get_implant_attribute_bonuses, set_character_clones, update_clone_name,
+};
+pub use enabled_features::{
+    ensure_default_enabled_features, get_enabled_features, set_feature_enabled,
 };
 pub use locations::{get_station, get_structure, upsert_station, upsert_structure};
 pub use notifications::{
@@ -80,6 +84,10 @@ pub async fn init_db(app: &tauri::AppHandle) -> Result<Pool> {
             ));
         }
     }
+
+    ensure_default_enabled_features(&pool)
+        .await
+        .context("failed to ensure default enabled features")?;
 
     Ok(pool)
 }

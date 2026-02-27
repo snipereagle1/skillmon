@@ -1,5 +1,6 @@
 use anyhow::{Context, Result};
 use chrono::Utc;
+use serde::Serialize;
 use tauri::{Emitter, Manager, State};
 
 use crate::auth;
@@ -7,6 +8,11 @@ use crate::cache;
 use crate::db;
 
 pub type AuthStateMap = std::sync::Mutex<std::collections::HashMap<String, auth::AuthState>>;
+
+#[derive(Debug, Clone, Serialize)]
+pub struct BaseScopeStrings {
+    pub scopes: Vec<String>,
+}
 
 pub fn get_eve_client_id() -> Result<String> {
     if let Some(compile_time_id) = option_env!("EVE_CLIENT_ID") {
@@ -16,9 +22,20 @@ pub fn get_eve_client_id() -> Result<String> {
 }
 
 #[tauri::command]
+pub fn get_base_scope_strings() -> BaseScopeStrings {
+    BaseScopeStrings {
+        scopes: crate::esi::BASE_SCOPES
+            .iter()
+            .map(|s| s.as_str().to_string())
+            .collect(),
+    }
+}
+
+#[tauri::command]
 pub async fn start_eve_login(
     app: tauri::AppHandle,
     auth_states: State<'_, AuthStateMap>,
+    pool: State<'_, db::Pool>,
 ) -> Result<String, String> {
     let client_id = get_eve_client_id().map_err(|e| e.to_string())?;
     let callback_url = std::env::var("EVE_CALLBACK_URL").unwrap_or_else(|_| {
@@ -29,13 +46,23 @@ pub async fn start_eve_login(
         }
     });
 
-    let scopes = [
-        "esi-skills.read_skills.v1",
-        "esi-skills.read_skillqueue.v1",
-        "esi-clones.read_clones.v1",
-        "esi-clones.read_implants.v1",
-        "esi-universe.read_structures.v1",
-    ];
+    let mut scopes: Vec<crate::esi::EsiScope> = crate::esi::BASE_SCOPES.to_vec();
+
+    let enabled_features = db::get_enabled_features(&pool)
+        .await
+        .map_err(|e| format!("Failed to get enabled features: {}", e))?;
+
+    let optional_features = crate::features::get_optional_features();
+
+    for feature_id in enabled_features {
+        if let Some(feature) = optional_features.iter().find(|f| f.id == feature_id) {
+            for scope in &feature.scopes {
+                if !scopes.contains(scope) {
+                    scopes.push(*scope);
+                }
+            }
+        }
+    }
 
     let (auth_url, auth_state) = auth::generate_auth_url(&client_id, &scopes, &callback_url);
 
