@@ -11,6 +11,8 @@ const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       staleTime: 60 * 1000,
+      gcTime: 12 * 60 * 60 * 1000,
+      placeholderData: 'keepPrevious',
     },
   },
 });

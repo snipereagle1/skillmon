@@ -7,6 +7,23 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+export function stableStringify(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return JSON.stringify(value);
+  }
+  if (Array.isArray(value)) {
+    return '[' + value.map(stableStringify).join(',') + ']';
+  }
+  const keys = Object.keys(value as object).sort();
+  const pairs = keys.map(
+    (k) =>
+      JSON.stringify(k) +
+      ':' +
+      stableStringify((value as Record<string, unknown>)[k])
+  );
+  return '{' + pairs.join(',') + '}';
+}
+
 export function toRoman(n: number): string {
   const roman = ['I', 'II', 'III', 'IV', 'V'];
   return roman[n - 1] || n.toString();

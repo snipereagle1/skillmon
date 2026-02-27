@@ -1,6 +1,8 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
 
+import { queryKeys } from './queryKeys';
+
 export function useAuthEvents() {
   const queryClient = useQueryClient();
 
@@ -16,19 +18,19 @@ export function useAuthEvents() {
           async (event) => {
             const characterId = event.payload;
             await queryClient.invalidateQueries({
-              queryKey: ['skillQueue', characterId],
+              queryKey: queryKeys.skillQueue(characterId),
             });
             await queryClient.invalidateQueries({
-              queryKey: ['characterSkills', characterId],
+              queryKey: queryKeys.characterSkills(characterId),
             });
             await queryClient.invalidateQueries({
-              queryKey: ['attributes', characterId],
+              queryKey: queryKeys.attributes(characterId),
             });
             await queryClient.invalidateQueries({
-              queryKey: ['clones', characterId],
+              queryKey: queryKeys.clones(characterId),
             });
             await queryClient.invalidateQueries({
-              queryKey: ['accountsAndCharacters'],
+              queryKey: queryKeys.accountsAndCharacters(),
             });
           }
         );

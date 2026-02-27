@@ -6,9 +6,11 @@ import {
 } from '@/generated/commands';
 import type { NotificationSettingResponse } from '@/generated/types';
 
+import { queryKeys } from './queryKeys';
+
 export function useNotificationSettings(characterId: number | null) {
   return useQuery<NotificationSettingResponse[]>({
-    queryKey: ['notificationSettings', characterId],
+    queryKey: queryKeys.notificationSettings(characterId),
     queryFn: async () => {
       if (!characterId) {
         return [];
@@ -41,7 +43,7 @@ export function useUpdateNotificationSetting() {
     },
     onSuccess: (_, variables) => {
       queryClient.invalidateQueries({
-        queryKey: ['notificationSettings', variables.characterId],
+        queryKey: queryKeys.notificationSettings(variables.characterId),
       });
     },
   });

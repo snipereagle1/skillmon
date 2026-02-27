@@ -2,6 +2,8 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { logoutCharacter } from '@/generated/commands';
 
+import { queryKeys } from './queryKeys';
+
 export function useLogoutCharacter() {
   const queryClient = useQueryClient();
 
@@ -10,8 +12,12 @@ export function useLogoutCharacter() {
       return await logoutCharacter({ characterId });
     },
     onSuccess: (_, characterId) => {
-      queryClient.invalidateQueries({ queryKey: ['accountsAndCharacters'] });
-      queryClient.invalidateQueries({ queryKey: ['skillQueue', characterId] });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.accountsAndCharacters(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillQueue(characterId),
+      });
     },
   });
 }

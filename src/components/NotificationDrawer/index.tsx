@@ -47,7 +47,10 @@ export function NotificationDrawer({
   }, [initialSelectedCharacterId]);
 
   const handleDismiss = (id: number) => {
-    dismissNotification.mutate(id);
+    dismissNotification.mutate({
+      notificationId: id,
+      characterId: filterCharacterId,
+    });
   };
 
   return (

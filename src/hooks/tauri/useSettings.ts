@@ -14,9 +14,11 @@ import type {
   OptionalFeature,
 } from '@/generated/types';
 
+import { queryKeys } from './queryKeys';
+
 export function useBaseScopeStrings() {
   return useQuery<BaseScopeStrings>({
-    queryKey: ['base-scope-strings'],
+    queryKey: queryKeys.baseScopeStrings(),
     queryFn: async () => {
       return await getBaseScopeStrings();
     },
@@ -25,7 +27,7 @@ export function useBaseScopeStrings() {
 
 export function useEnabledFeatures() {
   return useQuery<FeatureId[]>({
-    queryKey: ['enabled-features'],
+    queryKey: queryKeys.enabledFeatures(),
     queryFn: async () => {
       return await getEnabledFeatures();
     },
@@ -34,7 +36,7 @@ export function useEnabledFeatures() {
 
 export function useOptionalFeatures() {
   return useQuery<OptionalFeature[]>({
-    queryKey: ['optional-features'],
+    queryKey: queryKeys.optionalFeatures(),
     queryFn: async () => {
       return await getOptionalFeatures();
     },
@@ -55,9 +57,9 @@ export function useSetFeatureEnabled() {
       return await setFeatureEnabled({ featureId, enabled });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['enabled-features'] });
+      queryClient.invalidateQueries({ queryKey: queryKeys.enabledFeatures() });
       queryClient.invalidateQueries({
-        queryKey: ['character-feature-scope-status'],
+        queryKey: queryKeys.characterFeatureScopeStatus(),
       });
     },
   });
@@ -65,7 +67,7 @@ export function useSetFeatureEnabled() {
 
 export function useCharacterFeatureScopeStatus() {
   return useQuery<CharacterFeatureScopeStatus[]>({
-    queryKey: ['character-feature-scope-status'],
+    queryKey: queryKeys.characterFeatureScopeStatus(),
     queryFn: async () => {
       return await getCharacterFeatureScopeStatus();
     },

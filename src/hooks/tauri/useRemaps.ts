@@ -8,9 +8,11 @@ import {
 } from '@/generated/commands';
 import type { Remap, SaveRemapParams } from '@/generated/types';
 
+import { queryKeys } from './queryKeys';
+
 export function useCharacterRemaps(characterId: number | null) {
   return useQuery<Remap[]>({
-    queryKey: ['remaps', 'character', characterId],
+    queryKey: queryKeys.remaps.character(characterId),
     queryFn: async () => {
       if (characterId === null) return [];
       return await getCharacterRemaps({ characterId });
@@ -21,7 +23,7 @@ export function useCharacterRemaps(characterId: number | null) {
 
 export function usePlanRemaps(planId: number | null) {
   return useQuery<Remap[]>({
-    queryKey: ['remaps', 'plan', planId],
+    queryKey: queryKeys.remaps.plan(planId),
     queryFn: async () => {
       if (planId === null) return [];
       return await getPlanRemaps({ planId });
@@ -40,18 +42,18 @@ export function useSaveRemap() {
     onSuccess: (_, params) => {
       if (params.characterId) {
         queryClient.invalidateQueries({
-          queryKey: ['remaps', 'character', params.characterId],
+          queryKey: queryKeys.remaps.character(params.characterId),
         });
         queryClient.invalidateQueries({
-          queryKey: ['attributes', params.characterId],
+          queryKey: queryKeys.attributes(params.characterId),
         });
       }
       if (params.planId) {
         queryClient.invalidateQueries({
-          queryKey: ['remaps', 'plan', params.planId],
+          queryKey: queryKeys.remaps.plan(params.planId),
         });
         queryClient.invalidateQueries({
-          queryKey: ['simulation', params.planId],
+          queryKey: queryKeys.simulation(params.planId),
         });
       }
     },
@@ -73,18 +75,18 @@ export function useDeleteRemap() {
     onSuccess: (params) => {
       if (params.characterId) {
         queryClient.invalidateQueries({
-          queryKey: ['remaps', 'character', params.characterId],
+          queryKey: queryKeys.remaps.character(params.characterId),
         });
         queryClient.invalidateQueries({
-          queryKey: ['attributes', params.characterId],
+          queryKey: queryKeys.attributes(params.characterId),
         });
       }
       if (params.planId) {
         queryClient.invalidateQueries({
-          queryKey: ['remaps', 'plan', params.planId],
+          queryKey: queryKeys.remaps.plan(params.planId),
         });
         queryClient.invalidateQueries({
-          queryKey: ['simulation', params.planId],
+          queryKey: queryKeys.simulation(params.planId),
         });
       }
     },
