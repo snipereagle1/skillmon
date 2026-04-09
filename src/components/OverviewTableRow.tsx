@@ -44,6 +44,11 @@ export function OverviewTableRow({ character }: OverviewTableRowProps) {
         </Link>
       </TableCell>
       <TableCell>
+        {character.account_name ?? (
+          <span className="text-muted-foreground">—</span>
+        )}
+      </TableCell>
+      <TableCell>
         {character.queue_time_remaining_seconds != null
           ? formatDuration(character.queue_time_remaining_seconds, {
               showSeconds: false,
