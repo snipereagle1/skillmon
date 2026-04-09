@@ -12,6 +12,7 @@ use crate::skill_queue;
 pub struct TrainingCharacterOverview {
     pub character_id: i64,
     pub character_name: String,
+    pub account_name: Option<String>,
     pub queue_time_remaining_seconds: Option<i64>,
     pub current_skill_name: Option<String>,
     pub current_skill_level: Option<i32>,
@@ -31,6 +32,13 @@ pub async fn get_training_characters_overview(
         .await
         .map_err(|e| format!("Failed to get characters: {}", e))?;
 
+    let accounts = db::get_all_accounts(&pool)
+        .await
+        .map_err(|e| format!("Failed to get accounts: {}", e))?;
+
+    let account_name_map: std::collections::HashMap<i64, String> =
+        accounts.into_iter().map(|a| (a.id, a.name)).collect();
+
     let now = chrono::Utc::now();
     let mut tasks = Vec::new();
 
@@ -40,6 +48,9 @@ pub async fn get_training_characters_overview(
         let rate_limits = rate_limits.inner().clone();
         let character_name = character.character_name.clone();
         let char_id = character.character_id;
+        let account_name = character
+            .account_id
+            .and_then(|id| account_name_map.get(&id).cloned());
 
         tasks.push(tokio::spawn(async move {
             // 1. Get the skill queue and implants in parallel
@@ -153,6 +164,7 @@ pub async fn get_training_characters_overview(
                     return Ok(Some(TrainingCharacterOverview {
                         character_id: char_id,
                         character_name: character_name.clone(),
+                        account_name: account_name.clone(),
                         queue_time_remaining_seconds,
                         current_skill_name: skill.skill_name.clone(),
                         current_skill_level: Some(skill.finished_level),
