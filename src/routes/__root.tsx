@@ -13,6 +13,7 @@ import { NavigationTabs } from '@/components/ui/navigation-tabs';
 import { Toaster } from '@/components/ui/sonner';
 import { Spinner } from '@/components/ui/spinner';
 import { useAuthEvents } from '@/hooks/tauri/useAuthEvents';
+import { useEnabledFeatures } from '@/hooks/tauri/useSettings';
 import { useStartupState } from '@/hooks/tauri/useStartupState';
 import { cn } from '@/lib/utils';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
@@ -27,6 +28,8 @@ function RootComponent() {
   const { open, skillId, characterId, closeSkillDetail } =
     useSkillDetailStore();
   const { updateAvailable, setUpdate } = useUpdateStore();
+  const { data: enabledFeatures } = useEnabledFeatures();
+  const locationsEnabled = enabledFeatures?.includes('Locations') ?? false;
 
   useEffect(() => {
     const checkForUpdates = async () => {
@@ -63,6 +66,9 @@ function RootComponent() {
           items={[
             { to: '/overview', label: 'Overview' },
             { to: '/characters', label: 'Characters' },
+            ...(locationsEnabled
+              ? [{ to: '/location' as const, label: 'Location' }]
+              : []),
             { to: '/plans', label: 'Plans' },
             { to: '/settings', label: 'Settings' },
             { to: '/about', label: 'About' },
