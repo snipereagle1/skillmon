@@ -1,0 +1,1 @@
+ALTER TABLE stations ADD COLUMN type_id INTEGER;

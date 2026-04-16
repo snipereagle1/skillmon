@@ -48,13 +48,20 @@ async fn resolve_clone_location(
                     format!("Unknown Location {}", location_id)
                 };
 
-                db::upsert_station(pool, location_id, &name, station.system_id, station.owner)
-                    .await?;
+                db::upsert_station(
+                    pool,
+                    location_id,
+                    &name,
+                    station.system_id,
+                    Some(station.type_id),
+                    station.owner,
+                )
+                .await?;
 
                 Ok(name)
             } else {
                 let name = format!("Unknown Location {}", location_id);
-                db::upsert_station(pool, location_id, &name, 0, None).await?;
+                db::upsert_station(pool, location_id, &name, 0, None, None).await?;
                 Ok(name)
             }
         }
