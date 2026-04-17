@@ -4,8 +4,9 @@ use tauri::State;
 
 use crate::auth;
 use crate::db;
-use crate::esi::{self, EsiScope};
+use crate::esi;
 use crate::esi_helpers;
+use crate::features::FeatureId;
 use crate::utils;
 
 #[derive(Debug, Clone, Serialize)]
@@ -30,11 +31,7 @@ pub async fn get_character_location(
     rate_limits: State<'_, esi::RateLimitStore>,
     character_id: i64,
 ) -> Result<CharacterLocation, String> {
-    let required_scopes = [
-        EsiScope::ReadLocationV1,
-        EsiScope::ReadOnlineV1,
-        EsiScope::ReadShipTypeV1,
-    ];
+    let required_scopes = FeatureId::Locations.scopes();
 
     let missing_scopes = auth::check_token_scopes(&pool, character_id, &required_scopes)
         .await
@@ -170,12 +167,6 @@ pub struct CharacterLocationOverview {
     pub implants: Vec<ImplantInfo>,
 }
 
-const LOCATION_SCOPES: [EsiScope; 3] = [
-    EsiScope::ReadLocationV1,
-    EsiScope::ReadOnlineV1,
-    EsiScope::ReadShipTypeV1,
-];
-
 #[tauri::command]
 pub async fn get_all_characters_locations(
     pool: State<'_, db::Pool>,
@@ -194,8 +185,8 @@ pub async fn get_all_characters_locations(
         let character_name = character.character_name.clone();
 
         tasks.push(tokio::spawn(async move {
-            // Check if character has location scopes
-            let missing_scopes = auth::check_token_scopes(&pool, char_id, &LOCATION_SCOPES)
+            let location_scopes = FeatureId::Locations.scopes();
+            let missing_scopes = auth::check_token_scopes(&pool, char_id, &location_scopes)
                 .await
                 .map_err(|e| format!("Auth error for {}: {}", character_name, e))?;
 

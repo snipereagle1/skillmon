@@ -19,6 +19,14 @@ impl FeatureId {
             FeatureId::Waypoints => "waypoints",
         }
     }
+
+    pub fn scopes(self) -> Vec<EsiScope> {
+        get_optional_features()
+            .into_iter()
+            .find(|f| f.id == self)
+            .map(|f| f.scopes)
+            .unwrap_or_default()
+    }
 }
 
 impl std::str::FromStr for FeatureId {
