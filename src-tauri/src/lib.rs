@@ -279,6 +279,7 @@ pub fn run() {
             commands::auth::start_eve_login,
             is_startup_complete,
             commands::location::get_character_location,
+            commands::location::get_all_characters_locations,
             commands::characters::logout_character,
             commands::accounts::get_accounts_and_characters,
             commands::accounts::create_account,

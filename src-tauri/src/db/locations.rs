@@ -9,6 +9,7 @@ pub struct Station {
     pub station_id: i64,
     pub name: String,
     pub system_id: i64,
+    pub type_id: Option<i64>,
     pub owner: Option<i64>,
     pub updated_at: i64,
 }
@@ -25,7 +26,7 @@ pub struct Structure {
 
 pub async fn get_station(pool: &Pool, station_id: i64) -> Result<Option<Station>> {
     let station = sqlx::query_as::<_, Station>(
-        "SELECT station_id, name, system_id, owner, updated_at FROM stations WHERE station_id = ?",
+        "SELECT station_id, name, system_id, type_id, owner, updated_at FROM stations WHERE station_id = ?",
     )
     .bind(station_id)
     .fetch_optional(pool)
@@ -50,20 +51,23 @@ pub async fn upsert_station(
     station_id: i64,
     name: &str,
     system_id: i64,
+    type_id: Option<i64>,
     owner: Option<i64>,
 ) -> Result<()> {
     let now = chrono::Utc::now().timestamp();
     sqlx::query(
-        "INSERT INTO stations (station_id, name, system_id, owner, updated_at) VALUES (?, ?, ?, ?, ?)
-         ON CONFLICT(station_id) DO UPDATE SET name = ?, system_id = ?, owner = ?, updated_at = ?",
+        "INSERT INTO stations (station_id, name, system_id, type_id, owner, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+         ON CONFLICT(station_id) DO UPDATE SET name = ?, system_id = ?, type_id = ?, owner = ?, updated_at = ?",
     )
     .bind(station_id)
     .bind(name)
     .bind(system_id)
+    .bind(type_id)
     .bind(owner)
     .bind(now)
     .bind(name)
     .bind(system_id)
+    .bind(type_id)
     .bind(owner)
     .bind(now)
     .execute(pool)

@@ -250,3 +250,25 @@ pub async fn get_cached_structure_info(
     let cache_key = format!("{}:0", endpoint_path);
     esi::fetch_cached(pool, client, &endpoint_path, &cache_key, rate_limits, 0).await
 }
+
+pub async fn get_cached_constellation_info(
+    pool: &db::Pool,
+    client: &reqwest::Client,
+    constellation_id: i64,
+    rate_limits: &esi::RateLimitStore,
+) -> Result<Option<esi::UniverseConstellationsConstellationIdGet>> {
+    let endpoint_path = format!("universe/constellations/{}", constellation_id);
+    let cache_key = format!("{}:0", endpoint_path);
+    esi::fetch_cached(pool, client, &endpoint_path, &cache_key, rate_limits, 0).await
+}
+
+pub async fn get_cached_region_info(
+    pool: &db::Pool,
+    client: &reqwest::Client,
+    region_id: i64,
+    rate_limits: &esi::RateLimitStore,
+) -> Result<Option<esi::UniverseRegionsRegionIdGet>> {
+    let endpoint_path = format!("universe/regions/{}", region_id);
+    let cache_key = format!("{}:0", endpoint_path);
+    esi::fetch_cached(pool, client, &endpoint_path, &cache_key, rate_limits, 0).await
+}

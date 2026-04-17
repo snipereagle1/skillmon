@@ -94,4 +94,5 @@ export const queryKeys = {
     ['character-feature-scope-status'] as const,
 
   location: (characterId: number) => ['location', characterId] as const,
+  locationsOverview: () => ['locationsOverview'] as const,
 };
