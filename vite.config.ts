@@ -44,5 +44,9 @@ export default defineConfig(async () => ({
       // 3. tell Vite to ignore watching `src-tauri`
       ignored: ['**/src-tauri/**'],
     },
+    proxy: {
+      '/pw-poll': 'http://localhost:6275',
+      '/pw': 'http://localhost:6275',
+    },
   },
 }));

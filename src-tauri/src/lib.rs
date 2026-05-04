@@ -41,7 +41,8 @@ async fn is_startup_complete(
 pub fn run() {
     let _ = dotenvy::dotenv();
 
-    tauri::Builder::default()
+    #[allow(unused_mut)]
+    let mut builder = tauri::Builder::default()
         .setup(|app| {
             tauri::async_runtime::block_on(async {
                 let pool = db::init_db(app.handle()).await?;
@@ -76,7 +77,9 @@ pub fn run() {
                 let supervisor = Mutex::new(refresh::RefreshSupervisor::new());
 
                 // Seed with existing characters
-                let characters_for_refresh = db::get_all_characters(&pool_for_tray).await.unwrap_or_default();
+                let characters_for_refresh = db::get_all_characters(&pool_for_tray)
+                    .await
+                    .unwrap_or_default();
                 {
                     let mut sup = supervisor.lock().unwrap();
                     for character in characters_for_refresh {
@@ -222,27 +225,40 @@ pub fn run() {
 
                 let app_handle = app.handle().clone();
                 let pool_for_notifications = app.state::<db::Pool>().inner().clone();
-                let rate_limits_for_notifications = app.state::<esi::RateLimitStore>().inner().clone();
+                let rate_limits_for_notifications =
+                    app.state::<esi::RateLimitStore>().inner().clone();
                 let processor = std::sync::Arc::new(notifications::NotificationProcessor::new());
                 let processor_clone = processor.clone();
-                app_handle.clone().listen(notifications::EVENT_DATA_UPDATED, move |event| {
-                    let app_handle = app_handle.clone();
-                    let pool = pool_for_notifications.clone();
-                    let rate_limits = rate_limits_for_notifications.clone();
-                    let processor = processor_clone.clone();
-                    if let Ok(payload) = serde_json::from_str::<notifications::DataUpdatedPayload>(event.payload()) {
-                        tauri::async_runtime::spawn(async move {
-                            let ctx = notifications::NotificationContext {
-                                app: &app_handle,
-                                pool: &pool,
-                                rate_limits: &rate_limits,
-                            };
-                            if let Err(e) = processor.process_data_updated(&ctx, &payload.data_type, payload.character_id).await {
-                                eprintln!("Failed to process notification check: {}", e);
+                app_handle
+                        .clone()
+                        .listen(notifications::EVENT_DATA_UPDATED, move |event| {
+                            let app_handle = app_handle.clone();
+                            let pool = pool_for_notifications.clone();
+                            let rate_limits = rate_limits_for_notifications.clone();
+                            let processor = processor_clone.clone();
+                            if let Ok(payload) = serde_json::from_str::<
+                                notifications::DataUpdatedPayload,
+                            >(event.payload())
+                            {
+                                tauri::async_runtime::spawn(async move {
+                                    let ctx = notifications::NotificationContext {
+                                        app: &app_handle,
+                                        pool: &pool,
+                                        rate_limits: &rate_limits,
+                                    };
+                                    if let Err(e) = processor
+                                        .process_data_updated(
+                                            &ctx,
+                                            &payload.data_type,
+                                            payload.character_id,
+                                        )
+                                        .await
+                                    {
+                                        eprintln!("Failed to process notification check: {}", e);
+                                    }
+                                });
                             }
                         });
-                    }
-                });
 
                 Ok(())
             })
@@ -384,7 +400,14 @@ pub fn run() {
             commands::settings::get_optional_features,
             commands::settings::get_character_feature_scope_status,
             commands::esi_snapshot::get_esi_snapshot
-        ])
+        ]);
+
+    #[cfg(feature = "e2e-testing")]
+    {
+        builder = builder.plugin(tauri_plugin_playwright::init());
+    }
+
+    builder
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

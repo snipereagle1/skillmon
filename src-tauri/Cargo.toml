@@ -8,6 +8,9 @@ license = "MIT"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+e2e-testing = ["tauri-plugin-playwright"]
+
 [lib]
 # The `_lib` suffix may seem redundant but it is necessary
 # to make the lib name unique and wouldn't conflict with the bin name.
@@ -60,3 +63,4 @@ zip = { version = "0.6", default-features = false, features = ["deflate"] }
 quick-xml = "0.37"
 dotenvy = "0.15.7"
 tauri-plugin-updater = "2"
+tauri-plugin-playwright = { version = "0.1", optional = true }
