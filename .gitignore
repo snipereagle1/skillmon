@@ -22,6 +22,7 @@ dist-ssr
 *.sw?
 .specstory/
 .turbo/
+.fallow/
 
 # Generated ESI code
 src-tauri/src/esi/client.rs
@@ -39,3 +40,4 @@ src-tauri/tests/fixtures/sde_cache/
 .env
 .claude/.dirty
 .claude/settings.local.json
+src-tauri/capabilities/e2e.json
