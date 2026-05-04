@@ -4,9 +4,13 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "kebab-case")]
 pub enum FeatureId {
+    #[serde(rename = "contracts")]
     Contracts,
+    #[serde(rename = "industry")]
     Industry,
+    #[serde(rename = "locations")]
     Locations,
+    #[serde(rename = "waypoints")]
     Waypoints,
 }
 
