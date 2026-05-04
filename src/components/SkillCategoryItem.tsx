@@ -43,7 +43,7 @@ export function SkillCategoryItem({
       />
       {/* Planned progress bar fill - starting from trained percentage */}
       <div
-        className="absolute inset-y-0 bg-yellow-400/30 transition-all z-0"
+        className="absolute inset-y-0 bg-primary/15 transition-all z-0"
         style={{
           left: `${trainedPercentage}%`,
           width: `${plannedPercentage}%`,

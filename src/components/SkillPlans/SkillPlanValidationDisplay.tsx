@@ -79,7 +79,7 @@ export function SkillPlanValidationDisplay({
         <div className="flex items-center gap-4">
           {statusContent}
           {isProposed && (
-            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-bold uppercase tracking-wider">
+            <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-primary/10 text-primary text-[10px] font-bold uppercase tracking-wider">
               <Info className="h-3 w-3" />
               <span>Preview</span>
             </div>

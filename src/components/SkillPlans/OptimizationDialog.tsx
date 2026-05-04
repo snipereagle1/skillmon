@@ -408,7 +408,7 @@ export function OptimizationDialog({
                         })}
                       />
                     )}
-                    <div className="mt-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-md text-xs text-blue-600 dark:text-blue-400">
+                    <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-md text-xs text-primary">
                       <strong>Note:</strong> Up to {maxRemaps} remap
                       {maxRemaps > 1 ? 's' : ''} will be automatically scheduled
                       to match the new skill order.

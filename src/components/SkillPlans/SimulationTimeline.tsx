@@ -86,7 +86,7 @@ export function SimulationTimeline({
                   {remapAtThisEntry && (
                     <div className="mb-2">
                       <Badge variant="secondary" className="gap-1.5 py-1">
-                        <div className="h-2 w-2 rounded-full bg-blue-500" />
+                        <div className="h-2 w-2 rounded-full bg-primary" />
                         Remap: {remapAtThisEntry.attributes.intelligence}/
                         {remapAtThisEntry.attributes.memory}/
                         {remapAtThisEntry.attributes.perception}/
@@ -131,13 +131,13 @@ export function SimulationTimeline({
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 pointer-events-none">
                     {offsetPercentage > 0 && (
                       <div
-                        className="absolute h-full bg-blue-400/20 dark:bg-blue-500/20"
+                        className="absolute h-full bg-primary/20"
                         style={{ left: '0%', width: `${offsetPercentage}%` }}
                       />
                     )}
                     {spPercentage > 0 && (
                       <div
-                        className="absolute h-full bg-blue-400 dark:bg-blue-500"
+                        className="absolute h-full bg-primary"
                         style={{
                           left: `${offsetPercentage}%`,
                           width: `${spPercentage}%`,

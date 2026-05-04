@@ -341,7 +341,7 @@ export function PlanEntryRow({
           <div className="absolute bottom-0 left-0 right-0 h-0.5 pointer-events-none">
             {offsetPercentage > 0 && (
               <div
-                className="absolute h-full bg-blue-400/20 dark:bg-blue-500/20"
+                className="absolute h-full bg-primary/20"
                 style={{ left: '0%', width: `${offsetPercentage}%` }}
               />
             )}
@@ -349,9 +349,7 @@ export function PlanEntryRow({
               <div
                 className={cn(
                   'absolute h-full',
-                  isPrerequisite
-                    ? 'bg-muted-foreground/50'
-                    : 'bg-blue-400 dark:bg-blue-500'
+                  isPrerequisite ? 'bg-muted-foreground/50' : 'bg-primary'
                 )}
                 style={{
                   left: `${offsetPercentage}%`,

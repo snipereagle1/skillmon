@@ -61,8 +61,8 @@ export function SkillQueueEntry({
   const displayWidth = Math.max(timePercentage, MIN_WIDTH_PERCENTAGE);
 
   const useYellow = isPaused === true && isTraining;
-  const progressColor = useYellow ? 'bg-yellow-500/20' : 'bg-green-500/20';
-  const textColor = useYellow ? 'text-yellow-400' : 'text-green-400';
+  const progressColor = useYellow ? 'bg-yellow-500/20' : 'bg-primary/20';
+  const textColor = useYellow ? 'text-yellow-400' : 'text-primary';
 
   return (
     <div
@@ -133,13 +133,13 @@ export function SkillQueueEntry({
       <div className="absolute bottom-0 left-0 right-0 h-0.5 pointer-events-none">
         {offsetPercentage > 0 && (
           <div
-            className="absolute h-full bg-blue-400/20 dark:bg-blue-500/20"
+            className="absolute h-full bg-primary/20"
             style={{ left: '0%', width: `${offsetPercentage}%` }}
           />
         )}
         {timePercentage > 0 && (
           <div
-            className="absolute h-full bg-blue-400 dark:bg-blue-500"
+            className="absolute h-full bg-primary"
             style={{ left: `${offsetPercentage}%`, width: `${displayWidth}%` }}
           />
         )}

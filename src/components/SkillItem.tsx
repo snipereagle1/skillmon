@@ -37,9 +37,9 @@ export function SkillItem({
     if (isTrained) {
       bgColor = 'bg-white';
     } else if (isQueued) {
-      bgColor = 'bg-blue-400';
+      bgColor = 'bg-primary';
     } else if (isPlanned) {
-      bgColor = 'bg-yellow-400';
+      bgColor = 'bg-primary/60';
     }
 
     return (
