@@ -29,7 +29,7 @@ function RootComponent() {
     useSkillDetailStore();
   const { updateAvailable, setUpdate } = useUpdateStore();
   const { data: enabledFeatures } = useEnabledFeatures();
-  const locationsEnabled = enabledFeatures?.includes('Locations') ?? false;
+  const locationsEnabled = enabledFeatures?.includes('locations') ?? false;
 
   useEffect(() => {
     const checkForUpdates = async () => {
