@@ -1,6 +1,6 @@
 use std::sync::{
     atomic::{AtomicU8, Ordering},
-    Arc,
+    Arc, Mutex,
 };
 
 use tauri::{Emitter, Listener, Manager, WindowEvent};
@@ -13,6 +13,7 @@ mod esi;
 mod esi_helpers;
 mod features;
 mod notifications;
+mod refresh;
 mod sde;
 mod skill_plans;
 mod skill_queue;
@@ -56,6 +57,24 @@ pub fn run() {
 
                 let pool_for_tray = app.state::<db::Pool>().inner().clone();
                 let rate_limits_for_tray = app.state::<esi::RateLimitStore>().inner().clone();
+
+                let supervisor = Arc::new(Mutex::new(refresh::RefreshSupervisor::new()));
+
+                // Seed with existing characters
+                let characters_for_refresh = db::get_all_characters(&pool_for_tray).await.unwrap_or_default();
+                {
+                    let mut sup = supervisor.lock().unwrap();
+                    for character in characters_for_refresh {
+                        sup.spawn_character(
+                            character.character_id,
+                            pool_for_tray.clone(),
+                            app.handle().clone(),
+                            rate_limits_for_tray.clone(),
+                        );
+                    }
+                }
+
+                app.manage(supervisor);
 
                 let training_count_item = tauri::menu::MenuItem::with_id(
                     app,
@@ -344,7 +363,8 @@ pub fn run() {
             commands::settings::get_enabled_features,
             commands::settings::set_feature_enabled,
             commands::settings::get_optional_features,
-            commands::settings::get_character_feature_scope_status
+            commands::settings::get_character_feature_scope_status,
+            commands::esi_snapshot::get_esi_snapshot
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

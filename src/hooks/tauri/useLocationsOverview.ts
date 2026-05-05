@@ -9,7 +9,6 @@ export function useAllCharactersLocations() {
   return useQuery<CharacterLocationOverview[]>({
     queryKey: queryKeys.locationsOverview(),
     queryFn: () => getAllCharactersLocations(),
-    refetchInterval: 60_000,
     staleTime: 55_000,
   });
 }

@@ -1,9 +1,9 @@
 ---
 name: esi-phase-1
-status: backlog
+status: complete
 created: 2026-05-05T00:18:53Z
 updated: 2026-05-05T00:18:53Z
-progress: 0%
+progress: 100%
 prd: .claude/prds/esi-revamp.md
 github: (will be set on sync)
 ---

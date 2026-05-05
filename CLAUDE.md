@@ -24,7 +24,7 @@ pnpm verify          # typegen + lint:full + format:check:all + typecheck
 
 ## Critical Rules
 
-- **Never hand-edit `src/generated/`** — auto-generated from Rust structs. Run `pnpm typegen` after any Rust struct changes.
+- **Never hand-edit `src/generated/`** — auto-generated. `commands.ts`/`types.ts` by tauri-typegen (`pnpm typegen`); `events.ts` by typeshare (`pnpm typeshare`). Run the appropriate command after Rust struct changes.
 - **`routeTree.gen.ts` is generated** — run `pnpm generate-route-tree` or let Vite plugin handle it.
 - Husky + lint-staged enforce eslint/prettier on TS and clippy/fmt on Rust pre-commit.
 

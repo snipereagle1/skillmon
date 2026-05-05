@@ -15,9 +15,7 @@ function CharacterDetailLayout() {
 
   const { data: accountsData, isLoading, error } = useAccountsAndCharacters();
   const { data: characterSkills } = useCharacterSkills(characterIdNum);
-  const { data: selectedSkillQueue } = useSkillQueue(characterIdNum, {
-    refetchInterval: 60_000,
-  });
+  const { data: selectedSkillQueue } = useSkillQueue(characterIdNum);
 
   const allCharacters = useMemo(() => {
     if (!accountsData) return [];

@@ -1,0 +1,2 @@
+[typescript]
+output_file = "src/generated/events.ts"

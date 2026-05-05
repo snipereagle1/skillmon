@@ -1,4 +1,5 @@
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use tauri::State;
@@ -8,6 +9,7 @@ use crate::cache;
 use crate::db;
 use crate::esi;
 use crate::esi_helpers;
+use crate::refresh;
 use crate::skill_queue;
 use crate::utils;
 
@@ -452,11 +454,16 @@ pub async fn force_refresh_skill_queue(
     app: tauri::AppHandle,
     pool: State<'_, db::Pool>,
     rate_limits: State<'_, esi::RateLimitStore>,
+    supervisor: State<'_, Arc<Mutex<refresh::RefreshSupervisor>>>,
     character_id: i64,
 ) -> Result<CharacterSkillQueue, String> {
     cache::clear_character_cache(&pool, character_id)
         .await
         .map_err(|e| format!("Failed to clear cache: {}", e))?;
+
+    if let Ok(sup) = supervisor.lock() {
+        sup.poke(character_id);
+    }
 
     let character = db::get_character(&pool, character_id)
         .await

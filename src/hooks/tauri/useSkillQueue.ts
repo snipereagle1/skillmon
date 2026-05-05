@@ -5,10 +5,7 @@ import type { CharacterSkillQueue } from '@/generated/types';
 
 import { queryKeys } from './queryKeys';
 
-export function useSkillQueue(
-  characterId: number | null,
-  options?: { refetchInterval?: number | false }
-) {
+export function useSkillQueue(characterId: number | null) {
   return useQuery<CharacterSkillQueue>({
     queryKey: queryKeys.skillQueue(characterId),
     queryFn: async () => {
@@ -18,6 +15,5 @@ export function useSkillQueue(
       return await getSkillQueueForCharacter({ characterId });
     },
     enabled: characterId !== null,
-    refetchInterval: options?.refetchInterval,
   });
 }

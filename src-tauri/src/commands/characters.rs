@@ -1,7 +1,10 @@
+use std::sync::{Arc, Mutex};
+
 use serde::Serialize;
 use tauri::State;
 
 use crate::db;
+use crate::refresh;
 #[allow(dead_code)]
 #[derive(Debug, Clone, Serialize)]
 pub struct Character {
@@ -27,7 +30,15 @@ impl From<db::Character> for Character {
 }
 
 #[tauri::command]
-pub async fn logout_character(pool: State<'_, db::Pool>, character_id: i64) -> Result<(), String> {
+pub async fn logout_character(
+    pool: State<'_, db::Pool>,
+    supervisor: State<'_, Arc<Mutex<refresh::RefreshSupervisor>>>,
+    character_id: i64,
+) -> Result<(), String> {
+    if let Ok(mut sup) = supervisor.lock() {
+        sup.cancel_character(character_id);
+    }
+
     sqlx::query("DELETE FROM tokens WHERE character_id = ?")
         .bind(character_id)
         .execute(&*pool)
