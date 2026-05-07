@@ -7,7 +7,20 @@
       "Bash(rtk read *)",
       "Bash(rtk grep *)",
       "Bash(rtk wc *)",
-      "Bash(rtk ls *)"
+      "Bash(rtk ls *)",
+      "Bash(bash ~/.claude/skills/ccpm/references/scripts/epic-show.sh *)",
+      "Bash(typeshare *)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "Bash(rtk cargo check *)",
+      "Bash(pnpm typeshare *)",
+      "Bash(pnpm typegen *)",
+      "Bash(rtk git diff *)",
+      "Bash(rtk git log *)",
+      "Bash(rtk git show *)",
+      "Bash(rtk git stash list)",
+      "Bash(rtk git status *)",
+      "Bash(rtk git add *)"
     ]
   }
 }
