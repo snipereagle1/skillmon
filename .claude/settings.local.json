@@ -3,7 +3,11 @@
     "allow": [
       "Bash(cargo check *)",
       "Bash(pnpm typecheck *)",
-      "Bash(pnpm test *)"
+      "Bash(pnpm test *)",
+      "Bash(rtk read *)",
+      "Bash(rtk grep *)",
+      "Bash(rtk wc *)",
+      "Bash(rtk ls *)"
     ]
   }
 }
