@@ -1,9 +1,9 @@
 ---
 name: esi-phase-2.5
-status: backlog
+status: in_progress
 created: 2026-05-07T04:52:20Z
-updated: 2026-05-07T04:52:20Z
-progress: 0%
+updated: 2026-05-07T18:49:00Z
+progress: 86%
 prd: .claude/prds/esi-phase-2.5.md
 github: (will be set on sync)
 ---
@@ -103,12 +103,12 @@ Medium-large. 7 tasks, 3 parallel at start. Backend enrichment heaviest lift (ta
 
 ## Tasks Created
 
-- [ ] 001.md - Enrich queue/skills/attributes supervisor payloads + fix Ok(None) starvation (parallel: true)
-- [ ] 002.md - Enrich location/clones supervisor payloads + add ship/online/implants to supervisor (parallel: true)
-- [ ] 003.md - Rewrite get_esi_snapshot: all characters, all enriched data, DB-only (parallel: true)
-- [ ] 004.md - Replace tauri-typegen with typeshare: annotate structs, delete commands.ts, update scripts (depends on: 001, 002, 003)
-- [ ] 005.md - Rewrite esiEvents.ts as pure setters + rewrite mount hydration in \_\_root.tsx (depends on: 004)
-- [ ] 006.md - Update hooks: inline invoke calls, remove dead hooks, fix useOverview pattern (depends on: 004, 005)
+- [x] 001.md - Enrich queue/skills/attributes supervisor payloads + fix Ok(None) starvation (parallel: true)
+- [x] 002.md - Enrich location/clones supervisor payloads + add ship/online/implants to supervisor (parallel: true)
+- [x] 003.md - Rewrite get_esi_snapshot: all characters, all enriched data, DB-only (parallel: true)
+- [x] 004.md - Replace tauri-typegen with typeshare: annotate structs, delete commands.ts, update scripts (depends on: 001, 002, 003)
+- [x] 005.md - Rewrite esiEvents.ts as pure setters + rewrite mount hydration in \_\_root.tsx (depends on: 004)
+- [x] 006.md - Update hooks: inline invoke calls, remove dead hooks, fix useOverview pattern (depends on: 004, 005)
 - [ ] 007.md - Remove deleted Rust commands + final audit (depends on: 005, 006)
 
 Total tasks: 7

@@ -1,8 +1,8 @@
-import type { CloneResponse } from '@/generated/types';
+import type { CloneInfo } from '@/generated/types';
 import { useEsiStore } from '@/stores/esiStore';
 
 export function useClones(characterId: number | null): {
-  data: CloneResponse[];
+  data: CloneInfo[];
   isLoading: boolean;
   error: string | null;
 } {

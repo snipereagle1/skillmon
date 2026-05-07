@@ -1,35 +1,60 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invoke } from '@tauri-apps/api/core';
 
-import type {
-  AddCharacterToAccountParams,
-  CreateAccountParams,
-  DeleteAccountParams,
-  RemoveCharacterFromAccountParams,
-  ReorderAccountsParams,
-  ReorderCharactersInAccountParams,
-  ReorderUnassignedCharactersParams,
-  UpdateAccountNameParams,
-} from '@/generated/commands';
-import {
-  addCharacterToAccount,
-  createAccount,
-  deleteAccount,
-  getAccountsAndCharacters,
-  removeCharacterFromAccount,
-  reorderAccounts,
-  reorderCharactersInAccount,
-  reorderUnassignedCharacters,
-  updateAccountName,
-} from '@/generated/commands';
 import type { AccountsAndCharactersResponse } from '@/generated/types';
 
 import { queryKeys } from './queryKeys';
+
+interface CreateAccountParams {
+  [key: string]: unknown;
+  name: string;
+}
+
+interface UpdateAccountNameParams {
+  [key: string]: unknown;
+  accountId: number;
+  name: string;
+}
+
+interface DeleteAccountParams {
+  [key: string]: unknown;
+  accountId: number;
+}
+
+interface AddCharacterToAccountParams {
+  [key: string]: unknown;
+  characterId: number;
+  accountId: number;
+}
+
+interface RemoveCharacterFromAccountParams {
+  [key: string]: unknown;
+  characterId: number;
+}
+
+interface ReorderAccountsParams {
+  [key: string]: unknown;
+  accountIds: number[];
+}
+
+interface ReorderCharactersInAccountParams {
+  [key: string]: unknown;
+  accountId: number;
+  characterIds: number[];
+}
+
+interface ReorderUnassignedCharactersParams {
+  [key: string]: unknown;
+  characterIds: number[];
+}
 
 export function useAccountsAndCharacters() {
   return useQuery<AccountsAndCharactersResponse>({
     queryKey: queryKeys.accountsAndCharacters(),
     queryFn: async () => {
-      return await getAccountsAndCharacters();
+      return await invoke<AccountsAndCharactersResponse>(
+        'get_accounts_and_characters'
+      );
     },
   });
 }
@@ -39,7 +64,7 @@ export function useCreateAccount() {
 
   return useMutation({
     mutationFn: async (params: CreateAccountParams) => {
-      return await createAccount(params);
+      return await invoke('create_account', params);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -54,7 +79,7 @@ export function useUpdateAccountName() {
 
   return useMutation({
     mutationFn: async (params: UpdateAccountNameParams) => {
-      return await updateAccountName(params);
+      return await invoke('update_account_name', params);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -69,7 +94,7 @@ export function useDeleteAccount() {
 
   return useMutation({
     mutationFn: async (params: DeleteAccountParams) => {
-      return await deleteAccount(params);
+      return await invoke('delete_account', params);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -84,7 +109,7 @@ export function useAddCharacterToAccount() {
 
   return useMutation({
     mutationFn: async (params: AddCharacterToAccountParams) => {
-      return await addCharacterToAccount(params);
+      return await invoke('add_character_to_account', params);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -99,7 +124,7 @@ export function useRemoveCharacterFromAccount() {
 
   return useMutation({
     mutationFn: async (params: RemoveCharacterFromAccountParams) => {
-      return await removeCharacterFromAccount(params);
+      return await invoke('remove_character_from_account', params);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({
@@ -114,7 +139,7 @@ export function useReorderAccounts() {
 
   return useMutation({
     mutationFn: async (params: ReorderAccountsParams) => {
-      return await reorderAccounts(params);
+      return await invoke('reorder_accounts', params);
     },
     onMutate: async (params) => {
       const previousData =
@@ -165,7 +190,7 @@ export function useReorderCharactersInAccount() {
 
   return useMutation({
     mutationFn: async (params: ReorderCharactersInAccountParams) => {
-      return await reorderCharactersInAccount(params);
+      return await invoke('reorder_characters_in_account', params);
     },
     onMutate: async (params) => {
       const previousData =
@@ -222,7 +247,7 @@ export function useReorderUnassignedCharacters() {
 
   return useMutation({
     mutationFn: async (params: ReorderUnassignedCharactersParams) => {
-      return await reorderUnassignedCharacters(params);
+      return await invoke('reorder_unassigned_characters', params);
     },
     onMutate: async (params) => {
       const previousData =

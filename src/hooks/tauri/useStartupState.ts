@@ -1,6 +1,5 @@
+import { invoke } from '@tauri-apps/api/core';
 import { useEffect, useState } from 'react';
-
-import { isStartupComplete } from '@/generated/commands';
 
 export function useStartupState() {
   const [isStartingUp, setIsStartingUp] = useState(true);
@@ -11,7 +10,7 @@ export function useStartupState() {
     const setup = async () => {
       try {
         // Check initial startup status
-        const initialStatus = await isStartupComplete();
+        const initialStatus = await invoke<boolean>('is_startup_complete');
         setIsStartingUp(!initialStatus);
 
         // If already complete, no need to listen for events

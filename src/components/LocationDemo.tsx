@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query';
 import { Link } from '@tanstack/react-router';
+import { invoke } from '@tauri-apps/api/core';
 import { MapPin, RefreshCw, Rocket, Settings, ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
-import { getCharacterLocation } from '@/generated/commands';
+import type { CharacterLocation } from '@/generated/types';
 import { queryKeys } from '@/hooks/tauri/queryKeys';
 import { cn } from '@/lib/utils';
 
@@ -14,7 +15,10 @@ export function LocationDemo({ characterId }: { characterId: number }) {
 
   const { data, error, isLoading, refetch, isFetching } = useQuery({
     queryKey: queryKeys.location(characterId),
-    queryFn: () => getCharacterLocation({ characterId }),
+    queryFn: () =>
+      invoke<CharacterLocation>('get_character_location', {
+        characterId,
+      }),
     enabled: enabled,
     retry: false,
   });

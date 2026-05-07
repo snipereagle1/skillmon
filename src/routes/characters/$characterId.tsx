@@ -32,10 +32,10 @@ function CharacterDetailLayout() {
       return null;
     }
     const skillsSP = characterSkills.skills.reduce(
-      (sum, skill) => sum + skill.skillpoints_in_skill,
+      (sum, skill) => sum + skill.skillpointsInSkill,
       0
     );
-    const unallocatedSP = selectedSkillQueue.unallocated_sp ?? 0;
+    const unallocatedSP = selectedSkillQueue.unallocatedSp ?? 0;
     return skillsSP + unallocatedSP;
   }, [characterSkills, selectedSkillQueue]);
 

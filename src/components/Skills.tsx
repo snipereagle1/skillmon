@@ -4,6 +4,12 @@ import { match, P } from 'ts-pattern';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import type {
+  CharacterSkillResponse,
+  CharacterSkillsResponse,
+  SkillGroupResponse,
+  SkillsPayload,
+} from '@/generated/types';
 import { useCharacterSkills } from '@/hooks/tauri/useCharacterSkills';
 import { useSdeSkills } from '@/hooks/tauri/useSdeSkills';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
@@ -39,32 +45,84 @@ export function Skills({
     }) => state.openSkillDetail
   );
   const hasInitializedRef = useRef(false);
+  const normalizedData = useMemo(() => {
+    if (!data) return null;
+    if (isSdeMode) {
+      return data as CharacterSkillsResponse;
+    }
+
+    const payload = data as SkillsPayload;
+    const skills: CharacterSkillResponse[] = payload.skills.map((skill) => ({
+      skill_id: skill.skillId,
+      skill_name: skill.skillName ?? `Skill ${skill.skillId}`,
+      group_id: skill.groupId ?? 0,
+      group_name: skill.groupName ?? 'Unknown Group',
+      trained_skill_level: skill.trainedSkillLevel,
+      active_skill_level: skill.activeSkillLevel,
+      skillpoints_in_skill: skill.skillpointsInSkill,
+      is_in_queue: skill.isInQueue,
+      queue_level: undefined,
+      is_injected: skill.isInjected,
+    }));
+
+    const groupMap = new Map<number, SkillGroupResponse>();
+    for (const skill of skills) {
+      const current = groupMap.get(skill.group_id);
+      if (current) {
+        current.total_levels += 5;
+        current.trained_levels += skill.trained_skill_level;
+        if (skill.trained_skill_level > 0) current.has_trained_skills = true;
+      } else {
+        groupMap.set(skill.group_id, {
+          group_id: skill.group_id,
+          group_name: skill.group_name,
+          total_levels: 5,
+          trained_levels: skill.trained_skill_level,
+          has_trained_skills: skill.trained_skill_level > 0,
+        });
+      }
+    }
+
+    return {
+      character_id: payload.characterId,
+      skills,
+      groups: Array.from(groupMap.values()).sort((a, b) =>
+        a.group_name.localeCompare(b.group_name)
+      ),
+    } satisfies CharacterSkillsResponse;
+  }, [data, isSdeMode]);
 
   useEffect(() => {
-    if (data && selectedGroupId === null && !hasInitializedRef.current) {
+    if (
+      normalizedData &&
+      selectedGroupId === null &&
+      !hasInitializedRef.current
+    ) {
       hasInitializedRef.current = true;
-      const groupWithSkills = data.groups.find((g) => g.has_trained_skills);
-      const defaultGroup = groupWithSkills || data.groups[0];
+      const groupWithSkills = normalizedData.groups.find(
+        (g) => g.has_trained_skills
+      );
+      const defaultGroup = groupWithSkills || normalizedData.groups[0];
       if (defaultGroup) {
         startTransition(() => {
           setSelectedGroupId(defaultGroup.group_id);
         });
       }
     }
-  }, [data, selectedGroupId]);
+  }, [normalizedData, selectedGroupId]);
 
   // Calculate planned levels per group
   const plannedLevelsPerGroup = useMemo(() => {
-    if (!plannedSkills || !data) return new Map<number, number>();
+    if (!plannedSkills || !normalizedData) return new Map<number, number>();
     const map = new Map<number, number>();
-    data.skills.forEach((skill) => {
+    normalizedData.skills.forEach((skill) => {
       const plannedLevel = plannedSkills.get(skill.skill_id) || 0;
       if (plannedLevel > 0) {
         map.set(skill.group_id, (map.get(skill.group_id) || 0) + plannedLevel);
       }
     });
     return map;
-  }, [plannedSkills, data]);
+  }, [plannedSkills, normalizedData]);
 
   if (isLoading) {
     return (
@@ -85,7 +143,7 @@ export function Skills({
     );
   }
 
-  if (!data) {
+  if (!normalizedData) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-muted-foreground">No skill data available</p>
@@ -99,12 +157,12 @@ export function Skills({
     selectedGroupId,
   })
     .with({ searchQuery: P.select(P.when((q: string) => q.length > 0)) }, (q) =>
-      data.skills.filter((s) =>
+      normalizedData.skills.filter((s) =>
         s.skill_name.toLowerCase().includes(q.toLowerCase())
       )
     )
     .with({ selectedGroupId: P.select(P.not(null)) }, (id) =>
-      data.skills.filter((s) => s.group_id === id)
+      normalizedData.skills.filter((s) => s.group_id === id)
     )
     .otherwise(() => []);
 
@@ -183,7 +241,7 @@ export function Skills({
       {/* Top section: Skill groups */}
       <div className="border-b border-border p-2 shrink-0 overflow-y-auto max-h-[40vh]">
         <div className="columns-1 @[520px]:columns-2 @[865px]:columns-3 gap-1.5">
-          {data.groups.map((group) => (
+          {normalizedData.groups.map((group) => (
             <div key={group.group_id} className="break-inside-avoid mb-1.5">
               <SkillCategoryItem
                 group={group}

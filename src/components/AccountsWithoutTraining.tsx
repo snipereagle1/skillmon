@@ -1,5 +1,5 @@
 import { useAccountsAndCharacters } from '@/hooks/tauri/useAccountsAndCharacters';
-import { useTrainingCharactersOverview } from '@/hooks/tauri/useOverview';
+import { useEsiStore } from '@/stores/esiStore';
 
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Skeleton } from './ui/skeleton';
@@ -7,10 +7,9 @@ import { Skeleton } from './ui/skeleton';
 export function AccountsWithoutTraining() {
   const { data: accountsData, isLoading: accountsLoading } =
     useAccountsAndCharacters();
-  const { data: trainingCharacters, isLoading: trainingLoading } =
-    useTrainingCharactersOverview();
+  const queues = useEsiStore((state) => state.queues);
 
-  if (accountsLoading || trainingLoading) {
+  if (accountsLoading) {
     return (
       <Card>
         <CardHeader>
@@ -29,7 +28,9 @@ export function AccountsWithoutTraining() {
 
   const accounts = accountsData?.accounts ?? [];
   const trainingCharacterIds = new Set(
-    (trainingCharacters ?? []).map((c) => c.character_id)
+    Object.entries(queues)
+      .filter(([, slice]) => (slice.data?.queue.length ?? 0) > 0)
+      .map(([id]) => Number(id))
   );
 
   const idleAccounts = accounts.filter(

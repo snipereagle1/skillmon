@@ -1,12 +1,12 @@
 import { create } from 'zustand';
 
 import type {
-  CharacterAttributesBreakdown,
-  CharacterLocationOverview,
-  CharacterSkillQueue,
-  CharacterSkillsResponse,
-  CloneResponse,
+  AttributesPayload,
+  CloneInfo,
+  LocationPayload,
+  QueuePayload,
   Remap,
+  SkillsPayload,
 } from '@/generated/types';
 
 type ResourceSlice<T> = {
@@ -24,18 +24,18 @@ type ResourceKey =
   | 'remaps';
 
 interface EsiStoreState {
-  queues: Record<number, ResourceSlice<CharacterSkillQueue>>;
-  skills: Record<number, ResourceSlice<CharacterSkillsResponse>>;
-  locations: Record<number, ResourceSlice<CharacterLocationOverview>>;
-  attributes: Record<number, ResourceSlice<CharacterAttributesBreakdown>>;
-  clones: Record<number, ResourceSlice<CloneResponse[]>>;
+  queues: Record<number, ResourceSlice<QueuePayload>>;
+  skills: Record<number, ResourceSlice<SkillsPayload>>;
+  locations: Record<number, ResourceSlice<LocationPayload>>;
+  attributes: Record<number, ResourceSlice<AttributesPayload>>;
+  clones: Record<number, ResourceSlice<CloneInfo[]>>;
   remaps: Record<number, ResourceSlice<Remap[]>>;
 
-  setQueue(characterId: number, data: CharacterSkillQueue): void;
-  setSkills(characterId: number, data: CharacterSkillsResponse): void;
-  setLocation(characterId: number, data: CharacterLocationOverview): void;
-  setAttributes(characterId: number, data: CharacterAttributesBreakdown): void;
-  setClones(characterId: number, data: CloneResponse[]): void;
+  setQueue(characterId: number, data: QueuePayload): void;
+  setSkills(characterId: number, data: SkillsPayload): void;
+  setLocation(characterId: number, data: LocationPayload): void;
+  setAttributes(characterId: number, data: AttributesPayload): void;
+  setClones(characterId: number, data: CloneInfo[]): void;
   setRemaps(characterId: number, data: Remap[]): void;
   setError(resource: ResourceKey, characterId: number, error: string): void;
   clearCharacter(characterId: number): void;

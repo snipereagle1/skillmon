@@ -82,8 +82,8 @@ export function AccountSidebar() {
       const slice = queues[character.character_id];
       if (slice?.data) {
         map.set(character.character_id, {
-          skillQueue: slice.data.skill_queue,
-          isPaused: slice.data.is_paused,
+          skillQueue: slice.data.queue,
+          isPaused: slice.data.isPaused,
         });
       }
     }

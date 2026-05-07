@@ -1,6 +1,6 @@
+import { invoke } from '@tauri-apps/api/core';
 import { startTransition, useEffect, useMemo, useState } from 'react';
 
-import { getTypeNames } from '@/generated/commands';
 import { useClones } from '@/hooks/tauri/useClones';
 
 import { CloneRow } from './CloneRow';
@@ -18,7 +18,7 @@ export function Clones({ characterId }: ClonesProps) {
   const allImplantIds = useMemo(() => {
     const ids = new Set<number>();
     clones.forEach((clone) => {
-      clone.implants.forEach((implant) => ids.add(implant.implant_type_id));
+      clone.implants.forEach((implant) => ids.add(implant.typeId));
     });
     return Array.from(ids);
   }, [clones]);
@@ -32,7 +32,9 @@ export function Clones({ characterId }: ClonesProps) {
     }
 
     let cancelled = false;
-    getTypeNames({ typeIds: allImplantIds })
+    invoke<{ type_id: number; name: string }[]>('get_type_names', {
+      typeIds: allImplantIds,
+    })
       .then((names) => {
         if (cancelled) return;
         const map = new Map<number, string>();
@@ -54,8 +56,8 @@ export function Clones({ characterId }: ClonesProps) {
   const sortedClones = useMemo(() => {
     const sorted = [...clones];
     sorted.sort((a, b) => {
-      if (a.is_current && !b.is_current) return -1;
-      if (!a.is_current && b.is_current) return 1;
+      if (a.isCurrent && !b.isCurrent) return -1;
+      if (!a.isCurrent && b.isCurrent) return 1;
       return 0;
     });
     return sorted;

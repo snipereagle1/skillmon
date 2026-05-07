@@ -1,6 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-
-import { dismissNotification } from '@/generated/commands';
+import { invoke } from '@tauri-apps/api/core';
 
 import { queryKeys } from './queryKeys';
 
@@ -14,7 +13,7 @@ export function useDismissNotification() {
       notificationId: number;
       characterId?: number | null;
     }) => {
-      return await dismissNotification({ notificationId });
+      return invoke<void>('dismiss_notification', { notificationId });
     },
     onSuccess: (_, { characterId }) => {
       queryClient.invalidateQueries({

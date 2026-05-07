@@ -108,7 +108,7 @@ export function LocationTable() {
           </TableHeader>
           <TableBody>
             {characters.map((char) => (
-              <LocationTableRow key={char.character_id} character={char} />
+              <LocationTableRow key={char.characterId} character={char} />
             ))}
           </TableBody>
         </Table>

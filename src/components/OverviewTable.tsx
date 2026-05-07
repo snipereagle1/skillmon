@@ -6,18 +6,70 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useTrainingCharactersOverview } from '@/hooks/tauri/useOverview';
+import { useAccountsAndCharacters } from '@/hooks/tauri/useAccountsAndCharacters';
+import { useEsiStore } from '@/stores/esiStore';
 
-import { OverviewTableRow } from './OverviewTableRow';
+import {
+  OverviewTableRow,
+  type TrainingOverviewRowData,
+} from './OverviewTableRow';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Skeleton } from './ui/skeleton';
 
 export function OverviewTable() {
-  const {
-    data: trainingCharacters,
-    isLoading,
-    error,
-  } = useTrainingCharactersOverview();
+  const { data: accountsData, isLoading, error } = useAccountsAndCharacters();
+  const queues = useEsiStore((state) => state.queues);
+
+  const allCharacters = accountsData
+    ? [
+        ...accountsData.unassigned_characters.map((c) => ({
+          ...c,
+          account_name: undefined,
+        })),
+        ...accountsData.accounts.flatMap((account) =>
+          account.characters.map((character) => ({
+            ...character,
+            account_name: account.name,
+          }))
+        ),
+      ]
+    : [];
+
+  const trainingCharacters: TrainingOverviewRowData[] = allCharacters.reduce(
+    (rows, character) => {
+      const queue = queues[character.character_id]?.data;
+      if (!queue || queue.queue.length === 0) return rows;
+      const current = queue.queue[0];
+      const firstStart = queue.queue[0]?.startDate;
+      const lastFinish = queue.queue[queue.queue.length - 1]?.finishDate;
+      let queueTimeRemainingSeconds: number | undefined;
+      if (firstStart && lastFinish) {
+        const seconds =
+          (new Date(lastFinish).getTime() - new Date(firstStart).getTime()) /
+          1000;
+        queueTimeRemainingSeconds = Number.isFinite(seconds)
+          ? Math.max(0, Math.floor(seconds))
+          : undefined;
+      }
+
+      const spPerHour =
+        current?.spPerMinute != null ? current.spPerMinute * 60 : 0;
+      rows.push({
+        characterId: character.character_id,
+        characterName: queue.characterName,
+        accountName: character.account_name,
+        queueTimeRemainingSeconds,
+        currentSkillName: current?.skillName,
+        currentSkillLevel: current?.finishedLevel,
+        spPerHour,
+        isOmega: queue.isOmega,
+        hasImplants: false,
+        hasBooster: false,
+      });
+      return rows;
+    },
+    [] as TrainingOverviewRowData[]
+  );
 
   if (isLoading) {
     return (
@@ -114,7 +166,7 @@ export function OverviewTable() {
           </TableHeader>
           <TableBody>
             {trainingCharacters.map((char) => (
-              <OverviewTableRow key={char.character_id} character={char} />
+              <OverviewTableRow key={char.characterId} character={char} />
             ))}
           </TableBody>
         </Table>

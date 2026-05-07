@@ -1,8 +1,8 @@
-import type { CharacterSkillsResponse } from '@/generated/types';
+import type { SkillsPayload } from '@/generated/types';
 import { useEsiStore } from '@/stores/esiStore';
 
 export function useCharacterSkills(characterId: number | null): {
-  data: CharacterSkillsResponse | null;
+  data: SkillsPayload | null;
   isLoading: boolean;
   error: string | null;
 } {

@@ -1,22 +1,21 @@
-import type { CloneResponse } from '@/generated/types';
+import type { CloneInfo } from '@/generated/types';
 
 import { ImplantIcon } from './ImplantIcon';
 
 interface CloneRowProps {
-  clone: CloneResponse;
+  clone: CloneInfo;
   implantNames: Map<number, string>;
 }
 
 export function CloneRow({ clone, implantNames }: CloneRowProps) {
   const displayName =
-    clone.name ||
-    (clone.clone_id ? `Clone ${clone.clone_id}` : 'Current Clone');
-  const bgColor = clone.is_current ? 'bg-muted/50' : 'bg-background';
+    clone.name || (clone.cloneId ? `Clone ${clone.cloneId}` : 'Current Clone');
+  const bgColor = clone.isCurrent ? 'bg-muted/50' : 'bg-background';
 
   return (
     <div
       className={`border rounded-lg p-3 ${bgColor} ${
-        clone.is_current ? 'border-primary' : 'border-border'
+        clone.isCurrent ? 'border-primary' : 'border-border'
       }`}
     >
       <div className="flex items-start gap-3">
@@ -38,17 +37,17 @@ export function CloneRow({ clone, implantNames }: CloneRowProps) {
         <div className="flex-1 min-w-0">
           <div className="font-medium text-foreground">{displayName}</div>
           <div className="text-sm text-muted-foreground mt-1">
-            {clone.location_name || 'Unknown Location'}
+            {clone.locationName || 'Unknown Location'}
           </div>
           {clone.implants.length > 0 ? (
             <div className="flex flex-wrap gap-1.5 mt-2">
               {clone.implants.map((implant) => (
                 <ImplantIcon
-                  key={implant.implant_type_id}
-                  implantId={implant.implant_type_id}
+                  key={implant.typeId}
+                  implantId={implant.typeId}
                   name={
-                    implantNames.get(implant.implant_type_id) ||
-                    `Implant ${implant.implant_type_id}`
+                    implantNames.get(implant.typeId) ||
+                    `Implant ${implant.typeId}`
                   }
                 />
               ))}

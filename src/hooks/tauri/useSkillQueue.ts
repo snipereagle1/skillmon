@@ -1,8 +1,8 @@
-import type { CharacterSkillQueue } from '@/generated/types';
+import type { QueuePayload } from '@/generated/types';
 import { useEsiStore } from '@/stores/esiStore';
 
 export function useSkillQueue(characterId: number | null): {
-  data: CharacterSkillQueue | null;
+  data: QueuePayload | null;
   isLoading: boolean;
   error: string | null;
 } {

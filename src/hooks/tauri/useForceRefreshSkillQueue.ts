@@ -1,17 +1,14 @@
 import { useMutation } from '@tanstack/react-query';
+import { invoke } from '@tauri-apps/api/core';
 
-import { forceRefreshSkillQueue } from '@/generated/commands';
 import { useEsiStore } from '@/stores/esiStore';
 
 export function useForceRefreshSkillQueue() {
-  const { setQueue, setError } = useEsiStore();
+  const { setError } = useEsiStore();
 
   return useMutation({
     mutationFn: async (characterId: number) => {
-      return await forceRefreshSkillQueue({ characterId });
-    },
-    onSuccess: (data, characterId) => {
-      setQueue(characterId, data);
+      return await invoke('force_refresh_skill_queue', { characterId });
     },
     onError: (err, characterId) => {
       setError('queues', characterId, String(err));

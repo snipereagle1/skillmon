@@ -1,8 +1,8 @@
-import type { CharacterAttributesBreakdown } from '@/generated/types';
+import type { AttributesPayload } from '@/generated/types';
 import { useEsiStore } from '@/stores/esiStore';
 
 export function useAttributes(characterId: number | null): {
-  data: CharacterAttributesBreakdown | null;
+  data: AttributesPayload | null;
   isLoading: boolean;
   error: string | null;
 } {

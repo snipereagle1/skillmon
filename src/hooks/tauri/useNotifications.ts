@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import { invoke } from '@tauri-apps/api/core';
 
-import { getNotifications } from '@/generated/commands';
 import type { NotificationResponse } from '@/generated/types';
 
 import { queryKeys } from './queryKeys';
@@ -12,7 +12,7 @@ export function useNotifications(
   return useQuery<NotificationResponse[]>({
     queryKey: queryKeys.notifications(characterId, status),
     queryFn: async () => {
-      return await getNotifications({
+      return invoke<NotificationResponse[]>('get_notifications', {
         characterId: characterId ?? undefined,
         status: status ?? undefined,
       });

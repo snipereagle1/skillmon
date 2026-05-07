@@ -1,20 +1,15 @@
 import { useQueryClient } from '@tanstack/react-query';
+import { invoke } from '@tauri-apps/api/core';
 import { useEffect } from 'react';
 
-import {
-  getCharacterAttributesBreakdown,
-  getCharacterRemaps,
-  getCharacterSkillsWithGroups,
-  getClones,
-  getSkillQueueForCharacter,
-} from '@/generated/commands';
+import type { CharacterSnapshot } from '@/generated/types';
 import { useEsiStore } from '@/stores/esiStore';
 
 import { queryKeys } from './queryKeys';
 
 export function useAuthEvents() {
   const queryClient = useQueryClient();
-  const { setQueue, setSkills, setAttributes, setClones, setRemaps, setError } =
+  const { setQueue, setSkills, setAttributes, setClones, setRemaps } =
     useEsiStore();
 
   useEffect(() => {
@@ -26,28 +21,22 @@ export function useAuthEvents() {
 
         const unlistenSuccess = await listen<number>(
           'auth-success',
-          async (event) => {
-            const characterId = event.payload;
-            // Hydrate store with fresh data for newly authenticated character
-            await Promise.allSettled([
-              getSkillQueueForCharacter({ characterId })
-                .then((data) => setQueue(characterId, data))
-                .catch((err) => setError('queues', characterId, String(err))),
-              getCharacterSkillsWithGroups({ characterId })
-                .then((data) => setSkills(characterId, data))
-                .catch((err) => setError('skills', characterId, String(err))),
-              getCharacterAttributesBreakdown({ characterId })
-                .then((data) => setAttributes(characterId, data))
-                .catch((err) =>
-                  setError('attributes', characterId, String(err))
-                ),
-              getClones({ characterId })
-                .then((data) => setClones(characterId, data))
-                .catch((err) => setError('clones', characterId, String(err))),
-              getCharacterRemaps({ characterId })
-                .then((data) => setRemaps(characterId, data))
-                .catch((err) => setError('remaps', characterId, String(err))),
-            ]);
+          async () => {
+            try {
+              const snapshots =
+                await invoke<CharacterSnapshot[]>('get_esi_snapshot');
+              for (const snapshot of snapshots) {
+                const characterId = snapshot.characterId;
+                if (snapshot.queue) setQueue(characterId, snapshot.queue);
+                if (snapshot.skills) setSkills(characterId, snapshot.skills);
+                if (snapshot.attributes)
+                  setAttributes(characterId, snapshot.attributes);
+                setClones(characterId, snapshot.clones);
+                setRemaps(characterId, snapshot.remaps);
+              }
+            } catch (err) {
+              console.error('Failed to hydrate ESI snapshot after auth:', err);
+            }
             await queryClient.invalidateQueries({
               queryKey: queryKeys.accountsAndCharacters(),
             });

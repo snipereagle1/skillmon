@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { invoke } from '@tauri-apps/api/core';
 
-import { logoutCharacter } from '@/generated/commands';
 import { useEsiStore } from '@/stores/esiStore';
 
 import { queryKeys } from './queryKeys';
@@ -11,7 +11,7 @@ export function useLogoutCharacter() {
 
   return useMutation({
     mutationFn: async (characterId: number) => {
-      return await logoutCharacter({ characterId });
+      return invoke<void>('logout_character', { characterId });
     },
     onSuccess: (_, characterId) => {
       clearCharacter(characterId);

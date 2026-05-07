@@ -9,7 +9,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
-import type { CharacterLocationOverview } from '@/generated/types';
+import type { LocationPayload } from '@/generated/types';
 import { cn } from '@/lib/utils';
 
 interface LocationCellProps {
@@ -38,11 +38,11 @@ function LocationCell({ system, region }: LocationCellProps) {
 }
 
 interface LocationTableRowProps {
-  character: CharacterLocationOverview;
+  character: LocationPayload;
 }
 
 export function LocationTableRow({ character }: LocationTableRowProps) {
-  if (!character.has_location_scope) {
+  if (!character.hasLocationScope) {
     return (
       <TableRow>
         <TableCell className="text-center opacity-50">
@@ -51,18 +51,18 @@ export function LocationTableRow({ character }: LocationTableRowProps) {
         <TableCell className="font-medium opacity-50">
           <Link
             to="/characters/$characterId"
-            params={{ characterId: character.character_id.toString() }}
+            params={{ characterId: character.characterId.toString() }}
             className="flex items-center gap-3 hover:underline"
           >
             <img
-              src={`https://images.evetech.net/characters/${character.character_id}/portrait?size=32`}
-              alt={character.character_name}
+              src={`https://images.evetech.net/characters/${character.characterId}/portrait?size=32`}
+              alt={character.characterName}
               className="h-8 w-8 rounded object-contain shrink-0"
               width={32}
               height={32}
               loading="lazy"
             />
-            <span>{character.character_name}</span>
+            <span>{character.characterName}</span>
           </Link>
         </TableCell>
         <TableCell colSpan={5}>
@@ -75,8 +75,8 @@ export function LocationTableRow({ character }: LocationTableRowProps) {
     );
   }
 
-  const isOnline = character.is_online ?? false;
-  const isDocked = character.is_docked ?? false;
+  const isOnline = character.isOnline ?? false;
+  const isDocked = character.isDocked ?? false;
 
   const { dockedIcon, dockedLabel } = match({ isDocked, isOnline })
     .with({ isDocked: true }, () => ({
@@ -115,18 +115,18 @@ export function LocationTableRow({ character }: LocationTableRowProps) {
       <TableCell className="font-medium">
         <Link
           to="/characters/$characterId"
-          params={{ characterId: character.character_id.toString() }}
+          params={{ characterId: character.characterId.toString() }}
           className="flex items-center gap-3 hover:underline"
         >
           <img
-            src={`https://images.evetech.net/characters/${character.character_id}/portrait?size=32`}
-            alt={character.character_name}
+            src={`https://images.evetech.net/characters/${character.characterId}/portrait?size=32`}
+            alt={character.characterName}
             className="h-8 w-8 rounded object-contain shrink-0"
             width={32}
             height={32}
             loading="lazy"
           />
-          <span>{character.character_name}</span>
+          <span>{character.characterName}</span>
         </Link>
       </TableCell>
       <TableCell className="text-center">
@@ -138,18 +138,18 @@ export function LocationTableRow({ character }: LocationTableRowProps) {
         </Tooltip>
       </TableCell>
       <TableCell>
-        {character.ship_type_id && character.ship_name ? (
+        {character.shipTypeId && character.shipName ? (
           <div className="flex items-center gap-2">
             <img
-              src={`https://images.evetech.net/types/${character.ship_type_id}/render?size=32`}
-              alt={character.ship_type_name ?? ''}
+              src={`https://images.evetech.net/types/${character.shipTypeId}/render?size=32`}
+              alt={character.shipTypeName ?? ''}
               className="h-8 w-8 rounded object-contain"
             />
             <span>
-              {character.ship_name}
-              {character.ship_type_name && (
+              {character.shipName}
+              {character.shipTypeName && (
                 <span className="text-muted-foreground ml-1">
-                  · {character.ship_type_name}
+                  · {character.shipTypeName}
                 </span>
               )}
             </span>
@@ -174,7 +174,7 @@ export function LocationTableRow({ character }: LocationTableRowProps) {
             {hasImplants ? (
               <ul className="space-y-0.5">
                 {character.implants.map((implant) => (
-                  <li key={implant.type_id}>{implant.name}</li>
+                  <li key={implant.typeId}>{implant.name}</li>
                 ))}
               </ul>
             ) : (
@@ -185,21 +185,21 @@ export function LocationTableRow({ character }: LocationTableRowProps) {
       </TableCell>
       <TableCell>
         <LocationCell
-          system={character.solar_system_name}
-          region={character.region_name}
+          system={character.solarSystemName}
+          region={character.regionName}
         />
       </TableCell>
       <TableCell>
-        {(character.station_name ?? character.structure_name) ? (
+        {(character.stationName ?? character.structureName) ? (
           <div className="flex items-center gap-2">
-            {character.structure_type_id && (
+            {character.structureTypeId && (
               <img
-                src={`https://images.evetech.net/types/${character.structure_type_id}/render?size=32`}
+                src={`https://images.evetech.net/types/${character.structureTypeId}/render?size=32`}
                 alt=""
                 className="h-8 w-8 rounded object-contain"
               />
             )}
-            <span>{character.station_name ?? character.structure_name}</span>
+            <span>{character.stationName ?? character.structureName}</span>
           </div>
         ) : (
           <span className="text-muted-foreground">—</span>

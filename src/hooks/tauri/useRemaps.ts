@@ -1,17 +1,25 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invoke } from '@tauri-apps/api/core';
 
-import type { SaveRemapParams } from '@/generated/commands';
-import {
-  deleteRemap,
-  getCharacterAttributesBreakdown,
-  getCharacterRemaps,
-  getPlanRemaps,
-  saveRemap,
-} from '@/generated/commands';
 import type { Remap } from '@/generated/types';
 import { useEsiStore } from '@/stores/esiStore';
 
 import { queryKeys } from './queryKeys';
+
+interface SaveRemapParams {
+  [key: string]: unknown;
+  characterId?: number;
+  planId?: number;
+  afterSkillTypeId?: number;
+  afterSkillLevel?: number;
+  attributes: {
+    charisma: number;
+    intelligence: number;
+    memory: number;
+    perception: number;
+    willpower: number;
+  };
+}
 
 export function useCharacterRemaps(characterId: number | null): {
   data: Remap[];
@@ -34,7 +42,7 @@ export function usePlanRemaps(planId: number | null) {
     queryKey: queryKeys.remaps.plan(planId),
     queryFn: async () => {
       if (planId === null) return [];
-      return await getPlanRemaps({ planId });
+      return await invoke<Remap[]>('get_plan_remaps', { planId });
     },
     enabled: planId !== null,
   });
@@ -42,23 +50,20 @@ export function usePlanRemaps(planId: number | null) {
 
 export function useSaveRemap() {
   const queryClient = useQueryClient();
-  const { setAttributes, setRemaps, setError } = useEsiStore();
+  const { setRemaps, setError } = useEsiStore();
 
   return useMutation({
     mutationFn: async (params: SaveRemapParams) => {
-      return await saveRemap(params);
+      return await invoke('save_remap', params);
     },
     onSuccess: async (_, params) => {
       if (params.characterId) {
         const id = params.characterId;
-        await Promise.allSettled([
-          getCharacterAttributesBreakdown({ characterId: id })
-            .then((data) => setAttributes(id, data))
-            .catch((err) => setError('attributes', id, String(err))),
-          getCharacterRemaps({ characterId: id })
-            .then((data) => setRemaps(id, data))
-            .catch((err) => setError('remaps', id, String(err))),
-        ]);
+        await invoke<Remap[]>('get_character_remaps', {
+          characterId: id,
+        })
+          .then((data) => setRemaps(id, data))
+          .catch((err) => setError('remaps', id, String(err)));
       }
       if (params.planId) {
         queryClient.invalidateQueries({
@@ -74,7 +79,7 @@ export function useSaveRemap() {
 
 export function useDeleteRemap() {
   const queryClient = useQueryClient();
-  const { setAttributes, setRemaps, setError } = useEsiStore();
+  const { setRemaps, setError } = useEsiStore();
 
   return useMutation({
     mutationFn: async (params: {
@@ -82,20 +87,17 @@ export function useDeleteRemap() {
       characterId?: number | null;
       planId?: number | null;
     }) => {
-      await deleteRemap({ remapId: params.remapId });
+      await invoke('delete_remap', { remapId: params.remapId });
       return params;
     },
     onSuccess: async (params) => {
       if (params.characterId) {
         const id = params.characterId;
-        await Promise.allSettled([
-          getCharacterAttributesBreakdown({ characterId: id })
-            .then((data) => setAttributes(id, data))
-            .catch((err) => setError('attributes', id, String(err))),
-          getCharacterRemaps({ characterId: id })
-            .then((data) => setRemaps(id, data))
-            .catch((err) => setError('remaps', id, String(err))),
-        ]);
+        await invoke<Remap[]>('get_character_remaps', {
+          characterId: id,
+        })
+          .then((data) => setRemaps(id, data))
+          .catch((err) => setError('remaps', id, String(err)));
       }
       if (params.planId) {
         queryClient.invalidateQueries({

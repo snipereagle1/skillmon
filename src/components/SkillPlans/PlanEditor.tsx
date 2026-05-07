@@ -5,6 +5,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { useQueryClient } from '@tanstack/react-query';
+import { invoke } from '@tauri-apps/api/core';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
@@ -30,7 +31,6 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
-import { exportSkillPlanText, exportSkillPlanXml } from '@/generated/commands';
 import type { ValidationResponse } from '@/generated/types';
 import { queryKeys } from '@/hooks/tauri/queryKeys';
 import { usePlanRemaps } from '@/hooks/tauri/useRemaps';
@@ -278,7 +278,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
     setIsExportingText(true);
     try {
       console.log('Fetching plan text...');
-      const text = await exportSkillPlanText({ planId });
+      const text = await invoke<string>('export_skill_plan_text', { planId });
       console.log('Plan text fetched, opening save dialog...');
       const filePath = await save({
         title: 'Save Skill Plan',
@@ -316,7 +316,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
     setIsExportingXml(true);
     try {
       console.log('Fetching plan XML...');
-      const xml = await exportSkillPlanXml({ planId });
+      const xml = await invoke<string>('export_skill_plan_xml', { planId });
       console.log('Plan XML fetched, opening save dialog...');
       const filePath = await save({
         title: 'Save Skill Plan',
@@ -349,7 +349,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
     if (!data) return;
     setIsCopyingText(true);
     try {
-      const text = await exportSkillPlanText({ planId });
+      const text = await invoke<string>('export_skill_plan_text', { planId });
       await writeText(text);
     } catch (err) {
       console.error('Failed to copy to clipboard:', err);

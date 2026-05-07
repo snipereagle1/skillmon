@@ -1,5 +1,6 @@
 import { useIsFetching, useQueryClient } from '@tanstack/react-query';
 import { createRootRoute, Link, Outlet } from '@tanstack/react-router';
+import { invoke } from '@tauri-apps/api/core';
 import { check } from '@tauri-apps/plugin-updater';
 import { Download } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -12,15 +13,7 @@ import { Button } from '@/components/ui/button';
 import { NavigationTabs } from '@/components/ui/navigation-tabs';
 import { Toaster } from '@/components/ui/sonner';
 import { Spinner } from '@/components/ui/spinner';
-import {
-  getAccountsAndCharacters,
-  getAllCharactersLocations,
-  getCharacterAttributesBreakdown,
-  getCharacterRemaps,
-  getCharacterSkillsWithGroups,
-  getClones,
-  getSkillQueueForCharacter,
-} from '@/generated/commands';
+import type { CharacterSnapshot } from '@/generated/types';
 import { FeatureId } from '@/generated/types';
 import { useAuthEvents } from '@/hooks/tauri/useAuthEvents';
 import { useEnabledFeatures } from '@/hooks/tauri/useSettings';
@@ -36,15 +29,6 @@ function RootComponent() {
   const { isStartingUp } = useStartupState();
   const isFetching = useIsFetching();
   const queryClient = useQueryClient();
-  const {
-    setQueue,
-    setSkills,
-    setLocation,
-    setAttributes,
-    setClones,
-    setRemaps,
-    setError,
-  } = useEsiStore();
   const [addCharacterOpen, setAddCharacterOpen] = useState(false);
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const { open, skillId, characterId, closeSkillDetail } =
@@ -77,43 +61,43 @@ function RootComponent() {
 
     const hydrateStore = async () => {
       try {
-        const accountsData = await getAccountsAndCharacters();
-        const allCharacters = [
+        const accountsData = await invoke<{
+          accounts: { characters: { character_id: number }[] }[];
+          unassigned_characters: { character_id: number }[];
+        }>('get_accounts_and_characters');
+        const characterIds = [
           ...accountsData.unassigned_characters,
           ...accountsData.accounts.flatMap((a) => a.characters),
-        ];
+        ].map((c) => c.character_id);
 
-        await Promise.allSettled(
-          allCharacters.map(async (character) => {
-            const id = character.character_id;
-            await Promise.allSettled([
-              getSkillQueueForCharacter({ characterId: id })
-                .then((data) => setQueue(id, data))
-                .catch((err) => setError('queues', id, String(err))),
-              getCharacterSkillsWithGroups({ characterId: id })
-                .then((data) => setSkills(id, data))
-                .catch((err) => setError('skills', id, String(err))),
-              getCharacterAttributesBreakdown({ characterId: id })
-                .then((data) => setAttributes(id, data))
-                .catch((err) => setError('attributes', id, String(err))),
-              getClones({ characterId: id })
-                .then((data) => setClones(id, data))
-                .catch((err) => setError('clones', id, String(err))),
-              getCharacterRemaps({ characterId: id })
-                .then((data) => setRemaps(id, data))
-                .catch((err) => setError('remaps', id, String(err))),
-            ]);
-          })
-        );
+        try {
+          const snapshots =
+            await invoke<CharacterSnapshot[]>('get_esi_snapshot');
+          const store = useEsiStore.getState();
+          for (const snapshot of snapshots) {
+            const id = snapshot.characterId;
+            if (snapshot.queue) store.setQueue(id, snapshot.queue);
+            if (snapshot.skills) store.setSkills(id, snapshot.skills);
+            if (snapshot.attributes)
+              store.setAttributes(id, snapshot.attributes);
+            if (snapshot.clones.length > 0)
+              store.setClones(id, snapshot.clones);
+            if (snapshot.location) store.setLocation(id, snapshot.location);
+            if (snapshot.remaps.length > 0)
+              store.setRemaps(id, snapshot.remaps);
+          }
+        } catch (err) {
+          const store = useEsiStore.getState();
+          for (const id of characterIds) {
+            store.setError('queues', id, String(err));
+            store.setError('skills', id, String(err));
+            store.setError('attributes', id, String(err));
+            store.setError('locations', id, String(err));
+            store.setError('clones', id, String(err));
+            store.setError('remaps', id, String(err));
+          }
+        }
 
-        // Location data is per all characters in one call
-        getAllCharactersLocations()
-          .then((locs) =>
-            locs.forEach((loc) => setLocation(loc.character_id, loc))
-          )
-          .catch((err) => console.warn('Failed to hydrate locations:', err));
-
-        const characterIds = allCharacters.map((c) => c.character_id);
         cleanup = await bootstrapEsiEvents(queryClient, characterIds);
       } catch (err) {
         console.warn('Failed to hydrate ESI store:', err);

@@ -170,7 +170,7 @@ export function AddRemapDialog({
                     ))}
                   {!planId &&
                     characterId &&
-                    characterQueue?.skill_queue.map((item, idx) => (
+                    characterQueue?.queue.map((item, idx) => (
                       <SelectItem
                         key={`${item.skillId}-${item.finishedLevel}-${idx}`}
                         value={`${item.skillId}-${item.finishedLevel}`}

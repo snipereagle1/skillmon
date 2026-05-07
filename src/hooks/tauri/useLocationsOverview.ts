@@ -1,8 +1,8 @@
-import type { CharacterLocationOverview } from '@/generated/types';
+import type { LocationPayload } from '@/generated/types';
 import { useEsiStore } from '@/stores/esiStore';
 
 export function useAllCharactersLocations(): {
-  data: CharacterLocationOverview[];
+  data: LocationPayload[];
   isLoading: boolean;
   error: string | null;
 } {
@@ -11,7 +11,7 @@ export function useAllCharactersLocations(): {
   const entries = Object.values(locations);
   const data = entries
     .map((s) => s.data)
-    .filter((d): d is CharacterLocationOverview => d !== null);
+    .filter((d): d is LocationPayload => d !== null);
   const hasError = entries.find((s) => s.lastError !== null);
 
   return {
