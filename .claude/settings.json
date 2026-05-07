@@ -1,4 +1,10 @@
 {
+  "permissions": {
+    "allow": [
+      "Read(.claude/epics/**)",
+      "Read(.claude/prds/**)"
+    ]
+  },
   "hooks": {
     "PostToolUse": [
       {
