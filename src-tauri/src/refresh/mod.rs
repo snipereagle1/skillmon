@@ -10,7 +10,6 @@ use crate::{auth, cache, db, esi, esi_helpers, notifications};
 pub mod events;
 
 pub struct RefresherHandle {
-    pub handle: tokio::task::JoinHandle<()>,
     pub cancel: CancellationToken,
     pub poke: Arc<Notify>,
 }
@@ -300,11 +299,11 @@ impl RefreshSupervisor {
 
                 let now = chrono::Utc::now().timestamp();
                 let min_expires = expires_list.into_iter().min().unwrap_or(now + 300);
-                let secs_until = (min_expires - now).max(30).min(3600);
+                let secs_until = (min_expires - now).clamp(30, 3600);
                 let jitter_range = secs_until / 10;
                 let jitter =
                     rand::random::<i64>().abs() % (jitter_range.max(1) * 2) - jitter_range.max(1);
-                let sleep_secs = (secs_until + jitter).max(30).min(3600) as u64;
+                let sleep_secs = (secs_until + jitter).clamp(30, 3600) as u64;
 
                 tokio::select! {
                     _ = tokio::time::sleep(Duration::from_secs(sleep_secs)) => {}
@@ -314,14 +313,9 @@ impl RefreshSupervisor {
             }
         });
 
-        self.handles.insert(
-            character_id,
-            RefresherHandle {
-                handle,
-                cancel,
-                poke,
-            },
-        );
+        drop(handle);
+        self.handles
+            .insert(character_id, RefresherHandle { cancel, poke });
     }
 
     pub fn cancel_character(&mut self, character_id: i64) {
@@ -330,6 +324,7 @@ impl RefreshSupervisor {
         }
     }
 
+    #[allow(dead_code)]
     pub fn cancel_all(&mut self) {
         for (_, handle) in self.handles.drain() {
             handle.cancel.cancel();

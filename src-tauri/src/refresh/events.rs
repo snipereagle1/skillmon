@@ -46,6 +46,7 @@ pub struct LocationData {
 #[typeshare]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct PublicCharacterData {
     pub name: String,
     pub corporation_id: i32,
@@ -94,6 +95,7 @@ pub struct ClonesData {
 #[typeshare]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct RemapData {
     pub remap_id: i32,
     pub character_id: Option<i32>,
@@ -135,6 +137,7 @@ pub struct LocationPayload {
 #[typeshare]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct PublicPayload {
     pub character_id: i32,
     pub public: PublicCharacterData,
@@ -159,6 +162,7 @@ pub struct ClonesPayload {
 #[typeshare]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct RemapsPayload {
     pub character_id: i32,
     pub remaps: Vec<RemapData>,
@@ -167,6 +171,7 @@ pub struct RemapsPayload {
 #[typeshare]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct NotificationItem {
     pub id: i32,
     pub character_id: i32,
@@ -180,6 +185,7 @@ pub struct NotificationItem {
 #[typeshare]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[allow(dead_code)]
 pub struct NotificationsNewPayload {
     pub character_id: i32,
     pub notifications: Vec<NotificationItem>,
