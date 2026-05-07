@@ -1,23 +1,20 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 
 import { forceRefreshSkillQueue } from '@/generated/commands';
-
-import { queryKeys } from './queryKeys';
+import { useEsiStore } from '@/stores/esiStore';
 
 export function useForceRefreshSkillQueue() {
-  const queryClient = useQueryClient();
+  const { setQueue, setError } = useEsiStore();
 
   return useMutation({
     mutationFn: async (characterId: number) => {
       return await forceRefreshSkillQueue({ characterId });
     },
     onSuccess: (data, characterId) => {
-      queryClient.setQueryData(queryKeys.skillQueue(characterId), data);
+      setQueue(characterId, data);
     },
-    onSettled: (_, __, characterId) => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.skillQueue(characterId),
-      });
+    onError: (err, characterId) => {
+      setError('queues', characterId, String(err));
     },
   });
 }

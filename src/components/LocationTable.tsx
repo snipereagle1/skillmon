@@ -70,8 +70,7 @@ export function LocationTable() {
   if (error) {
     return (
       <div className="p-4 text-destructive bg-destructive/10 rounded-md">
-        Error loading locations:{' '}
-        {error instanceof Error ? error.message : String(error)}
+        Error loading locations: {error}
       </div>
     );
   }

@@ -1,6 +1,5 @@
 import { useIsFetching, useQueryClient } from '@tanstack/react-query';
 import { createRootRoute, Link, Outlet } from '@tanstack/react-router';
-import { invoke } from '@tauri-apps/api/core';
 import { check } from '@tauri-apps/plugin-updater';
 import { Download } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -13,12 +12,21 @@ import { Button } from '@/components/ui/button';
 import { NavigationTabs } from '@/components/ui/navigation-tabs';
 import { Toaster } from '@/components/ui/sonner';
 import { Spinner } from '@/components/ui/spinner';
-import { getAccountsAndCharacters } from '@/generated/commands';
+import {
+  getAccountsAndCharacters,
+  getAllCharactersLocations,
+  getCharacterAttributesBreakdown,
+  getCharacterRemaps,
+  getCharacterSkillsWithGroups,
+  getClones,
+  getSkillQueueForCharacter,
+} from '@/generated/commands';
 import { useAuthEvents } from '@/hooks/tauri/useAuthEvents';
 import { useEnabledFeatures } from '@/hooks/tauri/useSettings';
 import { useStartupState } from '@/hooks/tauri/useStartupState';
 import { bootstrapEsiEvents } from '@/lib/esiEvents';
 import { cn } from '@/lib/utils';
+import { useEsiStore } from '@/stores/esiStore';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
 import { useUpdateStore } from '@/stores/updateStore';
 
@@ -27,6 +35,15 @@ function RootComponent() {
   const { isStartingUp } = useStartupState();
   const isFetching = useIsFetching();
   const queryClient = useQueryClient();
+  const {
+    setQueue,
+    setSkills,
+    setLocation,
+    setAttributes,
+    setClones,
+    setRemaps,
+    setError,
+  } = useEsiStore();
   const [addCharacterOpen, setAddCharacterOpen] = useState(false);
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const { open, skillId, characterId, closeSkillDetail } =
@@ -50,14 +67,13 @@ function RootComponent() {
     checkForUpdates();
   }, [setUpdate]);
 
-  // Seed the query cache with snapshot data from SQLite on app mount.
-  // This ensures the UI has data immediately before the first ESI refresh fires.
-  // Also registers Tauri event listeners so the cache is invalidated when Rust
-  // pushes fresh ESI data.
+  // Hydrate the Zustand ESI store from SQLite on app mount so the UI has data
+  // immediately before the first Rust supervisor refresh fires.
+  // Also registers Tauri event listeners that keep the store (and RQ cache) current.
   useEffect(() => {
     let cleanup: (() => void) | undefined;
 
-    const seedSnapshotCache = async () => {
+    const hydrateStore = async () => {
       try {
         const accountsData = await getAccountsAndCharacters();
         const allCharacters = [
@@ -67,31 +83,42 @@ function RootComponent() {
 
         await Promise.allSettled(
           allCharacters.map(async (character) => {
-            try {
-              const snapshot = await invoke('get_esi_snapshot', {
-                characterId: character.character_id,
-              });
-              queryClient.setQueryData(
-                ['esiSnapshot', character.character_id],
-                snapshot
-              );
-            } catch (err) {
-              console.warn(
-                `Failed to seed ESI snapshot for character ${character.character_id}:`,
-                err
-              );
-            }
+            const id = character.character_id;
+            await Promise.allSettled([
+              getSkillQueueForCharacter({ characterId: id })
+                .then((data) => setQueue(id, data))
+                .catch((err) => setError('queues', id, String(err))),
+              getCharacterSkillsWithGroups({ characterId: id })
+                .then((data) => setSkills(id, data))
+                .catch((err) => setError('skills', id, String(err))),
+              getCharacterAttributesBreakdown({ characterId: id })
+                .then((data) => setAttributes(id, data))
+                .catch((err) => setError('attributes', id, String(err))),
+              getClones({ characterId: id })
+                .then((data) => setClones(id, data))
+                .catch((err) => setError('clones', id, String(err))),
+              getCharacterRemaps({ characterId: id })
+                .then((data) => setRemaps(id, data))
+                .catch((err) => setError('remaps', id, String(err))),
+            ]);
           })
         );
+
+        // Location data is per all characters in one call
+        getAllCharactersLocations()
+          .then((locs) =>
+            locs.forEach((loc) => setLocation(loc.character_id, loc))
+          )
+          .catch((err) => console.warn('Failed to hydrate locations:', err));
 
         const characterIds = allCharacters.map((c) => c.character_id);
         cleanup = await bootstrapEsiEvents(queryClient, characterIds);
       } catch (err) {
-        console.warn('Failed to seed ESI snapshot cache:', err);
+        console.warn('Failed to hydrate ESI store:', err);
       }
     };
 
-    seedSnapshotCache();
+    hydrateStore();
 
     return () => {
       cleanup?.();

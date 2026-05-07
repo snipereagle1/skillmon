@@ -16,8 +16,7 @@ export function SkillQueue({ characterId }: SkillQueueProps) {
   if (error) {
     return (
       <p className="text-destructive">
-        Error:{' '}
-        {error instanceof Error ? error.message : 'Failed to load skill queue'}
+        Error: {error ?? 'Failed to load skill queue'}
       </p>
     );
   }

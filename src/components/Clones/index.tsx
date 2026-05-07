@@ -73,8 +73,7 @@ export function Clones({ characterId }: ClonesProps) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-destructive">
-          Error:{' '}
-          {error instanceof Error ? error.message : 'Failed to load clones'}
+          Error: {error ?? 'Failed to load clones'}
         </p>
       </div>
     );

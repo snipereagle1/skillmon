@@ -1,7 +1,15 @@
+/* eslint-disable no-await-in-loop */
 import type { QueryClient } from '@tanstack/react-query';
 import { listen } from '@tauri-apps/api/event';
 
-import { queryKeys } from '@/hooks/tauri/queryKeys';
+import {
+  getAllCharactersLocations,
+  getCharacterAttributesBreakdown,
+  getCharacterSkillsWithGroups,
+  getClones,
+  getSkillQueueForCharacter,
+} from '@/generated/commands';
+import { useEsiStore } from '@/stores/esiStore';
 
 export async function bootstrapEsiEvents(
   queryClient: QueryClient,
@@ -10,58 +18,74 @@ export async function bootstrapEsiEvents(
   const unlisteners: Array<() => void> = [];
 
   for (const characterId of characterIds) {
-    const unlistenQueue = await listen(`character:${characterId}:queue`, () => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.skillQueue(characterId),
-      });
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.trainingCharactersOverview(),
-      });
-    });
+    const unlistenQueue = await listen(
+      `character:${characterId}:queue`,
+      async () => {
+        try {
+          const data = await getSkillQueueForCharacter({ characterId });
+          useEsiStore.getState().setQueue(characterId, data);
+        } catch (err) {
+          useEsiStore.getState().setError('queues', characterId, String(err));
+        }
+      }
+    );
     unlisteners.push(unlistenQueue);
 
     const unlistenSkills = await listen(
       `character:${characterId}:skills`,
-      () => {
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.characterSkills(characterId),
-        });
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.trainingCharactersOverview(),
-        });
+      async () => {
+        try {
+          const data = await getCharacterSkillsWithGroups({ characterId });
+          useEsiStore.getState().setSkills(characterId, data);
+        } catch (err) {
+          useEsiStore.getState().setError('skills', characterId, String(err));
+        }
       }
     );
     unlisteners.push(unlistenSkills);
 
     const unlistenAttributes = await listen(
       `character:${characterId}:attributes`,
-      () => {
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.attributes(characterId),
-        });
+      async () => {
+        try {
+          const data = await getCharacterAttributesBreakdown({ characterId });
+          useEsiStore.getState().setAttributes(characterId, data);
+        } catch (err) {
+          useEsiStore
+            .getState()
+            .setError('attributes', characterId, String(err));
+        }
       }
     );
     unlisteners.push(unlistenAttributes);
 
     const unlistenLocation = await listen(
       `character:${characterId}:location`,
-      () => {
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.locationsOverview(),
-        });
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.location(characterId),
-        });
+      async () => {
+        try {
+          const allLocations = await getAllCharactersLocations();
+          const store = useEsiStore.getState();
+          for (const loc of allLocations) {
+            store.setLocation(loc.character_id, loc);
+          }
+        } catch (err) {
+          useEsiStore
+            .getState()
+            .setError('locations', characterId, String(err));
+        }
       }
     );
     unlisteners.push(unlistenLocation);
 
     const unlistenClones = await listen(
       `character:${characterId}:clones`,
-      () => {
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.clones(characterId),
-        });
+      async () => {
+        try {
+          const data = await getClones({ characterId });
+          useEsiStore.getState().setClones(characterId, data);
+        } catch (err) {
+          useEsiStore.getState().setError('clones', characterId, String(err));
+        }
       }
     );
     unlisteners.push(unlistenClones);

@@ -1,14 +1,22 @@
-import { useQuery } from '@tanstack/react-query';
-
-import { getAllCharactersLocations } from '@/generated/commands';
 import type { CharacterLocationOverview } from '@/generated/types';
+import { useEsiStore } from '@/stores/esiStore';
 
-import { queryKeys } from './queryKeys';
+export function useAllCharactersLocations(): {
+  data: CharacterLocationOverview[];
+  isLoading: boolean;
+  error: string | null;
+} {
+  const locations = useEsiStore((state) => state.locations);
 
-export function useAllCharactersLocations() {
-  return useQuery<CharacterLocationOverview[]>({
-    queryKey: queryKeys.locationsOverview(),
-    queryFn: () => getAllCharactersLocations(),
-    staleTime: 55_000,
-  });
+  const entries = Object.values(locations);
+  const data = entries
+    .map((s) => s.data)
+    .filter((d): d is CharacterLocationOverview => d !== null);
+  const hasError = entries.find((s) => s.lastError !== null);
+
+  return {
+    data,
+    isLoading: entries.length === 0,
+    error: hasError?.lastError ?? null,
+  };
 }

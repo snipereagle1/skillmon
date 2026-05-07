@@ -4,16 +4,13 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
-import { useQueries } from '@tanstack/react-query';
 import { useParams } from '@tanstack/react-router';
 import { GripHorizontal, GripVertical } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { getSkillQueueForCharacter } from '@/generated/commands';
-import type { CharacterSkillQueue, SkillQueueItem } from '@/generated/types';
-import { queryKeys } from '@/hooks/tauri/queryKeys';
+import type { SkillQueueItem } from '@/generated/types';
 import {
   useAccountsAndCharacters,
   useReorderAccounts,
@@ -21,6 +18,7 @@ import {
 } from '@/hooks/tauri/useAccountsAndCharacters';
 import { useSortableList } from '@/hooks/useSortableList';
 import { cn } from '@/lib/utils';
+import { useEsiStore } from '@/stores/esiStore';
 
 import { AccountCard } from './AccountCard';
 import { CharacterPortrait } from './CharacterPortrait';
@@ -73,40 +71,24 @@ export function AccountSidebar() {
     return [...accountChars, ...accountsData.unassigned_characters];
   }, [accountsData]);
 
-  const skillQueueQueriesConfig = useMemo(
-    () =>
-      allCharacters.map((character) => ({
-        queryKey: queryKeys.skillQueue(character.character_id),
-        queryFn: async (): Promise<CharacterSkillQueue> => {
-          return await getSkillQueueForCharacter({
-            characterId: character.character_id,
-          });
-        },
-        refetchInterval:
-          character.character_id === selectedCharacterId ? 60_000 : 600_000,
-      })),
-    [allCharacters, selectedCharacterId]
-  );
-
-  const skillQueueQueries = useQueries({
-    queries: skillQueueQueriesConfig,
-  });
+  const queues = useEsiStore((state) => state.queues);
 
   const characterSkillQueues = useMemo(() => {
     const map = new Map<
       number,
       { skillQueue: SkillQueueItem[]; isPaused: boolean }
     >();
-    skillQueueQueries.forEach((query) => {
-      if (query.data) {
-        map.set(query.data.character_id, {
-          skillQueue: query.data.skill_queue,
-          isPaused: query.data.is_paused,
+    for (const character of allCharacters) {
+      const slice = queues[character.character_id];
+      if (slice?.data) {
+        map.set(character.character_id, {
+          skillQueue: slice.data.skill_queue,
+          isPaused: slice.data.is_paused,
         });
       }
-    });
+    }
     return map;
-  }, [skillQueueQueries]);
+  }, [queues, allCharacters]);
 
   if (isLoading) {
     return (

@@ -56,17 +56,6 @@ export const queryKeys = {
       maxRemaps,
     ] as const,
 
-  skillQueue: (characterId: number | null) =>
-    ['skillQueue', characterId] as const,
-
-  trainingCharactersOverview: () => ['trainingCharactersOverview'] as const,
-
-  characterSkills: (characterId: number | null) =>
-    ['characterSkills', characterId] as const,
-  attributes: (characterId: number | null) =>
-    ['attributes', characterId] as const,
-  clones: (characterId: number | null) => ['clones', characterId] as const,
-
   notifications: (
     characterId?: number | null,
     status?: 'active' | 'dismissed'
@@ -94,5 +83,4 @@ export const queryKeys = {
     ['character-feature-scope-status'] as const,
 
   location: (characterId: number) => ['location', characterId] as const,
-  locationsOverview: () => ['locationsOverview'] as const,
 };

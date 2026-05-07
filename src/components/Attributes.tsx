@@ -52,10 +52,7 @@ export function Attributes({ characterId }: AttributesProps) {
   }
 
   if (attributeError) {
-    const errorMessage =
-      attributeError instanceof Error
-        ? attributeError.message
-        : String(attributeError);
+    const errorMessage = attributeError;
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-destructive">Error: {errorMessage}</p>

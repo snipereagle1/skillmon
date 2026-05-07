@@ -2,23 +2,30 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import {
   deleteRemap,
+  getCharacterAttributesBreakdown,
   getCharacterRemaps,
   getPlanRemaps,
   saveRemap,
 } from '@/generated/commands';
 import type { Remap, SaveRemapParams } from '@/generated/types';
+import { useEsiStore } from '@/stores/esiStore';
 
 import { queryKeys } from './queryKeys';
 
-export function useCharacterRemaps(characterId: number | null) {
-  return useQuery<Remap[]>({
-    queryKey: queryKeys.remaps.character(characterId),
-    queryFn: async () => {
-      if (characterId === null) return [];
-      return await getCharacterRemaps({ characterId });
-    },
-    enabled: characterId !== null,
-  });
+export function useCharacterRemaps(characterId: number | null): {
+  data: Remap[];
+  isLoading: boolean;
+  error: string | null;
+} {
+  const slice = useEsiStore((state) =>
+    characterId !== null ? state.remaps[characterId] : undefined
+  );
+
+  return {
+    data: slice?.data ?? [],
+    isLoading: characterId !== null && slice === undefined,
+    error: slice?.lastError ?? null,
+  };
 }
 
 export function usePlanRemaps(planId: number | null) {
@@ -34,19 +41,23 @@ export function usePlanRemaps(planId: number | null) {
 
 export function useSaveRemap() {
   const queryClient = useQueryClient();
+  const { setAttributes, setRemaps, setError } = useEsiStore();
 
   return useMutation({
     mutationFn: async (params: SaveRemapParams) => {
       return await saveRemap(params);
     },
-    onSuccess: (_, params) => {
+    onSuccess: async (_, params) => {
       if (params.characterId) {
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.remaps.character(params.characterId),
-        });
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.attributes(params.characterId),
-        });
+        const id = params.characterId;
+        await Promise.allSettled([
+          getCharacterAttributesBreakdown({ characterId: id })
+            .then((data) => setAttributes(id, data))
+            .catch((err) => setError('attributes', id, String(err))),
+          getCharacterRemaps({ characterId: id })
+            .then((data) => setRemaps(id, data))
+            .catch((err) => setError('remaps', id, String(err))),
+        ]);
       }
       if (params.planId) {
         queryClient.invalidateQueries({
@@ -62,6 +73,7 @@ export function useSaveRemap() {
 
 export function useDeleteRemap() {
   const queryClient = useQueryClient();
+  const { setAttributes, setRemaps, setError } = useEsiStore();
 
   return useMutation({
     mutationFn: async (params: {
@@ -72,14 +84,17 @@ export function useDeleteRemap() {
       await deleteRemap({ remapId: params.remapId });
       return params;
     },
-    onSuccess: (params) => {
+    onSuccess: async (params) => {
       if (params.characterId) {
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.remaps.character(params.characterId),
-        });
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.attributes(params.characterId),
-        });
+        const id = params.characterId;
+        await Promise.allSettled([
+          getCharacterAttributesBreakdown({ characterId: id })
+            .then((data) => setAttributes(id, data))
+            .catch((err) => setError('attributes', id, String(err))),
+          getCharacterRemaps({ characterId: id })
+            .then((data) => setRemaps(id, data))
+            .catch((err) => setError('remaps', id, String(err))),
+        ]);
       }
       if (params.planId) {
         queryClient.invalidateQueries({
