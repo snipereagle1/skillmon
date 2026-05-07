@@ -33,45 +33,45 @@ export function formatTimeRemaining(
 }
 
 export function calculateTimeToTrain(skill: SkillQueueItem): string | null {
-  if (!skill.sp_per_minute || skill.sp_per_minute <= 0) {
+  if (!skill.spPerMinute || skill.spPerMinute <= 0) {
     return null;
   }
 
-  if (skill.level_start_sp == null || skill.level_end_sp == null) {
+  if (skill.levelStartSp == null || skill.levelEndSp == null) {
     return null;
   }
 
   const rawCurrentSP =
-    skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
+    skill.currentSp ?? skill.trainingStartSp ?? skill.levelStartSp;
   if (rawCurrentSP == null) {
     return null;
   }
-  const currentSP = Math.max(rawCurrentSP, skill.level_start_sp);
-  const remainingSP = skill.level_end_sp - currentSP;
+  const currentSP = Math.max(rawCurrentSP, skill.levelStartSp);
+  const remainingSP = skill.levelEndSp - currentSP;
 
   if (remainingSP <= 0) {
     return 'Complete';
   }
 
-  const spPerHour = skill.sp_per_minute * 60;
+  const spPerHour = skill.spPerMinute * 60;
   const hoursToTrain = remainingSP / spPerHour;
 
   return formatDurationFromHours(hoursToTrain);
 }
 
 export function calculateCompletionPercentage(skill: SkillQueueItem): number {
-  if (skill.level_start_sp == null || skill.level_end_sp == null) {
+  if (skill.levelStartSp == null || skill.levelEndSp == null) {
     return 0;
   }
 
   const rawCurrentSP =
-    skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
+    skill.currentSp ?? skill.trainingStartSp ?? skill.levelStartSp;
   if (rawCurrentSP == null) {
     return 0;
   }
-  const currentSP = Math.max(rawCurrentSP, skill.level_start_sp);
-  const totalSP = skill.level_end_sp - skill.level_start_sp;
-  const completedSP = currentSP - skill.level_start_sp;
+  const currentSP = Math.max(rawCurrentSP, skill.levelStartSp);
+  const totalSP = skill.levelEndSp - skill.levelStartSp;
+  const completedSP = currentSP - skill.levelStartSp;
 
   if (totalSP <= 0) {
     return 100;
@@ -89,40 +89,40 @@ export function calculateCompletionPercentage(skill: SkillQueueItem): number {
 }
 
 export function calculateTrainingHours(skill: SkillQueueItem): number {
-  if (!skill.sp_per_minute || skill.sp_per_minute <= 0) {
+  if (!skill.spPerMinute || skill.spPerMinute <= 0) {
     return 0;
   }
 
-  if (skill.level_start_sp == null || skill.level_end_sp == null) {
+  if (skill.levelStartSp == null || skill.levelEndSp == null) {
     return 0;
   }
 
   const rawCurrentSP =
-    skill.current_sp ?? skill.training_start_sp ?? skill.level_start_sp;
+    skill.currentSp ?? skill.trainingStartSp ?? skill.levelStartSp;
   if (rawCurrentSP == null) {
     return 0;
   }
-  const currentSP = Math.max(rawCurrentSP, skill.level_start_sp);
-  const remainingSP = skill.level_end_sp - currentSP;
+  const currentSP = Math.max(rawCurrentSP, skill.levelStartSp);
+  const remainingSP = skill.levelEndSp - currentSP;
 
   if (remainingSP <= 0) {
     return 0;
   }
 
-  const spPerHour = skill.sp_per_minute * 60;
+  const spPerHour = skill.spPerMinute * 60;
   return remainingSP / spPerHour;
 }
 
 export function isCurrentlyTraining(skill: SkillQueueItem): boolean {
-  if (skill.queue_position === 0) {
+  if (skill.queuePosition === 0) {
     return true;
   }
 
-  if (skill.start_date != null && skill.finish_date != null) {
+  if (skill.startDate != null && skill.finishDate != null) {
     try {
       const now = new Date();
-      const startDate = parseISO(skill.start_date);
-      const finishDate = parseISO(skill.finish_date);
+      const startDate = parseISO(skill.startDate);
+      const finishDate = parseISO(skill.finishDate);
 
       const isAfterOrEqualStart =
         isAfter(now, startDate) || isEqual(now, startDate);

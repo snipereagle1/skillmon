@@ -3,6 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use serde::Serialize;
 use tauri::State;
+use typeshare::typeshare;
 
 use crate::auth;
 use crate::cache;
@@ -11,6 +12,7 @@ use crate::esi;
 use crate::esi_helpers;
 use crate::refresh;
 use crate::skill_queue;
+use crate::ts_types::i64_ts;
 use crate::utils;
 
 use super::attributes::CharacterAttributesResponse;
@@ -33,13 +35,14 @@ pub struct SkillQueueItem {
     pub rank: Option<i64>,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct CharacterSkillQueue {
-    pub character_id: i64,
+    pub character_id: i64_ts,
     pub character_name: String,
     pub skill_queue: Vec<SkillQueueItem>,
     pub attributes: Option<CharacterAttributesResponse>,
-    pub unallocated_sp: i64,
+    pub unallocated_sp: i64_ts,
     pub is_paused: bool,
     pub is_omega: bool,
 }

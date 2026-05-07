@@ -5,6 +5,7 @@ use serde::Serialize;
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
 use tauri::State;
+use typeshare::typeshare;
 
 use crate::db;
 use crate::skill_plans::graph::{PlanDag, PlanNode};
@@ -12,6 +13,7 @@ use crate::skill_plans::optimization::{self, OptimizationResult, ReorderOptimiza
 use crate::skill_plans::plan_from_character::{self, PreviewPlanFromCharacterGroup};
 use crate::skill_plans::simulation::{self, SimulationProfile, SimulationResult};
 use crate::skill_plans::{Attributes, SkillmonPlan, SkillmonPlanEntry};
+use crate::ts_types::{i64_ts, usize_ts};
 use crate::utils;
 
 #[tauri::command]
@@ -194,14 +196,15 @@ pub async fn import_skill_plan_json(
     Ok(plan_id)
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillPlanResponse {
-    pub plan_id: i64,
+    pub plan_id: i64_ts,
     pub name: String,
     pub description: Option<String>,
     pub auto_prerequisites: bool,
-    pub created_at: i64,
-    pub updated_at: i64,
+    pub created_at: i64_ts,
+    pub updated_at: i64_ts,
 }
 
 impl From<db::skill_plans::SkillPlan> for SkillPlanResponse {
@@ -217,53 +220,58 @@ impl From<db::skill_plans::SkillPlan> for SkillPlanResponse {
     }
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillPlanEntryResponse {
-    pub entry_id: i64,
-    pub plan_id: i64,
-    pub skill_type_id: i64,
+    pub entry_id: i64_ts,
+    pub plan_id: i64_ts,
+    pub skill_type_id: i64_ts,
     pub skill_name: String,
-    pub planned_level: i64,
-    pub sort_order: i64,
+    pub planned_level: i64_ts,
+    pub sort_order: i64_ts,
     pub entry_type: String,
     pub notes: Option<String>,
-    pub rank: Option<i64>,
-    pub skillpoints_for_level: i64,
+    pub rank: Option<i64_ts>,
+    pub skillpoints_for_level: i64_ts,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillPlanWithEntriesResponse {
     pub plan: SkillPlanResponse,
     pub entries: Vec<SkillPlanEntryResponse>,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillSearchResult {
-    pub skill_type_id: i64,
+    pub skill_type_id: i64_ts,
     pub name: String,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct PlanComparisonResponse {
     pub plan: SkillPlanResponse,
-    pub character_id: i64,
+    pub character_id: i64_ts,
     pub entries: Vec<PlanComparisonEntry>,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct PlanComparisonEntry {
-    pub entry_id: i64,
-    pub skill_type_id: i64,
+    pub entry_id: i64_ts,
+    pub skill_type_id: i64_ts,
     pub skill_name: String,
-    pub planned_level: i64,
-    pub trained_level: i64,
-    pub active_level: i64,
+    pub planned_level: i64_ts,
+    pub trained_level: i64_ts,
+    pub active_level: i64_ts,
     pub entry_type: String,
-    pub sort_order: i64,
-    pub rank: Option<i64>,
-    pub skillpoints_for_planned_level: i64,
-    pub current_skillpoints: i64,
-    pub missing_skillpoints: i64,
+    pub sort_order: i64_ts,
+    pub rank: Option<i64_ts>,
+    pub skillpoints_for_planned_level: i64_ts,
+    pub current_skillpoints: i64_ts,
+    pub missing_skillpoints: i64_ts,
     pub status: String,
 }
 
@@ -278,10 +286,11 @@ pub async fn create_skill_plan(
         .map_err(|e| format!("Failed to create skill plan: {}", e))
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct PreviewPlanFromCharacterResponse {
-    pub skill_count: usize,
-    pub estimated_sp: i64,
+    pub skill_count: usize_ts,
+    pub estimated_sp: i64_ts,
     pub groups: Vec<PreviewPlanFromCharacterGroup>,
 }
 
@@ -639,17 +648,19 @@ pub async fn delete_plan_entry(pool: State<'_, db::Pool>, entry_id: i64) -> Resu
         .map_err(|e| format!("Failed to delete plan entry: {}", e))
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct ValidationEntryResponse {
     pub variant: String,
-    pub node_skill_type_id: i64,
+    pub node_skill_type_id: i64_ts,
     pub node_skill_name: String,
-    pub node_level: i64,
-    pub other_skill_type_id: i64,
+    pub node_level: i64_ts,
+    pub other_skill_type_id: i64_ts,
     pub other_skill_name: String,
-    pub other_level: i64,
+    pub other_level: i64_ts,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct ValidationResponse {
     pub is_valid: bool,
@@ -1662,17 +1673,19 @@ pub async fn search_skills(
     Ok(results)
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct PlanComparisonSummary {
-    pub character_id: i64,
+    pub character_id: i64_ts,
     pub character_name: String,
-    pub completed_sp: i64,
-    pub missing_sp: i64,
-    pub time_to_completion_seconds: i64,
+    pub completed_sp: i64_ts,
+    pub missing_sp: i64_ts,
+    pub time_to_completion_seconds: i64_ts,
     pub has_prerequisites: bool,
     pub status: String,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct MultiPlanComparisonResponse {
     pub plan: SkillPlanResponse,

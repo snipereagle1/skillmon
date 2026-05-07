@@ -1,32 +1,37 @@
 use crate::db;
 use crate::skill_plans::{Attributes, PlannedRemap};
+use crate::ts_types::i64_ts;
 use crate::utils;
 use std::collections::HashMap;
+use typeshare::typeshare;
 
 const TOTAL_REMAP_POINTS: i64 = 14;
 const MAX_POINTS_PER_ATTR: i64 = 10;
 
+#[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct OptimizationResult {
     pub recommended_remap: PlannedRemap,
-    pub original_seconds: i64,
-    pub optimized_seconds: i64,
+    pub original_seconds: i64_ts,
+    pub optimized_seconds: i64_ts,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct OptimizedEntry {
-    pub entry_id: i64,
-    pub skill_type_id: i64,
-    pub planned_level: i64,
+    pub entry_id: i64_ts,
+    pub skill_type_id: i64_ts,
+    pub planned_level: i64_ts,
     pub notes: Option<String>,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, serde::Serialize)]
 pub struct ReorderOptimizationResult {
     pub optimized_entries: Vec<OptimizedEntry>,
     pub recommended_remaps: Vec<PlannedRemap>,
-    pub original_seconds: i64,
-    pub optimized_seconds: i64,
+    pub original_seconds: i64_ts,
+    pub optimized_seconds: i64_ts,
 }
 
 struct EntryDemand {

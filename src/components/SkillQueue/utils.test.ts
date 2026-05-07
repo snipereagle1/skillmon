@@ -142,77 +142,77 @@ describe('calculateTimeToTrain', () => {
   const createMockSkill = (
     overrides: Partial<SkillQueueItem> = {}
   ): SkillQueueItem => ({
-    skill_id: 1,
-    queue_position: 0,
-    finished_level: 1,
-    level_start_sp: 0,
-    level_end_sp: 1000,
-    current_sp: 500,
-    sp_per_minute: 10,
+    skillId: 1,
+    queuePosition: 0,
+    finishedLevel: 1,
+    levelStartSp: 0,
+    levelEndSp: 1000,
+    currentSp: 500,
+    spPerMinute: 10,
     ...overrides,
   });
 
-  it('returns null for missing sp_per_minute', () => {
-    const skill = createMockSkill({ sp_per_minute: null });
+  it('returns null for missing spPerMinute', () => {
+    const skill = createMockSkill({ spPerMinute: undefined });
     expect(calculateTimeToTrain(skill)).toBeNull();
   });
 
-  it('returns null for zero sp_per_minute', () => {
-    const skill = createMockSkill({ sp_per_minute: 0 });
+  it('returns null for zero spPerMinute', () => {
+    const skill = createMockSkill({ spPerMinute: 0 });
     expect(calculateTimeToTrain(skill)).toBeNull();
   });
 
-  it('returns null for negative sp_per_minute', () => {
-    const skill = createMockSkill({ sp_per_minute: -5 });
+  it('returns null for negative spPerMinute', () => {
+    const skill = createMockSkill({ spPerMinute: -5 });
     expect(calculateTimeToTrain(skill)).toBeNull();
   });
 
-  it('returns null for missing level_start_sp', () => {
-    const skill = createMockSkill({ level_start_sp: null });
+  it('returns null for missing levelStartSp', () => {
+    const skill = createMockSkill({ levelStartSp: undefined });
     expect(calculateTimeToTrain(skill)).toBeNull();
   });
 
-  it('returns null for missing level_end_sp', () => {
-    const skill = createMockSkill({ level_end_sp: null });
+  it('returns null for missing levelEndSp', () => {
+    const skill = createMockSkill({ levelEndSp: undefined });
     expect(calculateTimeToTrain(skill)).toBeNull();
   });
 
-  it('returns null when all current_sp sources are missing', () => {
+  it('returns null when all currentSp sources are missing', () => {
     const skill = createMockSkill({
-      current_sp: null,
-      training_start_sp: null,
-      level_start_sp: null,
+      currentSp: undefined,
+      trainingStartSp: undefined,
+      levelStartSp: undefined,
     });
     expect(calculateTimeToTrain(skill)).toBeNull();
   });
 
-  it('uses current_sp when available', () => {
+  it('uses currentSp when available', () => {
     const skill = createMockSkill({
-      current_sp: 800,
-      training_start_sp: 500,
-      level_start_sp: 0,
-    });
-    const result = calculateTimeToTrain(skill);
-    expect(result).toBeTruthy();
-    expect(result).not.toBe('Complete');
-  });
-
-  it('falls back to training_start_sp when current_sp is null', () => {
-    const skill = createMockSkill({
-      current_sp: null,
-      training_start_sp: 600,
-      level_start_sp: 0,
+      currentSp: 800,
+      trainingStartSp: 500,
+      levelStartSp: 0,
     });
     const result = calculateTimeToTrain(skill);
     expect(result).toBeTruthy();
     expect(result).not.toBe('Complete');
   });
 
-  it('falls back to level_start_sp when current_sp and training_start_sp are null', () => {
+  it('falls back to trainingStartSp when currentSp is null', () => {
     const skill = createMockSkill({
-      current_sp: null,
-      training_start_sp: null,
-      level_start_sp: 0,
+      currentSp: undefined,
+      trainingStartSp: 600,
+      levelStartSp: 0,
+    });
+    const result = calculateTimeToTrain(skill);
+    expect(result).toBeTruthy();
+    expect(result).not.toBe('Complete');
+  });
+
+  it('falls back to levelStartSp when currentSp and trainingStartSp are null', () => {
+    const skill = createMockSkill({
+      currentSp: undefined,
+      trainingStartSp: undefined,
+      levelStartSp: 0,
     });
     const result = calculateTimeToTrain(skill);
     expect(result).toBeTruthy();
@@ -221,26 +221,26 @@ describe('calculateTimeToTrain', () => {
 
   it('returns "Complete" when remainingSP <= 0', () => {
     const skill = createMockSkill({
-      current_sp: 1000,
-      level_end_sp: 1000,
+      currentSp: 1000,
+      levelEndSp: 1000,
     });
     expect(calculateTimeToTrain(skill)).toBe('Complete');
   });
 
-  it('returns "Complete" when current_sp exceeds level_end_sp', () => {
+  it('returns "Complete" when currentSp exceeds levelEndSp', () => {
     const skill = createMockSkill({
-      current_sp: 1200,
-      level_end_sp: 1000,
+      currentSp: 1200,
+      levelEndSp: 1000,
     });
     expect(calculateTimeToTrain(skill)).toBe('Complete');
   });
 
   it('calculates time correctly for valid skill', () => {
     const skill = createMockSkill({
-      level_start_sp: 0,
-      level_end_sp: 1000,
-      current_sp: 0,
-      sp_per_minute: 10,
+      levelStartSp: 0,
+      levelEndSp: 1000,
+      currentSp: 0,
+      spPerMinute: 10,
     });
     const result = calculateTimeToTrain(skill);
     expect(result).toBeTruthy();
@@ -249,23 +249,23 @@ describe('calculateTimeToTrain', () => {
 
   it('calculates time correctly with partial progress', () => {
     const skill = createMockSkill({
-      level_start_sp: 0,
-      level_end_sp: 1000,
-      current_sp: 500,
-      sp_per_minute: 10,
+      levelStartSp: 0,
+      levelEndSp: 1000,
+      currentSp: 500,
+      spPerMinute: 10,
     });
     const result = calculateTimeToTrain(skill);
     expect(result).toBeTruthy();
     expect(result).toMatch(/^\d+(y|mo|[hdm])(\s\d+(y|mo|[hdm]))*$/);
   });
 
-  it('clamps current_sp to level_start_sp when current_sp is less than level_start_sp', () => {
+  it('clamps currentSp to levelStartSp when currentSp is less than levelStartSp', () => {
     const skill = createMockSkill({
-      level_start_sp: 226275,
-      level_end_sp: 1280000,
-      current_sp: 73702,
-      training_start_sp: 226275,
-      sp_per_minute: 10,
+      levelStartSp: 226275,
+      levelEndSp: 1280000,
+      currentSp: 73702,
+      trainingStartSp: 226275,
+      spPerMinute: 10,
     });
     const result = calculateTimeToTrain(skill);
     expect(result).toBeTruthy();
@@ -278,57 +278,57 @@ describe('calculateCompletionPercentage', () => {
   const createMockSkill = (
     overrides: Partial<SkillQueueItem> = {}
   ): SkillQueueItem => ({
-    skill_id: 1,
-    queue_position: 0,
-    finished_level: 1,
-    level_start_sp: 0,
-    level_end_sp: 1000,
-    current_sp: 500,
+    skillId: 1,
+    queuePosition: 0,
+    finishedLevel: 1,
+    levelStartSp: 0,
+    levelEndSp: 1000,
+    currentSp: 500,
     ...overrides,
   });
 
-  it('returns 0 for missing level_start_sp', () => {
-    const skill = createMockSkill({ level_start_sp: null });
+  it('returns 0 for missing levelStartSp', () => {
+    const skill = createMockSkill({ levelStartSp: undefined });
     expect(calculateCompletionPercentage(skill)).toBe(0);
   });
 
-  it('returns 0 for missing level_end_sp', () => {
-    const skill = createMockSkill({ level_end_sp: null });
+  it('returns 0 for missing levelEndSp', () => {
+    const skill = createMockSkill({ levelEndSp: undefined });
     expect(calculateCompletionPercentage(skill)).toBe(0);
   });
 
-  it('returns 0 when all current_sp sources are missing', () => {
+  it('returns 0 when all currentSp sources are missing', () => {
     const skill = createMockSkill({
-      current_sp: null,
-      training_start_sp: null,
-      level_start_sp: null,
+      currentSp: undefined,
+      trainingStartSp: undefined,
+      levelStartSp: undefined,
     });
     expect(calculateCompletionPercentage(skill)).toBe(0);
   });
 
   it('returns 100 when totalSP <= 0', () => {
     const skill = createMockSkill({
-      level_start_sp: 1000,
-      level_end_sp: 1000,
+      levelStartSp: 1000,
+      levelEndSp: 1000,
     });
     expect(calculateCompletionPercentage(skill)).toBe(100);
   });
 
   it('returns 0 when completedSP <= 0', () => {
     const skill = createMockSkill({
-      level_start_sp: 1000,
-      level_end_sp: 2000,
-      current_sp: 500,
+      levelStartSp: 1000,
+      levelEndSp: 2000,
+      currentSp: 500,
     });
     expect(calculateCompletionPercentage(skill)).toBe(0);
   });
 
-  it('clamps current_sp to level_start_sp when current_sp is less than level_start_sp', () => {
+  it('clamps currentSp to levelStartSp when currentSp is less than levelStartSp', () => {
     const skill = createMockSkill({
-      level_start_sp: 226275,
-      level_end_sp: 1280000,
-      current_sp: 73702,
-      training_start_sp: 226275,
+      levelStartSp: 226275,
+      levelEndSp: 1280000,
+      currentSp: 73702,
+      trainingStartSp: 226275,
     });
     const result = calculateCompletionPercentage(skill);
     expect(result).toBe(0);
@@ -336,93 +336,93 @@ describe('calculateCompletionPercentage', () => {
 
   it('returns 100 when completedSP >= totalSP', () => {
     const skill = createMockSkill({
-      level_start_sp: 0,
-      level_end_sp: 1000,
-      current_sp: 1000,
+      levelStartSp: 0,
+      levelEndSp: 1000,
+      currentSp: 1000,
     });
     expect(calculateCompletionPercentage(skill)).toBe(100);
   });
 
-  it('returns 100 when current_sp exceeds level_end_sp', () => {
+  it('returns 100 when currentSp exceeds levelEndSp', () => {
     const skill = createMockSkill({
-      level_start_sp: 0,
-      level_end_sp: 1000,
-      current_sp: 1200,
+      levelStartSp: 0,
+      levelEndSp: 1000,
+      currentSp: 1200,
     });
     expect(calculateCompletionPercentage(skill)).toBe(100);
   });
 
   it('calculates 50% correctly', () => {
     const skill = createMockSkill({
-      level_start_sp: 0,
-      level_end_sp: 1000,
-      current_sp: 500,
+      levelStartSp: 0,
+      levelEndSp: 1000,
+      currentSp: 500,
     });
     expect(calculateCompletionPercentage(skill)).toBe(50);
   });
 
   it('calculates 25% correctly', () => {
     const skill = createMockSkill({
-      level_start_sp: 0,
-      level_end_sp: 1000,
-      current_sp: 250,
+      levelStartSp: 0,
+      levelEndSp: 1000,
+      currentSp: 250,
     });
     expect(calculateCompletionPercentage(skill)).toBe(25);
   });
 
   it('calculates 75% correctly', () => {
     const skill = createMockSkill({
-      level_start_sp: 0,
-      level_end_sp: 1000,
-      current_sp: 750,
+      levelStartSp: 0,
+      levelEndSp: 1000,
+      currentSp: 750,
     });
     expect(calculateCompletionPercentage(skill)).toBe(75);
   });
 
-  it('uses current_sp when available', () => {
+  it('uses currentSp when available', () => {
     const skill = createMockSkill({
-      level_start_sp: 0,
-      level_end_sp: 1000,
-      current_sp: 800,
-      training_start_sp: 500,
+      levelStartSp: 0,
+      levelEndSp: 1000,
+      currentSp: 800,
+      trainingStartSp: 500,
     });
     expect(calculateCompletionPercentage(skill)).toBe(80);
   });
 
-  it('falls back to training_start_sp when current_sp is null', () => {
+  it('falls back to trainingStartSp when currentSp is null', () => {
     const skill = createMockSkill({
-      level_start_sp: 0,
-      level_end_sp: 1000,
-      current_sp: null,
-      training_start_sp: 600,
+      levelStartSp: 0,
+      levelEndSp: 1000,
+      currentSp: undefined,
+      trainingStartSp: 600,
     });
     expect(calculateCompletionPercentage(skill)).toBe(60);
   });
 
-  it('falls back to level_start_sp when current_sp and training_start_sp are null', () => {
+  it('falls back to levelStartSp when currentSp and trainingStartSp are null', () => {
     const skill = createMockSkill({
-      level_start_sp: 0,
-      level_end_sp: 1000,
-      current_sp: null,
-      training_start_sp: null,
+      levelStartSp: 0,
+      levelEndSp: 1000,
+      currentSp: undefined,
+      trainingStartSp: undefined,
     });
     expect(calculateCompletionPercentage(skill)).toBe(0);
   });
 
-  it('handles non-zero level_start_sp correctly', () => {
+  it('handles non-zero levelStartSp correctly', () => {
     const skill = createMockSkill({
-      level_start_sp: 1000,
-      level_end_sp: 2000,
-      current_sp: 1500,
+      levelStartSp: 1000,
+      levelEndSp: 2000,
+      currentSp: 1500,
     });
     expect(calculateCompletionPercentage(skill)).toBe(50);
   });
 
   it('clamps result to 0-100 range', () => {
     const skill = createMockSkill({
-      level_start_sp: 0,
-      level_end_sp: 1000,
-      current_sp: -100,
+      levelStartSp: 0,
+      levelEndSp: 1000,
+      currentSp: -100,
     });
     expect(calculateCompletionPercentage(skill)).toBe(0);
   });
@@ -432,126 +432,126 @@ describe('calculateTrainingHours', () => {
   const createMockSkill = (
     overrides: Partial<SkillQueueItem> = {}
   ): SkillQueueItem => ({
-    skill_id: 1,
-    queue_position: 0,
-    finished_level: 1,
-    level_start_sp: 0,
-    level_end_sp: 1000,
-    current_sp: 500,
-    sp_per_minute: 10,
+    skillId: 1,
+    queuePosition: 0,
+    finishedLevel: 1,
+    levelStartSp: 0,
+    levelEndSp: 1000,
+    currentSp: 500,
+    spPerMinute: 10,
     ...overrides,
   });
 
-  it('returns 0 for missing sp_per_minute', () => {
-    const skill = createMockSkill({ sp_per_minute: null });
+  it('returns 0 for missing spPerMinute', () => {
+    const skill = createMockSkill({ spPerMinute: undefined });
     expect(calculateTrainingHours(skill)).toBe(0);
   });
 
-  it('returns 0 for zero sp_per_minute', () => {
-    const skill = createMockSkill({ sp_per_minute: 0 });
+  it('returns 0 for zero spPerMinute', () => {
+    const skill = createMockSkill({ spPerMinute: 0 });
     expect(calculateTrainingHours(skill)).toBe(0);
   });
 
-  it('returns 0 for negative sp_per_minute', () => {
-    const skill = createMockSkill({ sp_per_minute: -5 });
+  it('returns 0 for negative spPerMinute', () => {
+    const skill = createMockSkill({ spPerMinute: -5 });
     expect(calculateTrainingHours(skill)).toBe(0);
   });
 
-  it('returns 0 for missing level_start_sp', () => {
-    const skill = createMockSkill({ level_start_sp: null });
+  it('returns 0 for missing levelStartSp', () => {
+    const skill = createMockSkill({ levelStartSp: undefined });
     expect(calculateTrainingHours(skill)).toBe(0);
   });
 
-  it('returns 0 for missing level_end_sp', () => {
-    const skill = createMockSkill({ level_end_sp: null });
+  it('returns 0 for missing levelEndSp', () => {
+    const skill = createMockSkill({ levelEndSp: undefined });
     expect(calculateTrainingHours(skill)).toBe(0);
   });
 
-  it('returns 0 when all current_sp sources are missing', () => {
+  it('returns 0 when all currentSp sources are missing', () => {
     const skill = createMockSkill({
-      current_sp: null,
-      training_start_sp: null,
-      level_start_sp: null,
+      currentSp: undefined,
+      trainingStartSp: undefined,
+      levelStartSp: undefined,
     });
     expect(calculateTrainingHours(skill)).toBe(0);
   });
 
   it('returns 0 when remainingSP <= 0', () => {
     const skill = createMockSkill({
-      current_sp: 1000,
-      level_end_sp: 1000,
+      currentSp: 1000,
+      levelEndSp: 1000,
     });
     expect(calculateTrainingHours(skill)).toBe(0);
   });
 
-  it('returns 0 when current_sp exceeds level_end_sp', () => {
+  it('returns 0 when currentSp exceeds levelEndSp', () => {
     const skill = createMockSkill({
-      current_sp: 1200,
-      level_end_sp: 1000,
+      currentSp: 1200,
+      levelEndSp: 1000,
     });
     expect(calculateTrainingHours(skill)).toBe(0);
   });
 
   it('calculates hours correctly for valid skill', () => {
     const skill = createMockSkill({
-      level_start_sp: 0,
-      level_end_sp: 600,
-      current_sp: 0,
-      sp_per_minute: 10,
+      levelStartSp: 0,
+      levelEndSp: 600,
+      currentSp: 0,
+      spPerMinute: 10,
     });
     expect(calculateTrainingHours(skill)).toBe(1);
   });
 
   it('calculates hours correctly with partial progress', () => {
     const skill = createMockSkill({
-      level_start_sp: 0,
-      level_end_sp: 600,
-      current_sp: 300,
-      sp_per_minute: 10,
+      levelStartSp: 0,
+      levelEndSp: 600,
+      currentSp: 300,
+      spPerMinute: 10,
     });
     expect(calculateTrainingHours(skill)).toBe(0.5);
   });
 
-  it('uses current_sp when available', () => {
+  it('uses currentSp when available', () => {
     const skill = createMockSkill({
-      level_start_sp: 0,
-      level_end_sp: 600,
-      current_sp: 200,
-      training_start_sp: 100,
-      sp_per_minute: 10,
+      levelStartSp: 0,
+      levelEndSp: 600,
+      currentSp: 200,
+      trainingStartSp: 100,
+      spPerMinute: 10,
     });
     expect(calculateTrainingHours(skill)).toBeCloseTo(400 / 600, 2);
   });
 
-  it('falls back to training_start_sp when current_sp is null', () => {
+  it('falls back to trainingStartSp when currentSp is null', () => {
     const skill = createMockSkill({
-      level_start_sp: 0,
-      level_end_sp: 600,
-      current_sp: null,
-      training_start_sp: 300,
-      sp_per_minute: 10,
+      levelStartSp: 0,
+      levelEndSp: 600,
+      currentSp: undefined,
+      trainingStartSp: 300,
+      spPerMinute: 10,
     });
     expect(calculateTrainingHours(skill)).toBe(0.5);
   });
 
-  it('falls back to level_start_sp when current_sp and training_start_sp are null', () => {
+  it('falls back to levelStartSp when currentSp and trainingStartSp are null', () => {
     const skill = createMockSkill({
-      level_start_sp: 0,
-      level_end_sp: 600,
-      current_sp: null,
-      training_start_sp: null,
-      sp_per_minute: 10,
+      levelStartSp: 0,
+      levelEndSp: 600,
+      currentSp: undefined,
+      trainingStartSp: undefined,
+      spPerMinute: 10,
     });
     expect(calculateTrainingHours(skill)).toBe(1);
   });
 
-  it('clamps current_sp to level_start_sp when current_sp is less than level_start_sp', () => {
+  it('clamps currentSp to levelStartSp when currentSp is less than levelStartSp', () => {
     const skill = createMockSkill({
-      level_start_sp: 226275,
-      level_end_sp: 1280000,
-      current_sp: 73702,
-      training_start_sp: 226275,
-      sp_per_minute: 10,
+      levelStartSp: 226275,
+      levelEndSp: 1280000,
+      currentSp: 73702,
+      trainingStartSp: 226275,
+      spPerMinute: 10,
     });
     const remainingSP = 1280000 - 226275;
     const expectedHours = remainingSP / (10 * 60);
@@ -563,9 +563,9 @@ describe('isCurrentlyTraining', () => {
   const createMockSkill = (
     overrides: Partial<SkillQueueItem> = {}
   ): SkillQueueItem => ({
-    skill_id: 1,
-    queue_position: 1,
-    finished_level: 1,
+    skillId: 1,
+    queuePosition: 1,
+    finishedLevel: 1,
     ...overrides,
   });
 
@@ -577,16 +577,16 @@ describe('isCurrentlyTraining', () => {
     vi.useRealTimers();
   });
 
-  it('returns true when queue_position is 0', () => {
-    const skill = createMockSkill({ queue_position: 0 });
+  it('returns true when queuePosition is 0', () => {
+    const skill = createMockSkill({ queuePosition: 0 });
     expect(isCurrentlyTraining(skill)).toBe(true);
   });
 
-  it('returns false when queue_position is not 0 and dates are missing', () => {
+  it('returns false when queuePosition is not 0 and dates are missing', () => {
     const skill = createMockSkill({
-      queue_position: 1,
-      start_date: null,
-      finish_date: null,
+      queuePosition: 1,
+      startDate: undefined,
+      finishDate: undefined,
     });
     expect(isCurrentlyTraining(skill)).toBe(false);
   });
@@ -596,9 +596,9 @@ describe('isCurrentlyTraining', () => {
     vi.setSystemTime(now);
 
     const skill = createMockSkill({
-      queue_position: 1,
-      start_date: '2024-01-15T10:00:00Z',
-      finish_date: '2024-01-15T14:00:00Z',
+      queuePosition: 1,
+      startDate: '2024-01-15T10:00:00Z',
+      finishDate: '2024-01-15T14:00:00Z',
     });
     expect(isCurrentlyTraining(skill)).toBe(true);
   });
@@ -608,9 +608,9 @@ describe('isCurrentlyTraining', () => {
     vi.setSystemTime(now);
 
     const skill = createMockSkill({
-      queue_position: 1,
-      start_date: '2024-01-15T10:00:00Z',
-      finish_date: '2024-01-15T14:00:00Z',
+      queuePosition: 1,
+      startDate: '2024-01-15T10:00:00Z',
+      finishDate: '2024-01-15T14:00:00Z',
     });
     expect(isCurrentlyTraining(skill)).toBe(true);
   });
@@ -620,9 +620,9 @@ describe('isCurrentlyTraining', () => {
     vi.setSystemTime(now);
 
     const skill = createMockSkill({
-      queue_position: 1,
-      start_date: '2024-01-15T10:00:00Z',
-      finish_date: '2024-01-15T14:00:00Z',
+      queuePosition: 1,
+      startDate: '2024-01-15T10:00:00Z',
+      finishDate: '2024-01-15T14:00:00Z',
     });
     expect(isCurrentlyTraining(skill)).toBe(false);
   });
@@ -632,9 +632,9 @@ describe('isCurrentlyTraining', () => {
     vi.setSystemTime(now);
 
     const skill = createMockSkill({
-      queue_position: 1,
-      start_date: '2024-01-15T10:00:00Z',
-      finish_date: '2024-01-15T14:00:00Z',
+      queuePosition: 1,
+      startDate: '2024-01-15T10:00:00Z',
+      finishDate: '2024-01-15T14:00:00Z',
     });
     expect(isCurrentlyTraining(skill)).toBe(false);
   });
@@ -644,36 +644,36 @@ describe('isCurrentlyTraining', () => {
     vi.setSystemTime(now);
 
     const skill = createMockSkill({
-      queue_position: 1,
-      start_date: '2024-01-15T10:00:00Z',
-      finish_date: '2024-01-15T14:00:00Z',
+      queuePosition: 1,
+      startDate: '2024-01-15T10:00:00Z',
+      finishDate: '2024-01-15T14:00:00Z',
     });
     expect(isCurrentlyTraining(skill)).toBe(false);
   });
 
   it('returns false for invalid date format', () => {
     const skill = createMockSkill({
-      queue_position: 1,
-      start_date: 'invalid-date',
-      finish_date: '2024-01-15T14:00:00Z',
+      queuePosition: 1,
+      startDate: 'invalid-date',
+      finishDate: '2024-01-15T14:00:00Z',
     });
     expect(isCurrentlyTraining(skill)).toBe(false);
   });
 
-  it('returns false when start_date is null but finish_date exists', () => {
+  it('returns false when startDate is null but finishDate exists', () => {
     const skill = createMockSkill({
-      queue_position: 1,
-      start_date: null,
-      finish_date: '2024-01-15T14:00:00Z',
+      queuePosition: 1,
+      startDate: undefined,
+      finishDate: '2024-01-15T14:00:00Z',
     });
     expect(isCurrentlyTraining(skill)).toBe(false);
   });
 
-  it('returns false when finish_date is null but start_date exists', () => {
+  it('returns false when finishDate is null but startDate exists', () => {
     const skill = createMockSkill({
-      queue_position: 1,
-      start_date: '2024-01-15T10:00:00Z',
-      finish_date: null,
+      queuePosition: 1,
+      startDate: '2024-01-15T10:00:00Z',
+      finishDate: undefined,
     });
     expect(isCurrentlyTraining(skill)).toBe(false);
   });

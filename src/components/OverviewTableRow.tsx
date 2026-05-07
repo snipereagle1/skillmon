@@ -33,9 +33,9 @@ export function OverviewTableRow({ character }: OverviewTableRowProps) {
             }}
             skillQueue={[
               {
-                skill_id: 0,
-                queue_position: 0,
-                finished_level: 0,
+                skillId: 0,
+                queuePosition: 0,
+                finishedLevel: 0,
               } satisfies SkillQueueItem,
             ]}
             size={32}

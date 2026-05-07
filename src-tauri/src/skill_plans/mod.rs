@@ -4,37 +4,45 @@ pub mod plan_from_character;
 pub mod simulation;
 
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
+use crate::ts_types::{i64_ts, usize_ts};
+
+#[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
 pub struct Attributes {
-    pub charisma: i64,
-    pub intelligence: i64,
-    pub memory: i64,
-    pub perception: i64,
-    pub willpower: i64,
+    pub charisma: i64_ts,
+    pub intelligence: i64_ts,
+    pub memory: i64_ts,
+    pub perception: i64_ts,
+    pub willpower: i64_ts,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlannedRemap {
-    pub entry_index: usize, // Index in the skill plan entries
+    pub entry_index: usize_ts,
     pub attributes: Attributes,
 }
 
+#[typeshare]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SkillmonPlanEntry {
-    pub skill_type_id: i64,
-    pub level: i64,
-    pub entry_type: String, // "Planned" or "Prerequisite"
+    pub skill_type_id: i64_ts,
+    pub level: i64_ts,
+    pub entry_type: String,
     pub notes: Option<String>,
 }
 
+#[typeshare]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SkillmonPlanRemap {
-    pub after_skill_type_id: Option<i64>,
-    pub after_skill_level: Option<i64>,
+    pub after_skill_type_id: Option<i64_ts>,
+    pub after_skill_level: Option<i64_ts>,
     pub attributes: Attributes,
 }
 
+#[typeshare]
 #[derive(Debug, Serialize, Deserialize)]
 pub struct SkillmonPlan {
     pub version: i32,

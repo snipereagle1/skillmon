@@ -1,15 +1,18 @@
 use serde::Serialize;
 use tauri::State;
+use typeshare::typeshare;
 
 use crate::db;
+use crate::ts_types::i64_ts;
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct Character {
-    pub character_id: i64,
+    pub character_id: i64_ts,
     pub character_name: String,
-    pub unallocated_sp: i64,
-    pub account_id: Option<i64>,
-    pub sort_order: i64,
+    pub unallocated_sp: i64_ts,
+    pub account_id: Option<i64_ts>,
+    pub sort_order: i64_ts,
     pub is_omega: bool,
 }
 
@@ -26,14 +29,16 @@ impl From<db::Character> for Character {
     }
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct AccountWithCharacters {
-    pub id: i64,
+    pub id: i64_ts,
     pub name: String,
-    pub sort_order: i64,
+    pub sort_order: i64_ts,
     pub characters: Vec<Character>,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct AccountsAndCharactersResponse {
     pub accounts: Vec<AccountWithCharacters>,

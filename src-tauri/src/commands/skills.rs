@@ -2,39 +2,44 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 use tauri::State;
+use typeshare::typeshare;
 
 use crate::auth;
 use crate::db;
 use crate::esi;
 use crate::esi_helpers;
+use crate::ts_types::i64_ts;
 use crate::utils;
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct CharacterSkillResponse {
-    pub skill_id: i64,
+    pub skill_id: i64_ts,
     pub skill_name: String,
-    pub group_id: i64,
+    pub group_id: i64_ts,
     pub group_name: String,
-    pub trained_skill_level: i64,
-    pub active_skill_level: i64,
-    pub skillpoints_in_skill: i64,
+    pub trained_skill_level: i64_ts,
+    pub active_skill_level: i64_ts,
+    pub skillpoints_in_skill: i64_ts,
     pub is_in_queue: bool,
-    pub queue_level: Option<i64>,
+    pub queue_level: Option<i64_ts>,
     pub is_injected: bool,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillGroupResponse {
-    pub group_id: i64,
+    pub group_id: i64_ts,
     pub group_name: String,
-    pub total_levels: i64,
-    pub trained_levels: i64,
+    pub total_levels: i64_ts,
+    pub trained_levels: i64_ts,
     pub has_trained_skills: bool,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct CharacterSkillsResponse {
-    pub character_id: i64,
+    pub character_id: i64_ts,
     pub skills: Vec<CharacterSkillResponse>,
     pub groups: Vec<SkillGroupResponse>,
 }
@@ -217,58 +222,64 @@ pub async fn get_sde_skills_with_groups(
     })
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct AttributeInfo {
-    pub attribute_id: i64,
+    pub attribute_id: i64_ts,
     pub name: String,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct BonusAttribute {
-    pub attribute_id: i64,
+    pub attribute_id: i64_ts,
     pub attribute_name: String,
     pub value: f64,
-    pub unit_id: Option<i64>,
+    pub unit_id: Option<i64_ts>,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillAttributesDetails {
     pub primary_attribute: Option<AttributeInfo>,
     pub secondary_attribute: Option<AttributeInfo>,
-    pub rank: Option<i64>,
+    pub rank: Option<i64_ts>,
     pub volume: Option<f64>,
     pub bonuses: Vec<BonusAttribute>,
     pub training_speed_sp_per_hour: Option<f64>,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillRequirement {
-    pub required_skill_id: i64,
+    pub required_skill_id: i64_ts,
     pub required_skill_name: String,
-    pub required_level: i64,
+    pub required_level: i64_ts,
     pub is_met: bool,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct RequiredForItem {
-    pub type_id: i64,
+    pub type_id: i64_ts,
     pub type_name: String,
-    pub required_level: i64,
-    pub category_id: i64,
+    pub required_level: i64_ts,
+    pub category_id: i64_ts,
     pub category_name: Option<String>,
-    pub group_id: i64,
+    pub group_id: i64_ts,
     pub group_name: String,
     pub is_skill: bool,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillDetailsResponse {
-    pub skill_id: i64,
+    pub skill_id: i64_ts,
     pub skill_name: String,
     pub description: Option<String>,
-    pub group_id: i64,
+    pub group_id: i64_ts,
     pub group_name: String,
-    pub category_id: i64,
+    pub category_id: i64_ts,
     pub attributes: SkillAttributesDetails,
     pub prerequisites: Vec<SkillRequirement>,
     pub required_for: Vec<RequiredForItem>,

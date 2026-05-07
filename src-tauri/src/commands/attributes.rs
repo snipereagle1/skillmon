@@ -1,28 +1,24 @@
 use serde::Serialize;
 use tauri::State;
+use typeshare::typeshare;
 
 use crate::db;
 use crate::esi;
 use crate::esi_helpers;
+use crate::refresh::events::AttributeBreakdown;
+use crate::ts_types::i64_ts;
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct CharacterAttributesResponse {
-    pub charisma: i64,
-    pub intelligence: i64,
-    pub memory: i64,
-    pub perception: i64,
-    pub willpower: i64,
+    pub charisma: i64_ts,
+    pub intelligence: i64_ts,
+    pub memory: i64_ts,
+    pub perception: i64_ts,
+    pub willpower: i64_ts,
 }
 
-#[derive(Debug, Clone, Serialize)]
-pub struct AttributeBreakdown {
-    pub base: i64,
-    pub implants: i64,
-    pub remap: i64,
-    pub accelerator: i64,
-    pub total: i64,
-}
-
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct CharacterAttributesBreakdown {
     pub charisma: AttributeBreakdown,
@@ -30,7 +26,7 @@ pub struct CharacterAttributesBreakdown {
     pub memory: AttributeBreakdown,
     pub perception: AttributeBreakdown,
     pub willpower: AttributeBreakdown,
-    pub bonus_remaps: Option<i64>,
+    pub bonus_remaps: Option<i64_ts>,
     pub accrued_remap_cooldown_date: Option<String>,
     pub last_remap_date: Option<String>,
 }

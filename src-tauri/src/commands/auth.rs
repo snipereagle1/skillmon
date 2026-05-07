@@ -4,6 +4,7 @@ use anyhow::{Context, Result};
 use chrono::Utc;
 use serde::Serialize;
 use tauri::{Emitter, Manager, State};
+use typeshare::typeshare;
 
 use crate::auth;
 use crate::cache;
@@ -13,6 +14,7 @@ use crate::refresh;
 
 pub type AuthStateMap = std::sync::Mutex<std::collections::HashMap<String, auth::AuthState>>;
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct BaseScopeStrings {
     pub scopes: Vec<String>,

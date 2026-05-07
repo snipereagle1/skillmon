@@ -1,19 +1,22 @@
 use futures_util::future::join_all;
 use serde::Serialize;
 use tauri::{AppHandle, State};
+use typeshare::typeshare;
 
 use crate::commands::skill_queues::is_skill_actively_training;
 use crate::db;
 use crate::esi;
 use crate::esi_helpers;
 use crate::skill_queue;
+use crate::ts_types::i64_ts;
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct TrainingCharacterOverview {
-    pub character_id: i64,
+    pub character_id: i64_ts,
     pub character_name: String,
     pub account_name: Option<String>,
-    pub queue_time_remaining_seconds: Option<i64>,
+    pub queue_time_remaining_seconds: Option<i64_ts>,
     pub current_skill_name: Option<String>,
     pub current_skill_level: Option<i32>,
     pub sp_per_hour: f64,

@@ -1,23 +1,26 @@
 use futures_util::future::join_all;
 use serde::Serialize;
 use tauri::State;
+use typeshare::typeshare;
 
 use crate::auth;
 use crate::db;
 use crate::esi;
 use crate::esi_helpers;
 use crate::features::FeatureId;
+use crate::ts_types::i64_ts;
 use crate::utils;
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct CharacterLocation {
-    pub solar_system_id: i64,
+    pub solar_system_id: i64_ts,
     pub solar_system_name: String,
-    pub station_id: Option<i64>,
+    pub station_id: Option<i64_ts>,
     pub station_name: Option<String>,
-    pub structure_id: Option<i64>,
+    pub structure_id: Option<i64_ts>,
     pub structure_name: Option<String>,
-    pub ship_type_id: i64,
+    pub ship_type_id: i64_ts,
     pub ship_type_name: String,
     pub ship_name: String,
     pub is_online: bool,
@@ -140,31 +143,32 @@ pub async fn get_character_location(
     })
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
-pub struct ImplantInfo {
-    pub type_id: i64,
+pub struct LocationImplantInfo {
+    pub type_id: i64_ts,
     pub name: String,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct CharacterLocationOverview {
-    pub character_id: i64,
+    pub character_id: i64_ts,
     pub character_name: String,
     pub has_location_scope: bool,
     pub is_online: Option<bool>,
     pub is_docked: Option<bool>,
     pub solar_system_name: Option<String>,
     pub region_name: Option<String>,
-    pub station_id: Option<i64>,
+    pub station_id: Option<i64_ts>,
     pub station_name: Option<String>,
-    pub structure_id: Option<i64>,
+    pub structure_id: Option<i64_ts>,
     pub structure_name: Option<String>,
-    /// The type_id of the station or structure the character is docked in (for image rendering)
-    pub structure_type_id: Option<i64>,
-    pub ship_type_id: Option<i64>,
+    pub structure_type_id: Option<i64_ts>,
+    pub ship_type_id: Option<i64_ts>,
     pub ship_type_name: Option<String>,
     pub ship_name: Option<String>,
-    pub implants: Vec<ImplantInfo>,
+    pub implants: Vec<LocationImplantInfo>,
 }
 
 #[tauri::command]
@@ -340,7 +344,7 @@ pub async fn get_all_characters_locations(
             let implant_names = utils::get_type_names(&pool, &implant_ids).await?;
             let implants = implant_ids
                 .iter()
-                .map(|&type_id| ImplantInfo {
+                .map(|&type_id| LocationImplantInfo {
                     type_id,
                     name: implant_names
                         .get(&type_id)

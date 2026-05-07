@@ -1,25 +1,29 @@
 use anyhow::Result;
 use serde::Serialize;
 use tauri::State;
+use typeshare::typeshare;
 
 use crate::db;
 use crate::esi;
 use crate::esi_helpers;
+use crate::ts_types::i64_ts;
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct CloneImplantResponse {
-    pub implant_type_id: i64,
-    pub slot: Option<i64>,
+    pub implant_type_id: i64_ts,
+    pub slot: Option<i64_ts>,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct CloneResponse {
-    pub id: i64,
-    pub character_id: i64,
-    pub clone_id: Option<i64>,
+    pub id: i64_ts,
+    pub character_id: i64_ts,
+    pub clone_id: Option<i64_ts>,
     pub name: Option<String>,
     pub location_type: String,
-    pub location_id: i64,
+    pub location_id: i64_ts,
     pub location_name: String,
     pub is_current: bool,
     pub implants: Vec<CloneImplantResponse>,

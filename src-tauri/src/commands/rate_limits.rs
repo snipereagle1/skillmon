@@ -1,8 +1,11 @@
 use serde::Serialize;
 use tauri::State;
+use typeshare::typeshare;
 
 use crate::esi;
+use crate::ts_types::i64_ts;
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct RateLimitResponse {
     pub group: String,
@@ -24,9 +27,10 @@ impl From<&esi::RateLimitInfo> for RateLimitResponse {
     }
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct CharacterRateLimits {
-    pub character_id: i64,
+    pub character_id: i64_ts,
     pub limits: Vec<RateLimitResponse>,
 }
 

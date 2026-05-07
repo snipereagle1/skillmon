@@ -128,7 +128,7 @@ export function CreatePlanFromCharacterDialog({
       const planId = await createPlanMutation.mutateAsync({
         characterId,
         planName: planName.trim(),
-        description: description.trim() || null,
+        description: description.trim() || undefined,
         includedGroupIds: Array.from(effectiveIncludedGroupIds),
       });
       handleOpenChange(false);

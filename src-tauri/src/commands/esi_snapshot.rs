@@ -5,12 +5,13 @@ use typeshare::typeshare;
 use crate::db;
 use crate::refresh::enrichment;
 use crate::refresh::events;
+use crate::ts_types::i64_ts;
 
 #[typeshare]
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CharacterSnapshot {
-    pub character_id: i64,
+    pub character_id: i64_ts,
     pub character_name: String,
     pub queue: Option<events::QueuePayload>,
     pub skills: Option<events::SkillsPayload>,

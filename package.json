@@ -11,8 +11,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "typegen": "cargo tauri-typegen generate --output-path src/generated",
-    "typeshare": "typeshare src-tauri/src --lang typescript --output-file src/generated/events.ts || true",
+    "typegen": "typeshare src-tauri/src --lang typescript --output-file src/generated/types.ts",
     "tauri:dev": "pnpm typegen && tauri dev",
     "tauri:build": "pnpm typegen && tauri build",
     "test": "TZ=UTC vitest",
@@ -28,7 +27,7 @@
     "format:check:rust": "cd src-tauri && cargo fmt -- --check",
     "lint:full": "pnpm lint && pnpm lint:rust",
     "format:check:all": "pnpm format:check && pnpm format:check:rust",
-    "verify": "pnpm typegen && pnpm typeshare && pnpm lint:full && pnpm format:check:all && pnpm typecheck",
+    "verify": "pnpm typegen && pnpm lint:full && pnpm format:check:all && pnpm typecheck",
     "prepare": "husky"
   },
   "lint-staged": {

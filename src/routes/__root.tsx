@@ -21,6 +21,7 @@ import {
   getClones,
   getSkillQueueForCharacter,
 } from '@/generated/commands';
+import { FeatureId } from '@/generated/types';
 import { useAuthEvents } from '@/hooks/tauri/useAuthEvents';
 import { useEnabledFeatures } from '@/hooks/tauri/useSettings';
 import { useStartupState } from '@/hooks/tauri/useStartupState';
@@ -50,7 +51,8 @@ function RootComponent() {
     useSkillDetailStore();
   const { updateAvailable, setUpdate } = useUpdateStore();
   const { data: enabledFeatures } = useEnabledFeatures();
-  const locationsEnabled = enabledFeatures?.includes('locations') ?? false;
+  const locationsEnabled =
+    enabledFeatures?.includes(FeatureId.Locations) ?? false;
 
   useEffect(() => {
     const checkForUpdates = async () => {

@@ -207,7 +207,7 @@ export function PlanEntryRow({
 
   const handleSave = async () => {
     const oldNotes = entry.notes;
-    const newNotes = editNotes.trim() || null;
+    const newNotes = editNotes.trim() || undefined;
 
     if (oldNotes === newNotes) {
       setEditDialogOpen(false);

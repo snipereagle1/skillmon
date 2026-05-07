@@ -30,16 +30,16 @@ function getTrainingStatus(
 
   for (const item of skillQueue) {
     // Check if queue_position is 0 (currently training)
-    if (item.queue_position === 0) {
+    if (item.queuePosition === 0) {
       return 'training';
     }
 
     // Check if current time is between start_date and finish_date
     // Backend logic: now >= start_utc && now < finish_utc (inclusive start, exclusive end)
-    if (item.start_date != null && item.finish_date != null) {
+    if (item.startDate != null && item.finishDate != null) {
       try {
-        const startDate = parseISO(item.start_date);
-        const finishDate = parseISO(item.finish_date);
+        const startDate = parseISO(item.startDate);
+        const finishDate = parseISO(item.finishDate);
 
         const isAfterOrEqualStart =
           isAfter(now, startDate) || isEqual(now, startDate);

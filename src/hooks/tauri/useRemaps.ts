@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import type { SaveRemapParams } from '@/generated/commands';
 import {
   deleteRemap,
   getCharacterAttributesBreakdown,
@@ -7,7 +8,7 @@ import {
   getPlanRemaps,
   saveRemap,
 } from '@/generated/commands';
-import type { Remap, SaveRemapParams } from '@/generated/types';
+import type { Remap } from '@/generated/types';
 import { useEsiStore } from '@/stores/esiStore';
 
 import { queryKeys } from './queryKeys';

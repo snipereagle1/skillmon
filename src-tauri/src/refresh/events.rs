@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use typeshare::typeshare;
 
+use crate::ts_types::i64_ts;
+
 // ── Task 001: Queue / Skills / Attributes enriched payloads ─────────────────
 
 #[typeshare]
@@ -16,11 +18,11 @@ pub struct SkillQueueItem {
     pub level_start_sp: Option<i32>,
     pub level_end_sp: Option<i32>,
     pub skill_name: Option<String>,
-    pub primary_attribute: Option<i64>,
-    pub secondary_attribute: Option<i64>,
-    pub rank: Option<i64>,
+    pub primary_attribute: Option<i64_ts>,
+    pub secondary_attribute: Option<i64_ts>,
+    pub rank: Option<i64_ts>,
     pub sp_per_minute: Option<f64>,
-    pub current_sp: Option<i64>,
+    pub current_sp: Option<i64_ts>,
 }
 
 #[typeshare]
@@ -32,7 +34,7 @@ pub struct SkillItem {
     pub skillpoints_in_skill: i32,
     pub trained_skill_level: i32,
     pub skill_name: Option<String>,
-    pub group_id: Option<i64>,
+    pub group_id: Option<i64_ts>,
     pub group_name: Option<String>,
     pub is_in_queue: bool,
     pub is_injected: bool,
@@ -96,7 +98,7 @@ pub struct QueuePayload {
     pub character_id: i32,
     pub queue: Vec<SkillQueueItem>,
     pub character_name: String,
-    pub unallocated_sp: i64,
+    pub unallocated_sp: i64_ts,
     pub is_paused: bool,
     pub is_omega: bool,
     pub attributes: Option<AttributesData>,
@@ -108,20 +110,20 @@ pub struct QueuePayload {
 pub struct SkillsPayload {
     pub character_id: i32,
     pub character_name: String,
-    pub total_sp: i64,
-    pub unallocated_sp: Option<i64>,
+    pub total_sp: i64_ts,
+    pub unallocated_sp: Option<i64_ts>,
     pub skills: Vec<SkillItem>,
 }
 
 #[typeshare]
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct AttributeBreakdown {
-    pub base: i64,
-    pub implants: i64,
-    pub remap: i64,
-    pub accelerator: i64,
-    pub total: i64,
+    pub base: i64_ts,
+    pub implants: i64_ts,
+    pub remap: i64_ts,
+    pub accelerator: i64_ts,
+    pub total: i64_ts,
 }
 
 #[typeshare]
@@ -147,7 +149,7 @@ pub struct AttributesPayload {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ImplantInfo {
-    pub type_id: i64,
+    pub type_id: i64_ts,
     pub name: String,
 }
 
@@ -156,11 +158,11 @@ pub struct ImplantInfo {
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct CloneInfo {
-    pub id: i64,
-    pub clone_id: Option<i64>,
+    pub id: i64_ts,
+    pub clone_id: Option<i64_ts>,
     pub name: Option<String>,
     pub location_type: String,
-    pub location_id: i64,
+    pub location_id: i64_ts,
     pub location_name: Option<String>,
     pub is_current: bool,
     pub implants: Vec<ImplantInfo>,
@@ -172,15 +174,15 @@ pub struct CloneInfo {
 pub struct LocationPayload {
     pub character_id: i32,
     pub has_location_scope: bool,
-    pub solar_system_id: i64,
+    pub solar_system_id: i64_ts,
     pub solar_system_name: String,
     pub region_name: Option<String>,
-    pub station_id: Option<i64>,
+    pub station_id: Option<i64_ts>,
     pub station_name: Option<String>,
-    pub structure_id: Option<i64>,
+    pub structure_id: Option<i64_ts>,
     pub structure_name: Option<String>,
-    pub structure_type_id: Option<i64>,
-    pub ship_type_id: Option<i64>,
+    pub structure_type_id: Option<i64_ts>,
+    pub ship_type_id: Option<i64_ts>,
     pub ship_type_name: Option<String>,
     pub ship_name: Option<String>,
     pub is_online: Option<bool>,

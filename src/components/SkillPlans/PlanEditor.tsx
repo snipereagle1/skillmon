@@ -382,7 +382,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
       await updatePlanMutation.mutateAsync({
         planId,
         name: data.plan.name,
-        description: editDescription.trim() || null,
+        description: editDescription.trim() || undefined,
         autoPrerequisites: data.plan.auto_prerequisites,
       });
       setIsEditingDescription(false);

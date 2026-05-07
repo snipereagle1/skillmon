@@ -41,10 +41,10 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
       description: `Imported from training queue on ${formatDate(new Date())}`,
       auto_prerequisites: true,
       entries: queue.skill_queue.map((item) => ({
-        skill_type_id: item.skill_id,
-        level: item.finished_level,
+        skill_type_id: item.skillId,
+        level: item.finishedLevel,
         entry_type: 'Planned',
-        notes: null,
+        notes: undefined,
       })),
       remaps: [],
     };
@@ -98,8 +98,8 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
 
   const calculateTotalSP = (): number => {
     return queue.skill_queue.reduce((total, skill) => {
-      if (skill.level_start_sp != null && skill.level_end_sp != null) {
-        return total + (skill.level_end_sp - skill.level_start_sp);
+      if (skill.levelStartSp != null && skill.levelEndSp != null) {
+        return total + (skill.levelEndSp - skill.levelStartSp);
       }
       return total;
     }, 0);
@@ -178,11 +178,11 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
                     cumulativeHours += skillHours;
                     const remapAfter = remaps?.find(
                       (r) =>
-                        r.after_skill_type_id === skill.skill_id &&
-                        r.after_skill_level === skill.finished_level
+                        r.after_skill_type_id === skill.skillId &&
+                        r.after_skill_level === skill.finishedLevel
                     );
                     return (
-                      <React.Fragment key={`${skill.skill_id}-${idx}`}>
+                      <React.Fragment key={`${skill.skillId}-${idx}`}>
                         <SkillQueueEntry
                           skill={skill}
                           totalQueueHours={totalHours}

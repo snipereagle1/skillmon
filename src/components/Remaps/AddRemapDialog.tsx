@@ -108,8 +108,8 @@ export function AddRemapDialog({
 
   const handleSave = async () => {
     try {
-      let finalAfterSkillTypeId = null;
-      let finalAfterSkillLevel = null;
+      let finalAfterSkillTypeId: number | undefined;
+      let finalAfterSkillLevel: number | undefined;
 
       if (selectedSkillId !== 'start') {
         const [typeId, level] = selectedSkillId.split('-').map(Number);
@@ -118,8 +118,8 @@ export function AddRemapDialog({
       }
 
       await saveRemapMutation.mutateAsync({
-        characterId,
-        planId,
+        characterId: characterId ?? undefined,
+        planId: planId ?? undefined,
         afterSkillTypeId: finalAfterSkillTypeId,
         afterSkillLevel: finalAfterSkillLevel,
         attributes,
@@ -172,10 +172,10 @@ export function AddRemapDialog({
                     characterId &&
                     characterQueue?.skill_queue.map((item, idx) => (
                       <SelectItem
-                        key={`${item.skill_id}-${item.finished_level}-${idx}`}
-                        value={`${item.skill_id}-${item.finished_level}`}
+                        key={`${item.skillId}-${item.finishedLevel}-${idx}`}
+                        value={`${item.skillId}-${item.finishedLevel}`}
                       >
-                        {item.skill_name} {item.finished_level}
+                        {item.skillName} {item.finishedLevel}
                       </SelectItem>
                     ))}
                 </SelectContent>

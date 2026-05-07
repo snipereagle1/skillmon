@@ -1,11 +1,14 @@
 use crate::db;
 use crate::skill_plans::{Attributes, PlannedRemap};
+use crate::ts_types::{i64_ts, usize_ts};
 use crate::utils;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use typeshare::typeshare;
 
 const BASE_ATTRIBUTE: i64 = 17;
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimulationProfile {
     pub implants: Attributes,
@@ -13,33 +16,36 @@ pub struct SimulationProfile {
     pub accelerators: Vec<PlannedAccelerator>,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlannedAccelerator {
-    pub entry_index: usize, // Index in the skill plan entries
-    pub bonus: i64,         // Additive bonus to all attributes
-    pub duration_seconds: i64,
+    pub entry_index: usize_ts,
+    pub bonus: i64_ts,
+    pub duration_seconds: i64_ts,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimulationResult {
-    pub total_seconds: i64,
-    pub total_sp: i64,
+    pub total_seconds: i64_ts,
+    pub total_sp: i64_ts,
     pub segments: Vec<SimulationSegment>,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct SimulationSegment {
-    pub entry_index: usize,
-    pub skill_type_id: i64,
-    pub level: i64,
-    pub duration_seconds: i64,
-    pub start_time_seconds: i64,
+    pub entry_index: usize_ts,
+    pub skill_type_id: i64_ts,
+    pub level: i64_ts,
+    pub duration_seconds: i64_ts,
+    pub start_time_seconds: i64_ts,
     pub attributes: Attributes,
     pub sp_per_minute: f64,
-    pub primary_attribute_id: Option<i64>,
-    pub secondary_attribute_id: Option<i64>,
-    pub sp_earned: i64,
-    pub cumulative_sp: i64,
+    pub primary_attribute_id: Option<i64_ts>,
+    pub secondary_attribute_id: Option<i64_ts>,
+    pub sp_earned: i64_ts,
+    pub cumulative_sp: i64_ts,
 }
 
 pub async fn simulate(

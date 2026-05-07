@@ -1,5 +1,15 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import type {
+  AddCharacterToAccountParams,
+  CreateAccountParams,
+  DeleteAccountParams,
+  RemoveCharacterFromAccountParams,
+  ReorderAccountsParams,
+  ReorderCharactersInAccountParams,
+  ReorderUnassignedCharactersParams,
+  UpdateAccountNameParams,
+} from '@/generated/commands';
 import {
   addCharacterToAccount,
   createAccount,
@@ -11,17 +21,7 @@ import {
   reorderUnassignedCharacters,
   updateAccountName,
 } from '@/generated/commands';
-import type {
-  AccountsAndCharactersResponse,
-  AddCharacterToAccountParams,
-  CreateAccountParams,
-  DeleteAccountParams,
-  RemoveCharacterFromAccountParams,
-  ReorderAccountsParams,
-  ReorderCharactersInAccountParams,
-  ReorderUnassignedCharactersParams,
-  UpdateAccountNameParams,
-} from '@/generated/types';
+import type { AccountsAndCharactersResponse } from '@/generated/types';
 
 import { queryKeys } from './queryKeys';
 
