@@ -7,6 +7,7 @@ use tokio_util::sync::CancellationToken;
 
 use crate::{auth, cache, db, esi, esi_helpers, notifications};
 
+pub mod enrichment;
 pub mod events;
 
 pub struct RefresherHandle {
@@ -39,6 +40,10 @@ impl RefreshSupervisor {
 
         let handle = tokio::spawn(async move {
             let notification_processor = notifications::NotificationProcessor::new();
+
+            // Per-character last-known location IDs for ESI name resolution gating
+            let mut last_location_ids = enrichment::LocationIds::none();
+
             loop {
                 if cancel_clone.is_cancelled() {
                     return;
@@ -73,7 +78,7 @@ impl RefreshSupervisor {
 
                 let mut any_success = false;
 
-                // Queue
+                // ── Queue ─────────────────────────────────────────────────────
                 match esi_helpers::get_cached_skill_queue(
                     &pool,
                     &client,
@@ -84,33 +89,32 @@ impl RefreshSupervisor {
                 {
                     Ok(Some(queue_data)) => {
                         any_success = true;
-                        let payload = events::QueuePayload {
-                            character_id: character_id as i32,
-                            queue: queue_data
-                                .into_iter()
-                                .map(|item| events::SkillQueueItem {
-                                    skill_id: item.skill_id as i32,
-                                    finished_level: item.finished_level as i32,
-                                    queue_position: item.queue_position as i32,
-                                    start_date: item.start_date.map(|d| d.to_rfc3339()),
-                                    finish_date: item.finish_date.map(|d| d.to_rfc3339()),
-                                    training_start_sp: item.training_start_sp.map(|v| v as i32),
-                                    level_start_sp: item.level_start_sp.map(|v| v as i32),
-                                    level_end_sp: item.level_end_sp.map(|v| v as i32),
-                                })
-                                .collect(),
-                        };
+                        let payload =
+                            enrichment::enrich_queue(&pool, character_id, queue_data).await;
                         if let Err(e) =
                             app_handle.emit(&format!("character:{}:queue", character_id), &payload)
                         {
                             eprintln!("refresh: emit error queue {}: {}", character_id, e);
                         }
                     }
-                    Ok(None) => {}
+                    Ok(None) => {
+                        if let Some(payload) =
+                            enrichment::enrich_queue_from_db(&pool, character_id).await
+                        {
+                            if let Err(e) = app_handle
+                                .emit(&format!("character:{}:queue", character_id), &payload)
+                            {
+                                eprintln!(
+                                    "refresh: emit error queue (cached) {}: {}",
+                                    character_id, e
+                                );
+                            }
+                        }
+                    }
                     Err(e) => eprintln!("refresh: fetch error queue {}: {}", character_id, e),
                 }
 
-                // Skills
+                // ── Skills ────────────────────────────────────────────────────
                 match esi_helpers::get_cached_character_skills(
                     &pool,
                     &client,
@@ -121,34 +125,55 @@ impl RefreshSupervisor {
                 {
                     Ok(Some(skills_data)) => {
                         any_success = true;
-                        let payload = events::SkillsPayload {
-                            character_id: character_id as i32,
-                            skills: events::SkillsData {
-                                skills: skills_data
-                                    .skills
-                                    .into_iter()
-                                    .map(|s| events::SkillItem {
-                                        skill_id: s.skill_id as i32,
-                                        active_skill_level: s.active_skill_level as i32,
-                                        skillpoints_in_skill: s.skillpoints_in_skill as i32,
-                                        trained_skill_level: s.trained_skill_level as i32,
-                                    })
-                                    .collect(),
-                                total_sp: skills_data.total_sp as i32,
-                                unallocated_sp: skills_data.unallocated_sp.map(|v| v as i32),
-                            },
+                        // Get current queue skill IDs to compute is_in_queue
+                        let queue_skill_ids: Vec<i64> = {
+                            let ep = format!("characters/{}/skillqueue", character_id);
+                            let ck = cache::build_cache_key(&ep, character_id);
+                            if let Ok(Some(entry)) = cache::get_cached_response(&pool, &ck).await {
+                                let now = chrono::Utc::now();
+                                serde_json::from_str::<Vec<esi::CharactersSkillqueueSkill>>(
+                                    &entry.response_body,
+                                )
+                                .unwrap_or_default()
+                                .into_iter()
+                                .filter(|item| item.finish_date.map(|fd| now < fd).unwrap_or(true))
+                                .map(|item| item.skill_id)
+                                .collect()
+                            } else {
+                                vec![]
+                            }
                         };
+                        let payload = enrichment::enrich_skills(
+                            &pool,
+                            character_id,
+                            &skills_data,
+                            &queue_skill_ids,
+                        )
+                        .await;
                         if let Err(e) =
                             app_handle.emit(&format!("character:{}:skills", character_id), &payload)
                         {
                             eprintln!("refresh: emit error skills {}: {}", character_id, e);
                         }
                     }
-                    Ok(None) => {}
+                    Ok(None) => {
+                        if let Some(payload) =
+                            enrichment::enrich_skills_from_db(&pool, character_id).await
+                        {
+                            if let Err(e) = app_handle
+                                .emit(&format!("character:{}:skills", character_id), &payload)
+                            {
+                                eprintln!(
+                                    "refresh: emit error skills (cached) {}: {}",
+                                    character_id, e
+                                );
+                            }
+                        }
+                    }
                     Err(e) => eprintln!("refresh: fetch error skills {}: {}", character_id, e),
                 }
 
-                // Attributes
+                // ── Attributes ────────────────────────────────────────────────
                 match esi_helpers::get_cached_character_attributes(
                     &pool,
                     &client,
@@ -159,32 +184,34 @@ impl RefreshSupervisor {
                 {
                     Ok(Some(attrs)) => {
                         any_success = true;
-                        let payload = events::AttributesPayload {
-                            character_id: character_id as i32,
-                            attributes: events::AttributesData {
-                                charisma: attrs.charisma as i32,
-                                intelligence: attrs.intelligence as i32,
-                                memory: attrs.memory as i32,
-                                perception: attrs.perception as i32,
-                                willpower: attrs.willpower as i32,
-                                bonus_remaps: attrs.bonus_remaps.map(|v| v as i32),
-                                last_remap_date: attrs.last_remap_date.map(|d| d.to_rfc3339()),
-                                accrued_remap_cooldown_date: attrs
-                                    .accrued_remap_cooldown_date
-                                    .map(|d| d.to_rfc3339()),
-                            },
-                        };
+                        let payload =
+                            enrichment::enrich_attributes(&pool, character_id, &attrs).await;
                         if let Err(e) = app_handle
                             .emit(&format!("character:{}:attributes", character_id), &payload)
                         {
                             eprintln!("refresh: emit error attributes {}: {}", character_id, e);
                         }
                     }
-                    Ok(None) => {}
-                    Err(e) => eprintln!("refresh: fetch error attributes {}: {}", character_id, e),
+                    Ok(None) => {
+                        if let Some(payload) =
+                            enrichment::enrich_attributes_from_db(&pool, character_id).await
+                        {
+                            if let Err(e) = app_handle
+                                .emit(&format!("character:{}:attributes", character_id), &payload)
+                            {
+                                eprintln!(
+                                    "refresh: emit error attributes (cached) {}: {}",
+                                    character_id, e
+                                );
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        eprintln!("refresh: fetch error attributes {}: {}", character_id, e)
+                    }
                 }
 
-                // Location
+                // ── Location ──────────────────────────────────────────────────
                 match esi_helpers::get_cached_character_location(
                     &pool,
                     &client,
@@ -195,25 +222,45 @@ impl RefreshSupervisor {
                 {
                     Ok(Some(loc)) => {
                         any_success = true;
-                        let payload = events::LocationPayload {
-                            character_id: character_id as i32,
-                            location: events::LocationData {
-                                solar_system_id: loc.solar_system_id as i32,
-                                station_id: loc.station_id.map(|v| v as i32),
-                                structure_id: loc.structure_id.map(|v| v as i32),
-                            },
-                        };
-                        if let Err(e) = app_handle
-                            .emit(&format!("character:{}:location", character_id), &payload)
+                        if let Some(payload) = enrichment::enrich_location(
+                            &pool,
+                            &client,
+                            character_id,
+                            &rate_limits,
+                            &last_location_ids,
+                        )
+                        .await
                         {
-                            eprintln!("refresh: emit error location {}: {}", character_id, e);
+                            last_location_ids = enrichment::LocationIds {
+                                solar_system_id: Some(loc.solar_system_id),
+                                station_id: loc.station_id,
+                                structure_id: loc.structure_id,
+                            };
+                            if let Err(e) = app_handle
+                                .emit(&format!("character:{}:location", character_id), &payload)
+                            {
+                                eprintln!("refresh: emit error location {}: {}", character_id, e);
+                            }
                         }
                     }
-                    Ok(None) => {}
+                    Ok(None) => {
+                        if let Some(payload) =
+                            enrichment::enrich_location_db_only(&pool, character_id).await
+                        {
+                            if let Err(e) = app_handle
+                                .emit(&format!("character:{}:location", character_id), &payload)
+                            {
+                                eprintln!(
+                                    "refresh: emit error location (cached) {}: {}",
+                                    character_id, e
+                                );
+                            }
+                        }
+                    }
                     Err(e) => eprintln!("refresh: fetch error location {}: {}", character_id, e),
                 }
 
-                // Clones
+                // ── Clones ────────────────────────────────────────────────────
                 match esi_helpers::get_cached_character_clones(
                     &pool,
                     &client,
@@ -222,34 +269,28 @@ impl RefreshSupervisor {
                 )
                 .await
                 {
-                    Ok(Some(clones_data)) => {
+                    Ok(Some(_clones_data)) => {
                         any_success = true;
-                        let payload = events::ClonesPayload {
-                            character_id: character_id as i32,
-                            clones: events::ClonesData {
-                                home_location: clones_data.home_location.map(|hl| {
-                                    events::HomeLocationData {
-                                        location_id: hl.location_id.map(|v| v as i32),
-                                        location_type: hl
-                                            .location_type
-                                            .map(|lt| format!("{:?}", lt)),
-                                    }
-                                }),
-                                last_clone_jump_date: clones_data
-                                    .last_clone_jump_date
-                                    .map(|d| d.to_rfc3339()),
-                                last_station_change_date: clones_data
-                                    .last_station_change_date
-                                    .map(|d| d.to_rfc3339()),
-                            },
-                        };
+                        let payload = enrichment::enrich_clones(&pool, character_id).await;
                         if let Err(e) =
                             app_handle.emit(&format!("character:{}:clones", character_id), &payload)
                         {
                             eprintln!("refresh: emit error clones {}: {}", character_id, e);
                         }
                     }
-                    Ok(None) => {}
+                    Ok(None) => {
+                        let payload = enrichment::enrich_clones(&pool, character_id).await;
+                        if !payload.clones.is_empty() {
+                            if let Err(e) = app_handle
+                                .emit(&format!("character:{}:clones", character_id), &payload)
+                            {
+                                eprintln!(
+                                    "refresh: emit error clones (cached) {}: {}",
+                                    character_id, e
+                                );
+                            }
+                        }
+                    }
                     Err(e) => eprintln!("refresh: fetch error clones {}: {}", character_id, e),
                 }
 
