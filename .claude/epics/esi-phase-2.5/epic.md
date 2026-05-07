@@ -12,18 +12,18 @@ github: (will be set on sync)
 
 ## Overview
 
-Phase 2 left the event layer in a half-finished state: payloads carry raw ESI shapes, listeners double-fetch via commands, the supervisor starves the store on cache hits, and tauri-typegen silently generates incorrect types. This epic completes the original intent of Option B from the Phase 2 findings: the supervisor becomes the single source of ESI traffic, events carry fully enriched component-ready data, listeners are pure setters, and the type system is correct by construction.
+Phase 2 left event layer half-finished: payloads carry raw ESI shapes, listeners double-fetch via commands, supervisor starves store on cache hits, tauri-typegen silently generates wrong types. Epic completes Option B from Phase 2 findings: supervisor becomes single ESI traffic source, events carry enriched component-ready data, listeners are pure setters, type system correct by construction.
 
-The cache-hit starvation bug (`Ok(None) => {}`) is fixed as part of this work — it's a structural consequence of the same root cause.
+Cache-hit starvation bug (`Ok(None) => {}`) fixed here — structural consequence of same root cause.
 
 ## Architecture Decisions
 
-- **Enrichment belongs in Rust**: skill names, group names, system/station/structure names, implant names, sp_per_minute — all resolved in the supervisor loop via SQLite reads. Frontend never joins data.
-- **Events are the data**: listeners write the payload directly to the store. No `invoke()` in `esiEvents.ts`.
-- **Single hydration call**: one `get_esi_snapshot` invocation returns all enriched data for all characters. No per-character fan-out on mount.
-- **Cache-hit re-emit**: `Ok(None)` triggers a DB read + re-emit of the last-known enriched row. The FE never waits for an ESI expiry to get its first value.
-- **Location owns ship/online/implants**: the supervisor manages these endpoints alongside location. Location event payload is fully enriched (system name, region name, station/structure name, ship, online status, implants).
-- **Location name resolution is DB-first, ESI-on-change**: station/structure/system names are resolved from SQLite; ESI is called only when IDs change from the cached row.
+- **Enrichment belongs in Rust**: skill names, group names, system/station/structure names, implant names, sp_per_minute — all resolved in supervisor loop via SQLite reads. Frontend never joins data.
+- **Events are the data**: listeners write payload directly to store. No `invoke()` in `esiEvents.ts`.
+- **Single hydration call**: one `get_esi_snapshot` call returns all enriched data for all characters. No per-character fan-out on mount.
+- **Cache-hit re-emit**: `Ok(None)` triggers DB read + re-emit of last-known enriched row. FE never waits for ESI expiry for first value.
+- **Location owns ship/online/implants**: supervisor manages these endpoints alongside location. Location event payload fully enriched (system name, region name, station/structure name, ship, online status, implants).
+- **Location name resolution is DB-first, ESI-on-change**: station/structure/system names resolved from SQLite; ESI called only when IDs change from cached row.
 - **typeshare replaces tauri-typegen entirely**: all command input/output structs annotated with `#[typeshare]`. `commands.ts` deleted. `invoke()` calls live in hooks.
 - **Remaps stay command-driven**: low change frequency, stable command, not worth adding to supervisor loop.
 
@@ -31,18 +31,18 @@ The cache-hit starvation bug (`Ok(None) => {}`) is fixed as part of this work �
 
 ### Backend — Rust
 
-**`src-tauri/src/refresh/events.rs`**: Replace raw ESI payload structs with enriched structs matching the frontend's consumed shapes. Annotate all with `#[typeshare]`.
+**`src-tauri/src/refresh/events.rs`**: Replace raw ESI payload structs with enriched structs matching frontend consumed shapes. Annotate all with `#[typeshare]`.
 
 **`src-tauri/src/refresh/mod.rs`**:
 
 - Each resource arm gains enrichment logic (SDE joins, name resolution) before emitting.
-- `Ok(None)` arms read the last-known DB row and re-emit the enriched payload.
-- Location arm: add parallel fetches for ship, online status, and implants. Track last-known IDs to gate ESI name resolution calls.
-- Enrichment functions extracted to a shared module callable from both the supervisor and the snapshot command.
+- `Ok(None)` arms read last-known DB row and re-emit enriched payload.
+- Location arm: add parallel fetches for ship, online status, implants. Track last-known IDs to gate ESI name resolution calls.
+- Enrichment functions extracted to shared module callable from supervisor and snapshot command.
 
-**`src-tauri/src/commands/esi_snapshot.rs`**: Rewritten to return all enriched data for all characters. DB-only reads. No ESI calls. Returns a `Vec<CharacterSnapshot>` covering queue, skills, attributes, clones, location, remaps per character.
+**`src-tauri/src/commands/esi_snapshot.rs`**: Rewritten to return all enriched data for all characters. DB-only reads. No ESI calls. Returns `Vec<CharacterSnapshot>` covering queue, skills, attributes, clones, location, remaps per character.
 
-**Deleted commands**: `skill_queues.rs` (get_skill_queue_for_character, get_skill_queues, get_training_characters_count), `skills.rs` (get_character_skills_with_groups), `attributes.rs` (get_character_attributes_breakdown), `clones.rs` (get_clones), `location.rs` (get_all_characters_locations, get_character_location), `overview.rs` (get_training_characters_overview). The command files themselves may be partially retained if they contain helpers used elsewhere.
+**Deleted commands**: `skill_queues.rs` (get_skill_queue_for_character, get_skill_queues, get_training_characters_count), `skills.rs` (get_character_skills_with_groups), `attributes.rs` (get_character_attributes_breakdown), `clones.rs` (get_clones), `location.rs` (get_all_characters_locations, get_character_location), `overview.rs` (get_training_characters_overview). Command files may be partially retained if they contain helpers used elsewhere.
 
 **`src-tauri/src/commands/mod.rs`**: Remove deleted command registrations.
 
@@ -50,7 +50,7 @@ The cache-hit starvation bug (`Ok(None) => {}`) is fixed as part of this work �
 
 ### Frontend — TypeScript
 
-**`src/generated/events.ts`**: Regenerated by typeshare from enriched event structs. Shapes match what store and components consume directly.
+**`src/generated/events.ts`**: Regenerated by typeshare from enriched event structs. Shapes match what store + components consume directly.
 
 **`src/generated/types.ts`**: Regenerated by typeshare from all annotated command types. Replaces tauri-typegen output.
 
@@ -58,9 +58,9 @@ The cache-hit starvation bug (`Ok(None) => {}`) is fixed as part of this work �
 
 **`src/lib/esiEvents.ts`**: Listeners become single-line setters — receive payload, call store setter, done. No async, no command calls.
 
-**`src/routes/__root.tsx`**: Hydration replaced with single `invoke<CharacterSnapshot[]>('get_esi_snapshot')` call. Result iterated to populate all store slices. Per-slice error handling so any failure sets `lastError` rather than leaving `data: undefined` forever.
+**`src/routes/__root.tsx`**: Hydration replaced with single `invoke<CharacterSnapshot[]>('get_esi_snapshot')` call. Result iterated to populate all store slices. Per-slice error handling so failure sets `lastError` not `data: undefined` forever.
 
-**`src/hooks/tauri/`**: All hooks that called deleted commands are updated. `invoke()` calls move inline. Hooks for `useTrainingCharactersOverview` and the command-re-fetch pattern in `useOverview.ts` are removed; overview data comes from the queue slice which now carries the fields needed (`character_name`, `account_name`, `current_skill_name`, `sp_per_hour`, `has_implants`, `has_booster`).
+**`src/hooks/tauri/`**: Hooks calling deleted commands updated. `invoke()` calls move inline. `useTrainingCharactersOverview` and command-re-fetch pattern in `useOverview.ts` removed; overview data comes from queue slice which now carries needed fields (`character_name`, `account_name`, `current_skill_name`, `sp_per_hour`, `has_implants`, `has_booster`).
 
 **`package.json`**: `typegen` script replaced by `typeshare`. `tauri:dev` and `tauri:build` updated accordingly.
 
@@ -68,7 +68,7 @@ The cache-hit starvation bug (`Ok(None) => {}`) is fixed as part of this work �
 
 ## Implementation Strategy
 
-Tasks 1 and 2 (backend enrichment) can be developed in parallel branches — they touch different resource arms of `mod.rs`. However, both modify `refresh/mod.rs` and `refresh/events.rs`, so their PRs will produce a merge conflict that requires a brief integration step before merging the second one. Plan for this: merge task 1 first, rebase task 2's branch onto it, then merge task 2. Task 3 (snapshot command) is also independent backend work and can run in parallel with 1 and 2. Task 4 (type system migration) depends on tasks 1–3 finalizing the Rust struct shapes. Tasks 5 and 6 (frontend) depend on 4. Task 7 (command removal) is the final cleanup and depends on 5 and 6 confirming no remaining callsites.
+Tasks 1+2 (backend enrichment) parallel branches — touch different arms of `mod.rs`. Both modify `refresh/mod.rs` + `refresh/events.rs`, so PRs will conflict; merge task 1 first, rebase task 2 onto it, then merge. Task 3 (snapshot command) also independent, runs parallel with 1+2. Task 4 (type migration) depends on 1–3 finalizing Rust struct shapes. Tasks 5+6 (frontend) depend on 4. Task 7 (command removal) final cleanup, depends on 5+6 confirming no remaining callsites.
 
 ## Task Breakdown Preview
 
@@ -77,7 +77,7 @@ Tasks 1 and 2 (backend enrichment) can be developed in parallel branches — the
 3. **Rewrite get_esi_snapshot — all characters, all enriched data, DB-only** — single command returns CharacterSnapshot[] covering all resources; extract enrichment helpers to shared module. (parallel: true)
 4. **Replace tauri-typegen with typeshare** — annotate all remaining command types with #[typeshare]; delete commands.ts; update pnpm scripts; remove tauri-typegen from Cargo.toml. (depends on: 1, 2, 3)
 5. **Rewrite esiEvents.ts as pure setters + rewrite mount hydration** — listeners write payload to store; \_\_root.tsx calls single get_esi_snapshot; per-slice error handling. (depends on: 4)
-6. **Update hooks — inline invoke calls, remove dead hooks** — move invoke() into hooks that call remaining commands; remove hooks for deleted commands; update useOverview pattern. (depends on: 4, 5)
+6. **Update hooks — inline invoke calls, remove dead hooks** — move invoke() into hooks calling remaining commands; remove hooks for deleted commands; update useOverview pattern. (depends on: 4, 5)
 7. **Remove deleted Rust commands + audit** — delete obsolete command handlers and registrations; confirm no dangling callsites in frontend; verify no tauri-typegen references remain. (depends on: 5, 6)
 
 ## Dependencies
@@ -92,14 +92,14 @@ Tasks 1 and 2 (backend enrichment) can be developed in parallel branches — the
 - `src/generated/commands.ts` does not exist.
 - tauri-typegen absent from `Cargo.toml` and `package.json`.
 - All command input/output types annotated with `#[typeshare]` and present in `src/generated/types.ts`.
-- App shows populated data on launch with no permanent spinners (verified with warm SQLite cache + ESI network disabled).
+- App shows populated data on launch, no permanent spinners (warm SQLite cache + ESI network disabled).
 - `Ok(None)` arms in `refresh/mod.rs` all emit — no silent no-ops.
 - No `useMemo` in frontend components performing ESI data joins across store slices.
 - `pnpm verify` passes clean.
 
 ## Estimated Effort
 
-Medium-large. 7 tasks, 3 parallelizable at start. Backend enrichment is the heaviest lift (task 1 + 2); type migration (task 4) has broad file coverage but is mechanical; frontend tasks (5 + 6) are straightforward once shapes are correct.
+Medium-large. 7 tasks, 3 parallel at start. Backend enrichment heaviest lift (task 1+2); type migration (task 4) broad file coverage but mechanical; frontend tasks (5+6) straightforward once shapes correct.
 
 ## Tasks Created
 
