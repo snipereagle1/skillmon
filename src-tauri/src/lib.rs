@@ -7,6 +7,7 @@ use tauri::{Emitter, Listener, Manager, WindowEvent};
 
 mod auth;
 mod cache;
+mod clone_sync;
 mod commands;
 mod db;
 mod esi;
@@ -298,8 +299,6 @@ pub fn run() {
             commands::auth::get_base_scope_strings,
             commands::auth::start_eve_login,
             is_startup_complete,
-            commands::location::get_character_location,
-            commands::location::get_all_characters_locations,
             commands::characters::logout_character,
             commands::accounts::get_accounts_and_characters,
             commands::accounts::create_account,
@@ -310,19 +309,12 @@ pub fn run() {
             commands::accounts::reorder_accounts,
             commands::accounts::reorder_characters_in_account,
             commands::accounts::reorder_unassigned_characters,
-            commands::skill_queues::get_skill_queues,
-            commands::skill_queues::get_training_characters_count,
-            commands::skill_queues::get_skill_queue_for_character,
             commands::skill_queues::force_refresh_skill_queue,
-            commands::overview::get_training_characters_overview,
-            commands::skills::get_character_skills_with_groups,
             commands::skills::get_sde_skills_with_groups,
             commands::skills::get_skill_details,
             commands::sde::refresh_sde,
-            commands::clones::get_clones,
             commands::clones::update_clone_name,
             commands::sde::get_type_names,
-            commands::attributes::get_character_attributes_breakdown,
             commands::rate_limits::get_rate_limits,
             commands::notifications::get_notifications,
             commands::notifications::dismiss_notification,

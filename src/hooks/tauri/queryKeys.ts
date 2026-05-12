@@ -81,6 +81,4 @@ export const queryKeys = {
   optionalFeatures: () => ['optional-features'] as const,
   characterFeatureScopeStatus: () =>
     ['character-feature-scope-status'] as const,
-
-  location: (characterId: number) => ['location', characterId] as const,
 };

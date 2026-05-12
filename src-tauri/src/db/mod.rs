@@ -47,7 +47,7 @@ pub use notifications::{
     get_notification_settings, get_notifications, upsert_notification_setting, Notification,
     NotificationSetting,
 };
-pub use sde::{get_skill_groups_for_category, get_skills_for_group, SkillInfo};
+pub use sde::{get_skill_groups_for_category, get_skills_for_group};
 pub use tokens::{get_tokens, set_tokens, update_tokens};
 
 pub type Pool = SqlitePool;

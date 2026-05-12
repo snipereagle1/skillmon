@@ -4,6 +4,6 @@ pub mod pkce;
 pub mod types;
 
 pub use oauth::{
-    check_token_scopes, ensure_valid_access_token, exchange_code_for_tokens,
-    extract_character_from_jwt, extract_scopes_from_jwt, generate_auth_url, AuthState,
+    ensure_valid_access_token, exchange_code_for_tokens, extract_character_from_jwt,
+    extract_scopes_from_jwt, generate_auth_url, AuthState,
 };

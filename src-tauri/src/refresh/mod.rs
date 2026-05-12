@@ -269,8 +269,19 @@ impl RefreshSupervisor {
                 )
                 .await
                 {
-                    Ok(Some(_clones_data)) => {
+                    Ok(Some(clones_data)) => {
                         any_success = true;
+                        if let Err(e) = crate::clone_sync::sync_character_clones_to_db(
+                            &pool,
+                            &client,
+                            character_id,
+                            &rate_limits,
+                            &clones_data,
+                        )
+                        .await
+                        {
+                            eprintln!("refresh: clone DB sync {}: {}", character_id, e);
+                        }
                         let payload = enrichment::enrich_clones(&pool, character_id).await;
                         if let Err(e) =
                             app_handle.emit(&format!("character:{}:clones", character_id), &payload)

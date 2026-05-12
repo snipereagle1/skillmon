@@ -8,7 +8,7 @@ export function useForceRefreshSkillQueue() {
 
   return useMutation({
     mutationFn: async (characterId: number) => {
-      return await invoke('force_refresh_skill_queue', { characterId });
+      await invoke<void>('force_refresh_skill_queue', { characterId });
     },
     onError: (err, characterId) => {
       setError('queues', characterId, String(err));

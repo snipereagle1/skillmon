@@ -26,6 +26,7 @@ impl FeatureId {
         }
     }
 
+    #[allow(dead_code)]
     pub fn scopes(self) -> Vec<EsiScope> {
         get_optional_features()
             .into_iter()
