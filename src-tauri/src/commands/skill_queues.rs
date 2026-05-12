@@ -7,7 +7,14 @@ use crate::cache;
 use crate::db;
 use crate::refresh;
 
-use super::attributes::CharacterAttributesResponse;
+#[derive(Debug, Clone, Serialize)]
+pub struct CharacterAttributesResponse {
+    pub charisma: i64,
+    pub intelligence: i64,
+    pub memory: i64,
+    pub perception: i64,
+    pub willpower: i64,
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillQueueItem {

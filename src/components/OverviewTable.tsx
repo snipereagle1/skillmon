@@ -38,7 +38,7 @@ export function OverviewTable() {
   const trainingCharacters: TrainingOverviewRowData[] = allCharacters.reduce(
     (rows, character) => {
       const queue = queues[character.character_id]?.data;
-      if (!queue || queue.queue.length === 0) return rows;
+      if (!queue || queue.queue.length === 0 || queue.isPaused) return rows;
       const current = queue.queue[0];
       const firstStart = queue.queue[0]?.startDate;
       const lastFinish = queue.queue[queue.queue.length - 1]?.finishDate;

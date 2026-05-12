@@ -1,5 +1,4 @@
 pub mod accounts;
-pub mod attributes;
 pub mod auth;
 pub mod characters;
 pub mod clones;
