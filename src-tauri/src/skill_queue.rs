@@ -139,6 +139,8 @@ pub async fn build_character_skill_queue(
             is_omega: true,
         });
 
+    // Default Omega; if neither inference signal fires (empty queue, no lapsed skills),
+    // a true alpha is undetectable — acceptable gap given ESI constraints (see docs/context/eve.md).
     let mut is_omega = true;
 
     // Inference Method B: Lapsed Status (Active < Trained)

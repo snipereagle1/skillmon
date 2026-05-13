@@ -1,10 +1,9 @@
 import { useEffect, useState } from 'react';
 
-export function useNow(intervalMs = 1000): Date {
-  const [now, setNow] = useState(() => new Date());
+export function useTickRerender(intervalMs = 1000): void {
+  const [, setNow] = useState(() => new Date());
   useEffect(() => {
     const id = setInterval(() => setNow(new Date()), intervalMs);
     return () => clearInterval(id);
   }, [intervalMs]);
-  return now;
 }

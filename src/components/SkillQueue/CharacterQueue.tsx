@@ -10,7 +10,7 @@ import type { QueuePayload, SkillmonPlan } from '@/generated/types';
 import { useForceRefreshSkillQueue } from '@/hooks/tauri/useForceRefreshSkillQueue';
 import { useCharacterRemaps } from '@/hooks/tauri/useRemaps';
 import { useImportSkillPlanJson } from '@/hooks/tauri/useSkillPlans';
-import { useNow } from '@/hooks/useNow';
+import { useTickRerender } from '@/hooks/useTickRerender';
 import { formatDate, formatNumber } from '@/lib/utils';
 
 import { RemapRow } from '../Remaps/RemapRow';
@@ -29,7 +29,7 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
   const importPlan = useImportSkillPlanJson();
   const { data: remaps } = useCharacterRemaps(characterId);
   const navigate = useNavigate();
-  useNow();
+  useTickRerender();
 
   const handleCreatePlanFromQueue = () => {
     if (queue.queue.length === 0) {

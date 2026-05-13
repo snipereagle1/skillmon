@@ -21,20 +21,10 @@ export function formatAbsoluteDate(
 
   if (!isFuture(finish)) return 'Complete';
 
-  const month = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ][finish.getUTCMonth()];
+  const month = finish.toLocaleString('en-US', {
+    month: 'short',
+    timeZone: 'UTC',
+  });
   const day = finish.getUTCDate();
   const hours = String(finish.getUTCHours()).padStart(2, '0');
   const mins = String(finish.getUTCMinutes()).padStart(2, '0');

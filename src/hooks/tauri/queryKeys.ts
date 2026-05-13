@@ -25,8 +25,10 @@ export const queryKeys = {
   planComparison: (planId: number | null, characterId: number | null) =>
     ['planComparison', planId, characterId] as const,
   planComparisonByPlan: (planId: number) => ['planComparison', planId] as const,
+  planComparisonByPlanAll: () => ['planComparison'] as const,
   planComparisonAll: (planId: number | null) =>
     ['planComparisonAll', planId] as const,
+  planComparisonAllRoot: () => ['planComparisonAll'] as const,
   skillPlanSimulation: (planId: number) =>
     ['skillPlanSimulation', planId] as const,
   skillPlanSimulationQuery: (
