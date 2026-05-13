@@ -13,6 +13,8 @@ src-tauri/target
 src/components/ui/**
 src-tauri/gen/schemas/**
 # Build artifacts
+.turbo/**
+turbo.json
 *.log
 pnpm-lock.yaml
 
