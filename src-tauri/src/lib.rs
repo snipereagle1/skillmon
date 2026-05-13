@@ -60,7 +60,7 @@ pub fn run() {
                 let pool_for_tray = app.state::<db::Pool>().inner().clone();
                 let rate_limits_for_tray = app.state::<esi::RateLimitStore>().inner().clone();
 
-                let supervisor = Arc::new(Mutex::new(refresh::RefreshSupervisor::new()));
+                let supervisor = Mutex::new(refresh::RefreshSupervisor::new());
 
                 // Seed with existing characters
                 let characters_for_refresh = db::get_all_characters(&pool_for_tray).await.unwrap_or_default();
@@ -285,7 +285,18 @@ pub fn run() {
                 }
             }
             "quit" => {
-                app.exit(0);
+                let app_handle = app.clone();
+                tokio::spawn(async move {
+                    let handles = app_handle
+                        .state::<Mutex<refresh::RefreshSupervisor>>()
+                        .lock()
+                        .unwrap()
+                        .cancel_all();
+                    for h in handles {
+                        let _ = h.await;
+                    }
+                    app_handle.exit(0);
+                });
             }
             _ => {}
         })

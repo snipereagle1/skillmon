@@ -1,3 +1,4 @@
+use futures_util::future::join_all;
 use serde::{Deserialize, Serialize};
 use tauri::State;
 use typeshare::typeshare;
@@ -27,34 +28,41 @@ pub async fn get_esi_snapshot(pool: State<'_, db::Pool>) -> Result<Vec<Character
         .await
         .map_err(|e| e.to_string())?;
 
-    let mut snapshots = Vec::with_capacity(characters.len());
+    let futures = characters.into_iter().map(|character| {
+        let pool = pool.inner().clone();
+        async move {
+            let character_id = character.character_id;
+            let character_name = character.character_name.clone();
 
-    for character in characters {
-        let character_id = character.character_id;
-        let character_name = character.character_name.clone();
+            let (queue, skills, attributes, clones_payload, location, remaps) = tokio::join!(
+                enrichment::enrich_queue_from_db(&pool, character_id),
+                enrichment::enrich_skills_from_db(&pool, character_id),
+                enrichment::enrich_attributes_from_db(&pool, character_id),
+                enrichment::enrich_clones(&pool, character_id),
+                enrichment::enrich_location_db_only(&pool, character_id),
+                db::remaps::get_character_remaps(&pool, character_id),
+            );
 
-        let (queue, skills, attributes, clones_payload, location, remaps) = tokio::join!(
-            enrichment::enrich_queue_from_db(&pool, character_id),
-            enrichment::enrich_skills_from_db(&pool, character_id),
-            enrichment::enrich_attributes_from_db(&pool, character_id),
-            enrichment::enrich_clones(&pool, character_id),
-            enrichment::enrich_location_db_only(&pool, character_id),
-            db::remaps::get_character_remaps(&pool, character_id),
-        );
+            let remaps = remaps.unwrap_or_else(|e| {
+                eprintln!(
+                    "esi_snapshot: remaps fetch error for {}: {}",
+                    character_id, e
+                );
+                vec![]
+            });
 
-        let remaps = remaps.unwrap_or_default();
+            CharacterSnapshot {
+                character_id,
+                character_name,
+                queue,
+                skills,
+                attributes,
+                clones: clones_payload.clones,
+                location,
+                remaps,
+            }
+        }
+    });
 
-        snapshots.push(CharacterSnapshot {
-            character_id,
-            character_name,
-            queue,
-            skills,
-            attributes,
-            clones: clones_payload.clones,
-            location,
-            remaps,
-        });
-    }
-
-    Ok(snapshots)
+    Ok(join_all(futures).await)
 }

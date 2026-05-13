@@ -5,6 +5,8 @@ use tokio::sync::Notify;
 use tokio::time::Duration;
 use tokio_util::sync::CancellationToken;
 
+use rand::Rng;
+
 use crate::{auth, cache, db, esi, esi_helpers, notifications};
 
 pub mod enrichment;
@@ -13,6 +15,7 @@ pub mod events;
 pub struct RefresherHandle {
     pub cancel: CancellationToken,
     pub poke: Arc<Notify>,
+    pub join_handle: tokio::task::JoinHandle<()>,
 }
 
 pub struct RefreshSupervisor {
@@ -77,6 +80,8 @@ impl RefreshSupervisor {
                 };
 
                 let mut any_success = false;
+                let mut queue_skill_ids: Vec<i64> = vec![];
+                let queue_now = chrono::Utc::now();
 
                 // ── Queue ─────────────────────────────────────────────────────
                 match esi_helpers::get_cached_skill_queue(
@@ -89,6 +94,15 @@ impl RefreshSupervisor {
                 {
                     Ok(Some(queue_data)) => {
                         any_success = true;
+                        queue_skill_ids = queue_data
+                            .iter()
+                            .filter(|item| {
+                                item.finish_date
+                                    .map(|fd| queue_now < fd)
+                                    .unwrap_or(true)
+                            })
+                            .map(|item| item.skill_id)
+                            .collect();
                         let payload =
                             enrichment::enrich_queue(&pool, character_id, queue_data).await;
                         if let Err(e) =
@@ -125,24 +139,6 @@ impl RefreshSupervisor {
                 {
                     Ok(Some(skills_data)) => {
                         any_success = true;
-                        // Get current queue skill IDs to compute is_in_queue
-                        let queue_skill_ids: Vec<i64> = {
-                            let ep = format!("characters/{}/skillqueue", character_id);
-                            let ck = cache::build_cache_key(&ep, character_id);
-                            if let Ok(Some(entry)) = cache::get_cached_response(&pool, &ck).await {
-                                let now = chrono::Utc::now();
-                                serde_json::from_str::<Vec<esi::CharactersSkillqueueSkill>>(
-                                    &entry.response_body,
-                                )
-                                .unwrap_or_default()
-                                .into_iter()
-                                .filter(|item| item.finish_date.map(|fd| now < fd).unwrap_or(true))
-                                .map(|item| item.skill_id)
-                                .collect()
-                            } else {
-                                vec![]
-                            }
-                        };
                         let payload = enrichment::enrich_skills(
                             &pool,
                             character_id,
@@ -281,12 +277,13 @@ impl RefreshSupervisor {
                         .await
                         {
                             eprintln!("refresh: clone DB sync {}: {}", character_id, e);
-                        }
-                        let payload = enrichment::enrich_clones(&pool, character_id).await;
-                        if let Err(e) =
-                            app_handle.emit(&format!("character:{}:clones", character_id), &payload)
-                        {
-                            eprintln!("refresh: emit error clones {}: {}", character_id, e);
+                        } else {
+                            let payload = enrichment::enrich_clones(&pool, character_id).await;
+                            if let Err(e) = app_handle
+                                .emit(&format!("character:{}:clones", character_id), &payload)
+                            {
+                                eprintln!("refresh: emit error clones {}: {}", character_id, e);
+                            }
                         }
                     }
                     Ok(None) => {
@@ -362,8 +359,8 @@ impl RefreshSupervisor {
                 let min_expires = expires_list.into_iter().min().unwrap_or(now + 300);
                 let secs_until = (min_expires - now).clamp(30, 3600);
                 let jitter_range = secs_until / 10;
-                let jitter =
-                    rand::random::<i64>().abs() % (jitter_range.max(1) * 2) - jitter_range.max(1);
+                let jitter = rand::thread_rng()
+                    .gen_range(-jitter_range.max(1)..=jitter_range.max(1));
                 let sleep_secs = (secs_until + jitter).clamp(30, 3600) as u64;
 
                 tokio::select! {
@@ -374,22 +371,34 @@ impl RefreshSupervisor {
             }
         });
 
-        drop(handle);
+        self.handles.insert(
+            character_id,
+            RefresherHandle {
+                cancel,
+                poke,
+                join_handle: handle,
+            },
+        );
+    }
+
+    pub fn cancel_character(
+        &mut self,
+        character_id: i64,
+    ) -> Option<tokio::task::JoinHandle<()>> {
+        self.handles.remove(&character_id).map(|h| {
+            h.cancel.cancel();
+            h.join_handle
+        })
+    }
+
+    pub fn cancel_all(&mut self) -> Vec<tokio::task::JoinHandle<()>> {
         self.handles
-            .insert(character_id, RefresherHandle { cancel, poke });
-    }
-
-    pub fn cancel_character(&mut self, character_id: i64) {
-        if let Some(handle) = self.handles.remove(&character_id) {
-            handle.cancel.cancel();
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn cancel_all(&mut self) {
-        for (_, handle) in self.handles.drain() {
-            handle.cancel.cancel();
-        }
+            .drain()
+            .map(|(_, h)| {
+                h.cancel.cancel();
+                h.join_handle
+            })
+            .collect()
     }
 
     pub fn poke(&self, character_id: i64) {

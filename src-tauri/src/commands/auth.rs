@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use anyhow::{Context, Result};
 use chrono::Utc;
@@ -177,21 +177,21 @@ pub async fn handle_oauth_callback(
         .context("Failed to clear character cache")?;
 
     // Spawn (or re-spawn) the background refresher for this character
-    if let Ok(supervisor) = app
-        .try_state::<Arc<Mutex<refresh::RefreshSupervisor>>>()
-        .ok_or(())
-    {
+    if let Some(supervisor) = app.try_state::<Mutex<refresh::RefreshSupervisor>>() {
         let rate_limits = app.state::<esi::RateLimitStore>().inner().clone();
-        if let Ok(mut sup) = supervisor.lock() {
-            // Cancel any existing task first to avoid duplicates
-            sup.cancel_character(character_info.character_id);
-            sup.spawn_character(
-                character_info.character_id,
-                pool.inner().clone(),
-                app.clone(),
-                rate_limits,
-            );
+        let old_handle = supervisor
+            .lock()
+            .unwrap()
+            .cancel_character(character_info.character_id);
+        if let Some(h) = old_handle {
+            let _ = h.await;
         }
+        supervisor.lock().unwrap().spawn_character(
+            character_info.character_id,
+            pool.inner().clone(),
+            app.clone(),
+            rate_limits,
+        );
     }
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;

@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use serde::Serialize;
 use tauri::State;
@@ -32,11 +32,15 @@ impl From<db::Character> for Character {
 #[tauri::command]
 pub async fn logout_character(
     pool: State<'_, db::Pool>,
-    supervisor: State<'_, Arc<Mutex<refresh::RefreshSupervisor>>>,
+    supervisor: State<'_, Mutex<refresh::RefreshSupervisor>>,
     character_id: i64,
 ) -> Result<(), String> {
-    if let Ok(mut sup) = supervisor.lock() {
-        sup.cancel_character(character_id);
+    let join_handle = supervisor
+        .lock()
+        .ok()
+        .and_then(|mut sup| sup.cancel_character(character_id));
+    if let Some(h) = join_handle {
+        let _ = h.await;
     }
 
     sqlx::query("DELETE FROM tokens WHERE character_id = ?")

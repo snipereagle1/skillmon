@@ -1,4 +1,4 @@
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 
 use serde::Serialize;
 use tauri::State;
@@ -64,7 +64,7 @@ pub fn is_skill_actively_training(skill: &SkillQueueItem) -> bool {
 #[tauri::command]
 pub async fn force_refresh_skill_queue(
     pool: State<'_, db::Pool>,
-    supervisor: State<'_, Arc<Mutex<refresh::RefreshSupervisor>>>,
+    supervisor: State<'_, Mutex<refresh::RefreshSupervisor>>,
     character_id: i64,
 ) -> Result<(), String> {
     cache::clear_character_cache(&pool, character_id)
