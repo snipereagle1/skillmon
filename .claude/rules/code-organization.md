@@ -10,12 +10,12 @@
 | `db/` | sqlx queries per domain (characters, tokens, skills, clones, notifications, etc.) |
 | `esi/` | EVE ESI HTTP client + rate limiting (auto-generated client, do not edit `client.rs` / `types.rs`) |
 | `auth/` | OAuth2 flow + local callback server |
-| `sde/` | Static Data Export import/management |
+| `sde.rs` | Static Data Export import/management (single file) |
 | `notifications/` | Plugin-based notification checkers |
 | `refresh/` | `RefreshSupervisor` — per-character background loops, polls ESI, emits Tauri events |
 | `skill_plans/` | DAG-based prerequisite validation, training simulation, optimisation |
 | `cache/` | ESI response cache with ETags and expiration timestamps |
-| `features/` | Optional feature definitions and ESI scope management |
+| `features.rs` | Optional feature definitions and ESI scope management (single file) |
 
 ### Key Files
 

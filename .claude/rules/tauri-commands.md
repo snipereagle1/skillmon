@@ -66,6 +66,12 @@ async fn my_command(app: tauri::AppHandle) -> Result<(), String> {
 }
 ```
 
+## ESI and Live Data
+
+Live character ESI data (skill queue, skills, attributes, location, clones) is owned by `RefreshSupervisor` — never fetch it inside a command. The frontend receives live data via Tauri events and stores it in Zustand (`esiStore`), not via React Query polling commands.
+
+Include `rate_limits: State<'_, esi::RateLimitStore>` only when a command genuinely makes an ESI request.
+
 ## Best Practices
 
 - One command = one operation — keep commands focused

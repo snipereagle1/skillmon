@@ -1,6 +1,6 @@
 ---
 paths:
-  - "src-tauri/src/sde/**"
+  - "src-tauri/src/sde.rs"
   - "src-tauri/migrations/003_sde_schema.sql"
 ---
 

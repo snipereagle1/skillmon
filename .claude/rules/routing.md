@@ -9,26 +9,7 @@ TanStack Router with file-based routing. Routes are auto-discovered from `src/ro
 
 ## Route Structure
 
-```
-src/routes/
-├── __root.tsx                    # Root layout, auth events, global dialogs
-├── index.tsx                     # /
-├── overview.tsx                  # /overview
-├── characters/
-│   ├── index.tsx                 # /characters
-│   ├── $characterId.tsx          # layout for /characters/$characterId
-│   └── $characterId/
-│       ├── index.tsx             # redirect → skill-queue
-│       ├── skill-queue.tsx       # /characters/$characterId/skill-queue
-│       ├── skills.tsx
-│       ├── clones.tsx
-│       ├── attributes.tsx
-│       ├── plans.tsx
-│       └── settings.tsx
-└── plans/
-    ├── index.tsx                 # /plans
-    └── $planId.tsx               # /plans/$planId
-```
+Routes live in `src/routes/`. File path maps directly to URL path. To see current routes, run `find src/routes -name "*.tsx" | sort`.
 
 ## Route File Conventions
 

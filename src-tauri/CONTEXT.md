@@ -14,7 +14,7 @@ Rust + Tauri v2 backend for skillmon. Always load `docs/context/eve.md` first fo
 
 **sqlx pool** — the SQLite connection pool managed as Tauri state. Accessed in commands via `State<'_, SqlitePool>`.
 
-**SDE import** — the process of loading EVE Static Data Export JSONL files into the local SQLite DB. Handled by `src-tauri/src/sde/`.
+**SDE import** — the process of loading EVE Static Data Export JSONL files into the local SQLite DB. Handled by `src-tauri/src/sde.rs`.
 
 **OAuth2 flow** — ESI authentication via `src-tauri/src/auth/`. Spawns a local callback server to capture the auth code.
 
