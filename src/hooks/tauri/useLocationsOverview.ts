@@ -11,7 +11,8 @@ export function useAllCharactersLocations(): {
   const entries = Object.values(locations);
   const data = entries
     .map((s) => s.data)
-    .filter((d): d is LocationPayload => d !== null);
+    .filter((d): d is LocationPayload => d !== null)
+    .sort((a, b) => Number(b.isOnline ?? false) - Number(a.isOnline ?? false));
   const hasError = entries.find((s) => s.lastError !== null);
 
   return {

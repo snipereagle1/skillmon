@@ -725,15 +725,22 @@ pub async fn enrich_location(
         (None, None)
     };
 
-    let structure_type_id_final = station_type_id.or(structure_type_id);
+    let docked_type_id = station_type_id.or(structure_type_id);
 
-    // Resolve ship type name
+    // Resolve ship type name; when manning a structure the ship endpoint returns
+    // non-200, so fall back to the structure type so the UI shows something useful.
     let (ship_type_id, ship_type_name, ship_name) = if let Some(ship) = ship {
         let names = utils::get_type_names(pool, &[ship.ship_type_id])
             .await
             .unwrap_or_default();
         let type_name = names.get(&ship.ship_type_id).cloned();
         (Some(ship.ship_type_id), type_name, Some(ship.ship_name))
+    } else if let Some(type_id) = docked_type_id {
+        let names = utils::get_type_names(pool, &[type_id])
+            .await
+            .unwrap_or_default();
+        let type_name = names.get(&type_id).cloned();
+        (Some(type_id), type_name, Some(String::new()))
     } else {
         (None, None, None)
     };
@@ -766,7 +773,7 @@ pub async fn enrich_location(
         station_name,
         structure_id: location.structure_id,
         structure_name,
-        structure_type_id: structure_type_id_final,
+        structure_type_id: docked_type_id,
         ship_type_id,
         ship_type_name,
         ship_name,
@@ -872,7 +879,7 @@ pub async fn enrich_location_db_only(
         (None, None)
     };
 
-    let structure_type_id_final = station_type_id.or(structure_type_id);
+    let docked_type_id = station_type_id.or(structure_type_id);
 
     // Implants from active clone in DB
     let implant_ids = get_active_clone_implant_ids(pool, character_id).await;
@@ -902,10 +909,18 @@ pub async fn enrich_location_db_only(
         station_name,
         structure_id: location.structure_id,
         structure_name,
-        structure_type_id: structure_type_id_final,
-        ship_type_id: None,
-        ship_type_name: None,
-        ship_name: None,
+        structure_type_id: docked_type_id,
+        ship_type_id: docked_type_id,
+        ship_type_name: if let Some(type_id) = docked_type_id {
+            utils::get_type_names(pool, &[type_id])
+                .await
+                .unwrap_or_default()
+                .get(&type_id)
+                .cloned()
+        } else {
+            None
+        },
+        ship_name: docked_type_id.map(|_| String::new()),
         is_online: None,
         is_docked,
         implants,

@@ -138,7 +138,7 @@ export function LocationTableRow({ character }: LocationTableRowProps) {
         </Tooltip>
       </TableCell>
       <TableCell>
-        {character.shipTypeId && character.shipName ? (
+        {character.shipTypeId ? (
           <div className="flex items-center gap-2">
             <img
               src={`https://images.evetech.net/types/${character.shipTypeId}/render?size=32`}
@@ -146,8 +146,8 @@ export function LocationTableRow({ character }: LocationTableRowProps) {
               className="h-8 w-8 rounded object-contain"
             />
             <span>
-              {character.shipName}
-              {character.shipTypeName && (
+              {character.shipName || character.shipTypeName}
+              {character.shipName && character.shipTypeName && (
                 <span className="text-muted-foreground ml-1">
                   · {character.shipTypeName}
                 </span>
