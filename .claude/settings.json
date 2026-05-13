@@ -1,8 +1,19 @@
 {
   "permissions": {
     "allow": [
-      "Read(.claude/epics/**)",
-      "Read(.claude/prds/**)"
+      "mcp__skillmon-sqlite__db_info",
+      "mcp__skillmon-sqlite__get_table_schema",
+      "mcp__skillmon-sqlite__list_tables",
+      "mcp__skillmon-sqlite__read_records",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "mcp__plugin_context7_context7__query-docs",
+      "mcp__codegraph__*",
+      "mcp__shadcn__*"
+    ],
+    "deny": [
+      "mcp__skillmon-sqlite__create_record",
+      "mcp__skillmon-sqlite__update_records",
+      "mcp__skillmon-sqlite__delete_records"
     ]
   },
   "hooks": {
