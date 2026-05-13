@@ -16,6 +16,9 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Skeleton } from './ui/skeleton';
 
+// TODO: overview data should be computed in Rust and emitted as a dedicated store slice
+// rather than derived here — processing in Rust gives better type safety and a single
+// place to handle ESI edge cases (paused queues, missing dates, etc).
 export function OverviewTable() {
   const { data: accountsData, isLoading, error } = useAccountsAndCharacters();
   const queues = useEsiStore((state) => state.queues);
@@ -70,6 +73,18 @@ export function OverviewTable() {
     },
     [] as TrainingOverviewRowData[]
   );
+
+  trainingCharacters.sort((a, b) => {
+    if (
+      a.queueTimeRemainingSeconds != null &&
+      b.queueTimeRemainingSeconds != null
+    ) {
+      return a.queueTimeRemainingSeconds - b.queueTimeRemainingSeconds;
+    }
+    if (a.queueTimeRemainingSeconds != null) return -1;
+    if (b.queueTimeRemainingSeconds != null) return 1;
+    return 0;
+  });
 
   if (isLoading) {
     return (
