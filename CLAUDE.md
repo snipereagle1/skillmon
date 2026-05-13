@@ -83,4 +83,4 @@ Default canonical label strings (`needs-triage`, `needs-info`, `ready-for-agent`
 
 ### Domain docs
 
-Single-context layout — `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
+Multi-context layout — `docs/context/eve.md` (shared EVE domain) + `src/CONTEXT.md` (frontend) + `src-tauri/CONTEXT.md` (backend), each with their own `docs/adr/`. See `docs/agents/domain.md`.
