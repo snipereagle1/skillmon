@@ -11,8 +11,10 @@ import type {
 } from '@/generated/types';
 import { useEsiStore } from '@/stores/esiStore';
 
-function listenCharacterChannels(characterId: number) {
-  return Promise.all([
+export async function listenCharacterChannels(
+  characterId: number
+): Promise<() => void> {
+  const unlisteners = await Promise.all([
     listen<QueuePayload>(`character:${characterId}:queue`, ({ payload }) =>
       useEsiStore.getState().setQueue(characterId, payload)
     ),
@@ -35,20 +37,23 @@ function listenCharacterChannels(characterId: number) {
       useEsiStore.getState().setOverviewRow(characterId, payload)
     ),
   ]);
+  return () => unlisteners.forEach((fn) => fn());
 }
 
 export async function bootstrapEsiEvents(
   queryClient: QueryClient,
   characterIds: number[]
 ): Promise<() => void> {
-  const unlisteners: Array<() => void> = (
-    await Promise.all(characterIds.map(listenCharacterChannels))
-  ).flat();
+  const characterCleanups = await Promise.all(
+    characterIds.map(listenCharacterChannels)
+  );
 
   const unlistenNotifications = await listen('notifications:new', () => {
     queryClient.invalidateQueries({ queryKey: ['notifications'] });
   });
-  unlisteners.push(unlistenNotifications);
 
-  return () => unlisteners.forEach((fn) => fn());
+  return () => {
+    characterCleanups.forEach((fn) => fn());
+    unlistenNotifications();
+  };
 }

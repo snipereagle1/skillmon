@@ -37,6 +37,12 @@ interface EsiStoreState {
 
 const now = () => new Date().toISOString();
 
+const DEFAULT_RESOURCE_SLICE = {
+  data: null,
+  lastUpdatedAt: null,
+  lastError: null,
+} satisfies ResourceSlice<never>;
+
 export const useEsiStore = create<EsiStoreState>((set) => ({
   queues: {},
   skills: {},
@@ -95,7 +101,7 @@ export const useEsiStore = create<EsiStoreState>((set) => ({
       [resource]: {
         ...s[resource],
         [characterId]: {
-          ...(s[resource][characterId] ?? { data: null, lastUpdatedAt: null }),
+          ...(s[resource][characterId] ?? DEFAULT_RESOURCE_SLICE),
           lastError: error,
         },
       },

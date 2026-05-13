@@ -1,15 +1,16 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { invoke } from '@tauri-apps/api/core';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 import type { CharacterSnapshot } from '@/generated/types';
+import { listenCharacterChannels } from '@/lib/esiEvents';
 import { useEsiStore } from '@/stores/esiStore';
 
 import { queryKeys } from './queryKeys';
 
 export function useAuthEvents() {
   const queryClient = useQueryClient();
-  const { setQueue, setSkills, setAttributes, setClones } = useEsiStore();
+  const characterUnlisteners = useRef<Map<number, () => void>>(new Map());
 
   useEffect(() => {
     let cleanup: (() => void) | null = null;
@@ -20,17 +21,27 @@ export function useAuthEvents() {
 
         const unlistenSuccess = await listen<number>(
           'auth-success',
-          async () => {
+          async (event) => {
+            const newCharacterId = event.payload;
+
+            // Register event listeners for the newly authenticated character
+            const unlisten = await listenCharacterChannels(newCharacterId);
+            characterUnlisteners.current.set(newCharacterId, unlisten);
+
             try {
               const snapshots =
                 await invoke<CharacterSnapshot[]>('get_esi_snapshot');
-              for (const snapshot of snapshots) {
-                const characterId = snapshot.characterId;
-                if (snapshot.queue) setQueue(characterId, snapshot.queue);
-                if (snapshot.skills) setSkills(characterId, snapshot.skills);
+              const snapshot = snapshots.find(
+                (s) => s.characterId === newCharacterId
+              );
+              if (snapshot) {
+                const { setQueue, setSkills, setAttributes, setClones } =
+                  useEsiStore.getState();
+                if (snapshot.queue) setQueue(newCharacterId, snapshot.queue);
+                if (snapshot.skills) setSkills(newCharacterId, snapshot.skills);
                 if (snapshot.attributes)
-                  setAttributes(characterId, snapshot.attributes);
-                setClones(characterId, snapshot.clones);
+                  setAttributes(newCharacterId, snapshot.attributes);
+                setClones(newCharacterId, snapshot.clones);
               }
             } catch (err) {
               console.error('Failed to hydrate ESI snapshot after auth:', err);
@@ -48,6 +59,8 @@ export function useAuthEvents() {
         cleanup = () => {
           unlistenSuccess();
           unlistenError();
+          characterUnlisteners.current.forEach((fn) => fn());
+          characterUnlisteners.current.clear();
         };
       } catch (error) {
         console.error('Failed to setup auth listeners:', error);
