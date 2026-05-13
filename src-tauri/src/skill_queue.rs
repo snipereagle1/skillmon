@@ -139,7 +139,9 @@ pub async fn build_character_skill_queue(
             is_omega: true,
         });
 
-    let mut is_omega = updated_character.is_omega;
+    // Default Omega; if neither inference signal fires (empty queue, no lapsed skills),
+    // a true alpha is undetectable — acceptable gap given ESI constraints (see docs/context/eve.md).
+    let mut is_omega = true;
 
     // Inference Method B: Lapsed Status (Active < Trained)
     if is_omega
@@ -291,7 +293,7 @@ pub async fn build_character_skill_queue(
                                 };
                                 let expected_omega_rate = (p_val as f64) + (s_val as f64 / 2.0);
                                 // If actual rate is significantly lower than expected Omega rate (e.g., < 75%)
-                                if actual_rate < expected_omega_rate * 0.75 {
+                                if actual_rate < expected_omega_rate * 0.55 {
                                     is_omega = false;
                                 }
                             }

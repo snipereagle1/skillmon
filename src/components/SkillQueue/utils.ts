@@ -12,6 +12,26 @@ import { formatDuration, formatDurationFromHours } from '@/lib/utils';
 
 export { formatDurationFromHours };
 
+export function formatAbsoluteDate(
+  finishDate: string | null | undefined
+): string {
+  if (!finishDate) return 'Paused';
+
+  const finish = parseISO(finishDate);
+
+  if (!isFuture(finish)) return 'Complete';
+
+  const month = finish.toLocaleString('en-US', {
+    month: 'short',
+    timeZone: 'UTC',
+  });
+  const day = finish.getUTCDate();
+  const hours = String(finish.getUTCHours()).padStart(2, '0');
+  const mins = String(finish.getUTCMinutes()).padStart(2, '0');
+
+  return `${month} ${day} at ${hours}:${mins} UTC`;
+}
+
 export function formatTimeRemaining(
   finishDate: string | null | undefined
 ): string {

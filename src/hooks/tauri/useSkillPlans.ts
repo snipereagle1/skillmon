@@ -260,6 +260,12 @@ export function useAddPlanEntry() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.skillPlanValidation(params.planId),
       });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonAll(params.planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonByPlan(params.planId),
+      });
     },
   });
 }
@@ -278,6 +284,12 @@ export function useUpdatePlanEntry() {
       queryClient.invalidateQueries({
         queryKey: queryKeys.skillPlanValidationAll(),
       });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonAllRoot(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonByPlanAll(),
+      });
     },
   });
 }
@@ -295,6 +307,12 @@ export function useDeletePlanEntry() {
       });
       queryClient.invalidateQueries({
         queryKey: queryKeys.skillPlanValidationAll(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonAllRoot(),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonByPlanAll(),
       });
     },
   });
