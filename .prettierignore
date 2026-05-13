@@ -16,6 +16,10 @@ src-tauri/gen/schemas/**
 *.log
 pnpm-lock.yaml
 
+# Tooling configs
+.claude/**
+.codegraph/**
+
 # SDE data
 sde/*.jsonl
 eve-online-static-data-*.zip

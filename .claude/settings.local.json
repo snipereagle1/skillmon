@@ -20,7 +20,8 @@
       "Bash(rtk git show *)",
       "Bash(rtk git stash list)",
       "Bash(rtk git status *)",
-      "Bash(rtk git add *)"
+      "Bash(rtk git add *)",
+      "mcp__codegraph__*"
     ]
   }
 }
