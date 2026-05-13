@@ -9,8 +9,7 @@ import { queryKeys } from './queryKeys';
 
 export function useAuthEvents() {
   const queryClient = useQueryClient();
-  const { setQueue, setSkills, setAttributes, setClones, setRemaps } =
-    useEsiStore();
+  const { setQueue, setSkills, setAttributes, setClones } = useEsiStore();
 
   useEffect(() => {
     let cleanup: (() => void) | null = null;
@@ -32,7 +31,6 @@ export function useAuthEvents() {
                 if (snapshot.attributes)
                   setAttributes(characterId, snapshot.attributes);
                 setClones(characterId, snapshot.clones);
-                setRemaps(characterId, snapshot.remaps);
               }
             } catch (err) {
               console.error('Failed to hydrate ESI snapshot after auth:', err);

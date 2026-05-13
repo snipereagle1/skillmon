@@ -6,7 +6,6 @@ import type {
   LocationPayload,
   OverviewRow,
   QueuePayload,
-  Remap,
   SkillsPayload,
 } from '@/generated/types';
 
@@ -16,13 +15,7 @@ type ResourceSlice<T> = {
   lastError: string | null;
 };
 
-type ResourceKey =
-  | 'queues'
-  | 'skills'
-  | 'locations'
-  | 'attributes'
-  | 'clones'
-  | 'remaps';
+type ResourceKey = 'queues' | 'skills' | 'locations' | 'attributes' | 'clones';
 
 interface EsiStoreState {
   queues: Record<number, ResourceSlice<QueuePayload>>;
@@ -30,7 +23,6 @@ interface EsiStoreState {
   locations: Record<number, ResourceSlice<LocationPayload>>;
   attributes: Record<number, ResourceSlice<AttributesPayload>>;
   clones: Record<number, ResourceSlice<CloneInfo[]>>;
-  remaps: Record<number, ResourceSlice<Remap[]>>;
   overview: Record<number, OverviewRow>;
 
   setQueue(characterId: number, data: QueuePayload): void;
@@ -38,7 +30,6 @@ interface EsiStoreState {
   setLocation(characterId: number, data: LocationPayload): void;
   setAttributes(characterId: number, data: AttributesPayload): void;
   setClones(characterId: number, data: CloneInfo[]): void;
-  setRemaps(characterId: number, data: Remap[]): void;
   setOverviewRow(characterId: number, row: OverviewRow): void;
   setError(resource: ResourceKey, characterId: number, error: string): void;
   clearCharacter(characterId: number): void;
@@ -52,7 +43,6 @@ export const useEsiStore = create<EsiStoreState>((set) => ({
   locations: {},
   attributes: {},
   clones: {},
-  remaps: {},
   overview: {},
 
   setQueue: (characterId, data) =>
@@ -95,14 +85,6 @@ export const useEsiStore = create<EsiStoreState>((set) => ({
       },
     })),
 
-  setRemaps: (characterId, data) =>
-    set((s) => ({
-      remaps: {
-        ...s.remaps,
-        [characterId]: { data, lastUpdatedAt: now(), lastError: null },
-      },
-    })),
-
   setOverviewRow: (characterId, row) =>
     set((s) => ({
       overview: { ...s.overview, [characterId]: row },
@@ -141,7 +123,6 @@ export const useEsiStore = create<EsiStoreState>((set) => ({
         locations: drop(s.locations),
         attributes: drop(s.attributes),
         clones: drop(s.clones),
-        remaps: drop(s.remaps),
         overview: dropOverview(s.overview),
       };
     }),

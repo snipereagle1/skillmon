@@ -83,8 +83,6 @@ function RootComponent() {
             if (snapshot.clones.length > 0)
               store.setClones(id, snapshot.clones);
             if (snapshot.location) store.setLocation(id, snapshot.location);
-            if (snapshot.remaps.length > 0)
-              store.setRemaps(id, snapshot.remaps);
           }
         } catch (err) {
           const store = useEsiStore.getState();
@@ -94,7 +92,6 @@ function RootComponent() {
             store.setError('attributes', id, String(err));
             store.setError('locations', id, String(err));
             store.setError('clones', id, String(err));
-            store.setError('remaps', id, String(err));
           }
         }
 
