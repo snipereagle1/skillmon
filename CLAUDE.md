@@ -53,8 +53,35 @@ pnpm verify          # typegen + lint:full + format:check:all + typecheck
 - Tauri commands return `Result<T, String>` (anyhow errors stringified)
 - ESI calls go through rate-limiter in `esi/`
 - DB uses sqlx with SQLite; pool managed via Tauri state
-- Frontend uses TanStack Query for all async data; invalidate on mutations
 - Use `ts-pattern` for exhaustive matching on discriminated unions
+
+## Data Flow
+
+Live ESI data and mutations/static data use different layers. New hooks must go in the right place.
+
+**Zustand (`src/stores/esiStore`) — live ESI data**
+
+- Character skills, skill queue, attributes, clones, remaps, locations
+- Populated by background Tauri refresh loop via `src/lib/esiEvents.ts` (channel events) and `useAuthEvents` (auth-triggered snapshot hydration)
+- Read via store hooks (e.g., `useEsiStore`)
+
+**React Query — mutations**
+
+- `useLogoutCharacter`, `useStartEveLogin`, `useDismissNotification`, `useForceRefreshSkillQueue`, skill plan mutations
+
+**React Query — SDE / static**
+
+- `useSdeSkills`, `useSkillDetails`, `useSkillPlans`
+
+**React Query — settings**
+
+- `useSettings`, `useNotificationSettings`
+
+**React Query — one-shot startup**
+
+- `useStartupState`, `useAccountsAndCharacters`
+
+No `refetchInterval` or sub-minute `staleTime`/`gcTime` should appear on ESI live-data hooks — those belong to Zustand now.
 
 ## Agent skills
 
