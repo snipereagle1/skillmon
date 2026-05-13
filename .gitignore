@@ -37,3 +37,4 @@ src-tauri/tests/fixtures/sde_cache/
 # Environment variables
 .env
 .claude/.dirty
+.claude/settings.local.json
