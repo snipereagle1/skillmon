@@ -124,20 +124,18 @@ jobs:
         if: steps.cache-oas3-gen.outputs.cache-hit != 'true'
         run: cargo install oas3-gen --version 0.22.1 --force
 
-      - name: Cache tauri-typegen
-        id: cache-tauri-typegen
+      - name: Cache typeshare-cli
+        id: cache-typeshare-cli
         uses: actions/cache@v4
         with:
           path: |
-            ~/.cargo/bin/cargo-tauri-typegen
-            ~/.cargo/bin/cargo-tauri-typegen.exe
-            ~/.cargo/bin/tauri-typegen
-            ~/.cargo/bin/tauri-typegen.exe
-          key: ${{ runner.os }}-tauri-typegen-0.5.0
+            ~/.cargo/bin/typeshare
+            ~/.cargo/bin/typeshare.exe
+          key: ${{ runner.os }}-typeshare-cli-1.13.4
 
-      - name: Install tauri-typegen
-        if: steps.cache-tauri-typegen.outputs.cache-hit != 'true'
-        run: cargo install tauri-typegen --version 0.5.0 --force
+      - name: Install typeshare-cli
+        if: steps.cache-typeshare-cli.outputs.cache-hit != 'true'
+        run: cargo install typeshare-cli --version 1.13.4 --force
 
       - name: Generate ESI client
         shell: bash
