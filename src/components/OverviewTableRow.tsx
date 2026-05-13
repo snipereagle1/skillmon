@@ -4,24 +4,11 @@ import { UserPlus, Zap } from 'lucide-react';
 import { CharacterPortrait } from '@/components/Accounts/CharacterPortrait';
 import { AlphaIcon } from '@/components/AlphaIcon';
 import { TableCell, TableRow } from '@/components/ui/table';
-import type { SkillQueueItem } from '@/generated/types';
+import type { OverviewRow, SkillQueueItem } from '@/generated/types';
 import { cn, formatDuration, formatNumber, toRoman } from '@/lib/utils';
 
-export interface TrainingOverviewRowData {
-  characterId: number;
-  characterName: string;
-  accountName?: string;
-  queueTimeRemainingSeconds?: number;
-  currentSkillName?: string;
-  currentSkillLevel?: number;
-  spPerHour: number;
-  isOmega: boolean;
-  hasImplants: boolean;
-  hasBooster: boolean;
-}
-
 interface OverviewTableRowProps {
-  character: TrainingOverviewRowData;
+  character: OverviewRow;
 }
 
 export function OverviewTableRow({ character }: OverviewTableRowProps) {

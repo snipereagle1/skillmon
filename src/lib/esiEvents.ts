@@ -5,6 +5,7 @@ import type {
   AttributesPayload,
   ClonesPayload,
   LocationPayload,
+  OverviewRow,
   QueuePayload,
   SkillsPayload,
 } from '@/generated/types';
@@ -29,6 +30,9 @@ function listenCharacterChannels(characterId: number) {
     ),
     listen<ClonesPayload>(`character:${characterId}:clones`, ({ payload }) =>
       useEsiStore.getState().setClones(characterId, payload.clones)
+    ),
+    listen<OverviewRow>(`character:${characterId}:overview`, ({ payload }) =>
+      useEsiStore.getState().setOverviewRow(characterId, payload)
     ),
   ]);
 }

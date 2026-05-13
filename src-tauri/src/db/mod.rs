@@ -21,7 +21,7 @@ pub mod skill_plans;
 pub mod tokens;
 
 pub use accounts::{
-    add_character_to_account, create_account, delete_account, get_all_accounts,
+    add_character_to_account, create_account, delete_account, get_account, get_all_accounts,
     get_characters_for_account, get_unassigned_characters, remove_character_from_account,
     reorder_accounts, reorder_characters_in_account, reorder_unassigned_characters,
     update_account_name,

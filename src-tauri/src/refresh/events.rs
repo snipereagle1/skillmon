@@ -199,6 +199,24 @@ pub struct ClonesPayload {
     pub clones: Vec<CloneInfo>,
 }
 
+// ── Overview payload ──────────────────────────────────────────────────────────
+
+#[typeshare]
+#[derive(Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct OverviewRow {
+    pub character_id: i32,
+    pub character_name: String,
+    pub account_name: Option<String>,
+    pub queue_time_remaining_seconds: Option<i64_ts>,
+    pub current_skill_name: Option<String>,
+    pub current_skill_level: Option<i32>,
+    pub sp_per_hour: f64,
+    pub is_omega: bool,
+    pub has_implants: bool,
+    pub has_booster: bool,
+}
+
 // ── Misc payloads ─────────────────────────────────────────────────────────────
 
 #[typeshare]

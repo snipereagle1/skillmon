@@ -9,72 +9,15 @@ import {
 import { useAccountsAndCharacters } from '@/hooks/tauri/useAccountsAndCharacters';
 import { useEsiStore } from '@/stores/esiStore';
 
-import {
-  OverviewTableRow,
-  type TrainingOverviewRowData,
-} from './OverviewTableRow';
+import { OverviewTableRow } from './OverviewTableRow';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Skeleton } from './ui/skeleton';
 
-// TODO: overview data should be computed in Rust and emitted as a dedicated store slice
-// rather than derived here — processing in Rust gives better type safety and a single
-// place to handle ESI edge cases (paused queues, missing dates, etc).
 export function OverviewTable() {
-  const { data: accountsData, isLoading, error } = useAccountsAndCharacters();
-  const queues = useEsiStore((state) => state.queues);
+  const { isLoading, error } = useAccountsAndCharacters();
+  const overview = useEsiStore((state) => state.overview);
 
-  const allCharacters = accountsData
-    ? [
-        ...accountsData.unassigned_characters.map((c) => ({
-          ...c,
-          account_name: undefined,
-        })),
-        ...accountsData.accounts.flatMap((account) =>
-          account.characters.map((character) => ({
-            ...character,
-            account_name: account.name,
-          }))
-        ),
-      ]
-    : [];
-
-  const trainingCharacters: TrainingOverviewRowData[] = allCharacters.reduce(
-    (rows, character) => {
-      const queue = queues[character.character_id]?.data;
-      if (!queue || queue.queue.length === 0 || queue.isPaused) return rows;
-      const current = queue.queue[0];
-      const firstStart = queue.queue[0]?.startDate;
-      const lastFinish = queue.queue[queue.queue.length - 1]?.finishDate;
-      let queueTimeRemainingSeconds: number | undefined;
-      if (firstStart && lastFinish) {
-        const seconds =
-          (new Date(lastFinish).getTime() - new Date(firstStart).getTime()) /
-          1000;
-        queueTimeRemainingSeconds = Number.isFinite(seconds)
-          ? Math.max(0, Math.floor(seconds))
-          : undefined;
-      }
-
-      const spPerHour =
-        current?.spPerMinute != null ? current.spPerMinute * 60 : 0;
-      rows.push({
-        characterId: character.character_id,
-        characterName: queue.characterName,
-        accountName: character.account_name,
-        queueTimeRemainingSeconds,
-        currentSkillName: current?.skillName,
-        currentSkillLevel: current?.finishedLevel,
-        spPerHour,
-        isOmega: queue.isOmega,
-        hasImplants: false,
-        hasBooster: false,
-      });
-      return rows;
-    },
-    [] as TrainingOverviewRowData[]
-  );
-
-  trainingCharacters.sort((a, b) => {
+  const trainingCharacters = Object.values(overview).sort((a, b) => {
     if (
       a.queueTimeRemainingSeconds != null &&
       b.queueTimeRemainingSeconds != null
@@ -146,7 +89,7 @@ export function OverviewTable() {
     );
   }
 
-  if (!trainingCharacters || trainingCharacters.length === 0) {
+  if (trainingCharacters.length === 0) {
     return (
       <Card>
         <CardHeader>

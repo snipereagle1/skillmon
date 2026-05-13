@@ -4,6 +4,7 @@ import type {
   AttributesPayload,
   CloneInfo,
   LocationPayload,
+  OverviewRow,
   QueuePayload,
   Remap,
   SkillsPayload,
@@ -30,6 +31,7 @@ interface EsiStoreState {
   attributes: Record<number, ResourceSlice<AttributesPayload>>;
   clones: Record<number, ResourceSlice<CloneInfo[]>>;
   remaps: Record<number, ResourceSlice<Remap[]>>;
+  overview: Record<number, OverviewRow>;
 
   setQueue(characterId: number, data: QueuePayload): void;
   setSkills(characterId: number, data: SkillsPayload): void;
@@ -37,6 +39,7 @@ interface EsiStoreState {
   setAttributes(characterId: number, data: AttributesPayload): void;
   setClones(characterId: number, data: CloneInfo[]): void;
   setRemaps(characterId: number, data: Remap[]): void;
+  setOverviewRow(characterId: number, row: OverviewRow): void;
   setError(resource: ResourceKey, characterId: number, error: string): void;
   clearCharacter(characterId: number): void;
 }
@@ -50,6 +53,7 @@ export const useEsiStore = create<EsiStoreState>((set) => ({
   attributes: {},
   clones: {},
   remaps: {},
+  overview: {},
 
   setQueue: (characterId, data) =>
     set((s) => ({
@@ -99,6 +103,11 @@ export const useEsiStore = create<EsiStoreState>((set) => ({
       },
     })),
 
+  setOverviewRow: (characterId, row) =>
+    set((s) => ({
+      overview: { ...s.overview, [characterId]: row },
+    })),
+
   setError: (resource, characterId, error) =>
     set((s) => ({
       [resource]: {
@@ -119,6 +128,13 @@ export const useEsiStore = create<EsiStoreState>((set) => ({
         delete next[characterId];
         return next;
       };
+      const dropOverview = (
+        record: Record<number, OverviewRow>
+      ): Record<number, OverviewRow> => {
+        const next = { ...record };
+        delete next[characterId];
+        return next;
+      };
       return {
         queues: drop(s.queues),
         skills: drop(s.skills),
@@ -126,6 +142,7 @@ export const useEsiStore = create<EsiStoreState>((set) => ({
         attributes: drop(s.attributes),
         clones: drop(s.clones),
         remaps: drop(s.remaps),
+        overview: dropOverview(s.overview),
       };
     }),
 }));

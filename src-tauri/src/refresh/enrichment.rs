@@ -973,3 +973,68 @@ pub async fn enrich_clones(pool: &db::Pool, character_id: i64) -> events::Clones
         clones,
     }
 }
+
+pub async fn compute_overview_row(
+    pool: &db::Pool,
+    character_id: i64,
+) -> Option<events::OverviewRow> {
+    let queue_payload = enrich_queue_from_db(pool, character_id).await?;
+    if queue_payload.is_paused || queue_payload.queue.is_empty() {
+        return None;
+    }
+
+    let current = &queue_payload.queue[0];
+
+    let queue_time_remaining_seconds = queue_payload
+        .queue
+        .last()
+        .and_then(|q| q.finish_date.as_deref())
+        .and_then(|finish| chrono::DateTime::parse_from_rfc3339(finish).ok())
+        .map(|finish_dt| {
+            (finish_dt.with_timezone(&chrono::Utc) - chrono::Utc::now())
+                .num_seconds()
+                .max(0)
+        });
+
+    let sp_per_hour = current.sp_per_minute.unwrap_or(0.0) * 60.0;
+
+    let has_implants = !get_active_clone_implant_ids(pool, character_id)
+        .await
+        .is_empty();
+
+    let has_booster = enrich_attributes_from_db(pool, character_id)
+        .await
+        .map(|a| {
+            a.charisma.accelerator > 0
+                || a.intelligence.accelerator > 0
+                || a.memory.accelerator > 0
+                || a.perception.accelerator > 0
+                || a.willpower.accelerator > 0
+        })
+        .unwrap_or(false);
+
+    let character = db::get_character(pool, character_id).await.ok().flatten();
+
+    let account_name = if let Some(account_id) = character.as_ref().and_then(|c| c.account_id) {
+        db::get_account(pool, account_id)
+            .await
+            .ok()
+            .flatten()
+            .map(|a| a.name)
+    } else {
+        None
+    };
+
+    Some(events::OverviewRow {
+        character_id: character_id as i32,
+        character_name: queue_payload.character_name,
+        account_name,
+        queue_time_remaining_seconds,
+        current_skill_name: current.skill_name.clone(),
+        current_skill_level: Some(current.finished_level),
+        sp_per_hour,
+        is_omega: queue_payload.is_omega,
+        has_implants,
+        has_booster,
+    })
+}
