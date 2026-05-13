@@ -12,6 +12,7 @@ import {
   calculateCompletionPercentage,
   calculateTimeToTrain,
   calculateTrainingHours,
+  formatAbsoluteDate,
   formatTimeRemaining,
   isCurrentlyTraining,
 } from './utils';
@@ -42,7 +43,13 @@ export function SkillQueueEntry({
     skill.finishedLevel.toString();
   const spPerHour = skill.spPerMinute ? skill.spPerMinute * 60 : null;
   const timeToTrain = calculateTimeToTrain(skill);
-  const completionTime = formatTimeRemaining(skill.finishDate);
+  const absoluteCompletionDate = formatAbsoluteDate(skill.finishDate);
+
+  // Currently training: finishDate countdown is always live (SP-based calc goes stale between refreshes)
+  const visibleTime = isTraining
+    ? formatTimeRemaining(skill.finishDate)
+    : timeToTrain;
+  const tooltipContent = absoluteCompletionDate;
 
   const completionPercentage = isTraining
     ? calculateCompletionPercentage(skill)
@@ -92,7 +99,7 @@ export function SkillQueueEntry({
             )}
           </div>
         </div>
-        {timeToTrain !== null ? (
+        {visibleTime !== null ? (
           <Tooltip delayDuration={0}>
             <TooltipTrigger asChild>
               <span
@@ -103,11 +110,11 @@ export function SkillQueueEntry({
                     : 'text-muted-foreground'
                 )}
               >
-                {timeToTrain}
+                {visibleTime}
               </span>
             </TooltipTrigger>
             <TooltipContent side="left">
-              <p>Completes: {completionTime}</p>
+              <p>Completes: {tooltipContent}</p>
             </TooltipContent>
           </Tooltip>
         ) : (
@@ -119,7 +126,7 @@ export function SkillQueueEntry({
                 : 'text-muted-foreground'
             )}
           >
-            {completionTime}
+            {absoluteCompletionDate}
           </span>
         )}
       </div>
