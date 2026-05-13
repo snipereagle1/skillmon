@@ -97,9 +97,7 @@ impl RefreshSupervisor {
                         queue_skill_ids = queue_data
                             .iter()
                             .filter(|item| {
-                                item.finish_date
-                                    .map(|fd| queue_now < fd)
-                                    .unwrap_or(true)
+                                item.finish_date.map(|fd| queue_now < fd).unwrap_or(true)
                             })
                             .map(|item| item.skill_id)
                             .collect();
@@ -359,8 +357,8 @@ impl RefreshSupervisor {
                 let min_expires = expires_list.into_iter().min().unwrap_or(now + 300);
                 let secs_until = (min_expires - now).clamp(30, 3600);
                 let jitter_range = secs_until / 10;
-                let jitter = rand::thread_rng()
-                    .gen_range(-jitter_range.max(1)..=jitter_range.max(1));
+                let jitter =
+                    rand::thread_rng().gen_range(-jitter_range.max(1)..=jitter_range.max(1));
                 let sleep_secs = (secs_until + jitter).clamp(30, 3600) as u64;
 
                 tokio::select! {
@@ -381,10 +379,7 @@ impl RefreshSupervisor {
         );
     }
 
-    pub fn cancel_character(
-        &mut self,
-        character_id: i64,
-    ) -> Option<tokio::task::JoinHandle<()>> {
+    pub fn cancel_character(&mut self, character_id: i64) -> Option<tokio::task::JoinHandle<()>> {
         self.handles.remove(&character_id).map(|h| {
             h.cancel.cancel();
             h.join_handle
