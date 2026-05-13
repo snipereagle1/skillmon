@@ -28,36 +28,6 @@ pnpm verify          # typegen + lint:full + format:check:all + typecheck
 - **`routeTree.gen.ts` is generated** — run `pnpm generate-route-tree` or let Vite plugin handle it.
 - Husky + lint-staged enforce eslint/prettier on TS and clippy/fmt on Rust pre-commit.
 
-## Architecture
-
-### Frontend (`src/`)
-
-- `routes/` — TanStack Router file-based routes
-- `components/` — React components; `ui/` = shadcn primitives
-- `hooks/tauri/` — typed wrappers around Tauri commands (TanStack Query)
-- `generated/` — typeshare output, never edit manually
-- `stores/` — Zustand stores
-- `lib/` — shared utilities
-
-### Backend (`src-tauri/src/`)
-
-- `commands/` — Tauri invoke handlers (exposed to frontend)
-- `db/` — sqlx queries per domain (accounts, characters, skill_plans, etc.)
-- `esi/` — EVE ESI HTTP client + rate limiting
-- `auth/` — OAuth2 + callback server
-- `sde/` — Static Data Export import/management
-- `notifications/` — background notification checks
-- `refresh/` — `RefreshSupervisor` spawns per-character background loops that poll ESI on a timer, enrich raw data, and emit Tauri events (`character:{id}:queue`, `:skills`, `:attributes`, `:location`, `:clones`, `:overview`) to the frontend
-- `skill_plans/` — skill training plan engine: DAG-based prerequisite validation, optimization, simulation, and JSON import/export
-- `cache/` — ESI response cache with ETags and expiration timestamps to reduce redundant API calls
-
-## Patterns
-
-- Tauri commands return `Result<T, String>` (anyhow errors stringified)
-- ESI calls go through rate-limiter in `esi/`
-- DB uses sqlx with SQLite; pool managed via Tauri state
-- Use `ts-pattern` for exhaustive matching on discriminated unions
-
 ## Agent skills
 
 ### Issue tracker
