@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import { invoke } from '@tauri-apps/api/core';
 
-import { compareSkillPlanWithCharacter } from '@/generated/commands';
 import type { PlanComparisonResponse } from '@/generated/types';
 
 import { queryKeys } from './queryKeys';
@@ -15,7 +15,10 @@ export function usePlanComparison(
       if (!planId || !characterId) {
         return null;
       }
-      return await compareSkillPlanWithCharacter({ planId, characterId });
+      return invoke<PlanComparisonResponse>(
+        'compare_skill_plan_with_character',
+        { planId, characterId }
+      );
     },
     enabled: planId !== null && characterId !== null,
   });

@@ -1,5 +1,6 @@
-import { useIsFetching } from '@tanstack/react-query';
+import { useIsFetching, useQueryClient } from '@tanstack/react-query';
 import { createRootRoute, Link, Outlet } from '@tanstack/react-router';
+import { invoke } from '@tauri-apps/api/core';
 import { check } from '@tauri-apps/plugin-updater';
 import { Download } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -12,10 +13,14 @@ import { Button } from '@/components/ui/button';
 import { NavigationTabs } from '@/components/ui/navigation-tabs';
 import { Toaster } from '@/components/ui/sonner';
 import { Spinner } from '@/components/ui/spinner';
+import type { CharacterSnapshot } from '@/generated/types';
+import { FeatureId } from '@/generated/types';
 import { useAuthEvents } from '@/hooks/tauri/useAuthEvents';
 import { useEnabledFeatures } from '@/hooks/tauri/useSettings';
 import { useStartupState } from '@/hooks/tauri/useStartupState';
+import { bootstrapEsiEvents } from '@/lib/esiEvents';
 import { cn } from '@/lib/utils';
+import { useEsiStore } from '@/stores/esiStore';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
 import { useUpdateStore } from '@/stores/updateStore';
 
@@ -23,13 +28,15 @@ function RootComponent() {
   useAuthEvents();
   const { isStartingUp } = useStartupState();
   const isFetching = useIsFetching();
+  const queryClient = useQueryClient();
   const [addCharacterOpen, setAddCharacterOpen] = useState(false);
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const { open, skillId, characterId, closeSkillDetail } =
     useSkillDetailStore();
   const { updateAvailable, setUpdate } = useUpdateStore();
   const { data: enabledFeatures } = useEnabledFeatures();
-  const locationsEnabled = enabledFeatures?.includes('locations') ?? false;
+  const locationsEnabled =
+    enabledFeatures?.includes(FeatureId.Locations) ?? false;
 
   useEffect(() => {
     const checkForUpdates = async () => {
@@ -45,6 +52,62 @@ function RootComponent() {
 
     checkForUpdates();
   }, [setUpdate]);
+
+  // Hydrate the Zustand ESI store from SQLite on app mount so the UI has data
+  // immediately before the first Rust supervisor refresh fires.
+  // Also registers Tauri event listeners that keep the store (and RQ cache) current.
+  useEffect(() => {
+    let cleanup: (() => void) | undefined;
+
+    const hydrateStore = async () => {
+      try {
+        const accountsData = await invoke<{
+          accounts: { characters: { character_id: number }[] }[];
+          unassigned_characters: { character_id: number }[];
+        }>('get_accounts_and_characters');
+        const characterIds = [
+          ...accountsData.unassigned_characters,
+          ...accountsData.accounts.flatMap((a) => a.characters),
+        ].map((c) => c.character_id);
+
+        try {
+          const snapshots =
+            await invoke<CharacterSnapshot[]>('get_esi_snapshot');
+          const store = useEsiStore.getState();
+          for (const snapshot of snapshots) {
+            const id = snapshot.characterId;
+            if (snapshot.queue) store.setQueue(id, snapshot.queue);
+            if (snapshot.skills) store.setSkills(id, snapshot.skills);
+            if (snapshot.attributes)
+              store.setAttributes(id, snapshot.attributes);
+            if (snapshot.clones.length > 0)
+              store.setClones(id, snapshot.clones);
+            if (snapshot.location) store.setLocation(id, snapshot.location);
+          }
+        } catch (err) {
+          const store = useEsiStore.getState();
+          for (const id of characterIds) {
+            store.setError('queues', id, String(err));
+            store.setError('skills', id, String(err));
+            store.setError('attributes', id, String(err));
+            store.setError('locations', id, String(err));
+            store.setError('clones', id, String(err));
+          }
+        }
+
+        cleanup = await bootstrapEsiEvents(queryClient, characterIds);
+      } catch (err) {
+        console.warn('Failed to hydrate ESI store:', err);
+      }
+    };
+
+    hydrateStore();
+
+    return () => {
+      cleanup?.();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   if (isStartingUp) {
     return (

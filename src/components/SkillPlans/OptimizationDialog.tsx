@@ -161,8 +161,8 @@ export function OptimizationDialog({
                 await saveRemapMutation.mutateAsync({
                   planId,
                   attributes: remap.attributes,
-                  afterSkillTypeId: entry?.skill_type_id || null,
-                  afterSkillLevel: entry?.planned_level || null,
+                  afterSkillTypeId: entry?.skill_type_id || undefined,
+                  afterSkillLevel: entry?.planned_level || undefined,
                 });
               }
             }
@@ -193,8 +193,8 @@ export function OptimizationDialog({
           await saveRemapMutation.mutateAsync({
             planId,
             attributes: optimization.recommended_remap.attributes,
-            afterSkillTypeId: null,
-            afterSkillLevel: null,
+            afterSkillTypeId: undefined,
+            afterSkillLevel: undefined,
           });
         }
         onApply(optimization.recommended_remap);
@@ -223,14 +223,14 @@ export function OptimizationDialog({
           skill_type_id: original.skill_type_id,
           level: original.planned_level,
           entry_type: original.entry_type,
-          notes: original.notes || null,
+          notes: original.notes || undefined,
         };
       }),
       remaps: optimization.recommended_remaps.map((remap) => {
         const entry = optimization.optimized_entries[remap.entry_index];
         return {
-          after_skill_type_id: entry?.skill_type_id || null,
-          after_skill_level: entry?.planned_level || null,
+          after_skill_type_id: entry?.skill_type_id || undefined,
+          after_skill_level: entry?.planned_level || undefined,
           attributes: remap.attributes,
         };
       }),

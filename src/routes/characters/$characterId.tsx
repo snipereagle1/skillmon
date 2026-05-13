@@ -15,9 +15,7 @@ function CharacterDetailLayout() {
 
   const { data: accountsData, isLoading, error } = useAccountsAndCharacters();
   const { data: characterSkills } = useCharacterSkills(characterIdNum);
-  const { data: selectedSkillQueue } = useSkillQueue(characterIdNum, {
-    refetchInterval: 60_000,
-  });
+  const { data: selectedSkillQueue } = useSkillQueue(characterIdNum);
 
   const allCharacters = useMemo(() => {
     if (!accountsData) return [];
@@ -34,10 +32,10 @@ function CharacterDetailLayout() {
       return null;
     }
     const skillsSP = characterSkills.skills.reduce(
-      (sum, skill) => sum + skill.skillpoints_in_skill,
+      (sum, skill) => sum + skill.skillpointsInSkill,
       0
     );
-    const unallocatedSP = selectedSkillQueue.unallocated_sp ?? 0;
+    const unallocatedSP = selectedSkillQueue.unallocatedSp ?? 0;
     return skillsSP + unallocatedSP;
   }, [characterSkills, selectedSkillQueue]);
 

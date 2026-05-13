@@ -1,9 +1,9 @@
+import { invoke } from '@tauri-apps/api/core';
 import { useEffect, useState } from 'react';
 
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { getTypeNames } from '@/generated/commands';
 import { SimulationProfile, SimulationResult } from '@/generated/types';
 import { formatDuration } from '@/lib/utils';
 
@@ -33,7 +33,9 @@ export function SimulationTimeline({
       new Set(result.segments.map((s) => s.skill_type_id))
     );
     if (typeIds.length > 0) {
-      getTypeNames({ typeIds }).then((names) => {
+      invoke<{ type_id: number; name: string }[]>('get_type_names', {
+        typeIds,
+      }).then((names) => {
         const map: Record<number, string> = {};
         names.forEach((n) => (map[n.type_id] = n.name));
         setSkillNames(map);

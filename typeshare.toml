@@ -1,0 +1,6 @@
+[typescript]
+output_file = "src/generated/types.ts"
+
+[typescript.type_mappings]
+i64_ts = "number"
+usize_ts = "number"

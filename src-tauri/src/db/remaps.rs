@@ -1,23 +1,26 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
+use typeshare::typeshare;
 
 use super::Pool;
 use crate::skill_plans::Attributes;
+use crate::ts_types::i64_ts;
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
 pub struct Remap {
-    pub remap_id: i64,
-    pub character_id: Option<i64>,
-    pub plan_id: Option<i64>,
-    pub after_skill_type_id: Option<i64>,
-    pub after_skill_level: Option<i64>,
-    pub intelligence: i64,
-    pub perception: i64,
-    pub charisma: i64,
-    pub willpower: i64,
-    pub memory: i64,
-    pub created_at: i64,
+    pub remap_id: i64_ts,
+    pub character_id: Option<i64_ts>,
+    pub plan_id: Option<i64_ts>,
+    pub after_skill_type_id: Option<i64_ts>,
+    pub after_skill_level: Option<i64_ts>,
+    pub intelligence: i64_ts,
+    pub perception: i64_ts,
+    pub charisma: i64_ts,
+    pub willpower: i64_ts,
+    pub memory: i64_ts,
+    pub created_at: i64_ts,
 }
 
 impl Remap {

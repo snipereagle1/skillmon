@@ -2,9 +2,11 @@ use std::collections::hash_map::Entry;
 use std::collections::{HashMap, HashSet};
 
 use serde::Serialize;
+use typeshare::typeshare;
 
 use crate::db;
 use crate::skill_plans::graph::{PlanDag, PlanNode};
+use crate::ts_types::{i64_ts, usize_ts};
 use crate::utils;
 use anyhow::Result;
 
@@ -30,11 +32,12 @@ struct AddSkillContext<'a> {
     group_id_cache: &'a mut HashMap<i64, Option<i64>>,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct PreviewPlanFromCharacterGroup {
-    pub group_id: i64,
+    pub group_id: i64_ts,
     pub group_name: String,
-    pub skill_count: usize,
+    pub skill_count: usize_ts,
 }
 
 #[derive(Debug, Clone, Serialize)]

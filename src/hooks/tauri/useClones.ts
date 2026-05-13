@@ -1,19 +1,18 @@
-import { useQuery } from '@tanstack/react-query';
+import type { CloneInfo } from '@/generated/types';
+import { useEsiStore } from '@/stores/esiStore';
 
-import { getClones } from '@/generated/commands';
-import type { CloneResponse } from '@/generated/types';
+export function useClones(characterId: number | null): {
+  data: CloneInfo[];
+  isLoading: boolean;
+  error: string | null;
+} {
+  const slice = useEsiStore((state) =>
+    characterId !== null ? state.clones[characterId] : undefined
+  );
 
-import { queryKeys } from './queryKeys';
-
-export function useClones(characterId: number | null) {
-  return useQuery<CloneResponse[]>({
-    queryKey: queryKeys.clones(characterId),
-    queryFn: async () => {
-      if (characterId === null) {
-        return [];
-      }
-      return await getClones({ characterId });
-    },
-    enabled: characterId !== null,
-  });
+  return {
+    data: slice?.data ?? [],
+    isLoading: characterId !== null && slice === undefined,
+    error: slice?.lastError ?? null,
+  };
 }

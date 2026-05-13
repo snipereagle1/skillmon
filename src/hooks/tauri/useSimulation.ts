@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
+import { invoke } from '@tauri-apps/api/core';
 import { useState } from 'react';
 
-import { simulateSkillPlan } from '@/generated/commands';
 import type {
   Remap,
   SimulationProfile,
+  SimulationResult,
   SkillPlanEntryResponse,
 } from '@/generated/types';
 import { stableStringify } from '@/lib/utils';
@@ -75,7 +76,7 @@ export function useSimulation(planId: number, characterId?: number | null) {
       characterId
     ),
     queryFn: () =>
-      simulateSkillPlan({
+      invoke<SimulationResult>('simulate_skill_plan', {
         planId,
         profile,
         characterId: characterId || undefined,

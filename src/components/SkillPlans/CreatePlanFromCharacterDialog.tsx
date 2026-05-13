@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Textarea } from '@/components/ui/textarea';
+import type { SkillGroupResponse } from '@/generated/types';
 import { useAccountsAndCharacters } from '@/hooks/tauri/useAccountsAndCharacters';
 import { useCharacterSkills } from '@/hooks/tauri/useCharacterSkills';
 import {
@@ -52,15 +53,38 @@ export function CreatePlanFromCharacterDialog({
   const { data: accountsData } = useAccountsAndCharacters();
   const { data: characterSkills } = useCharacterSkills(characterId);
 
+  const groups = useMemo<SkillGroupResponse[]>(() => {
+    if (!characterSkills) return [];
+    const grouped = new Map<number, SkillGroupResponse>();
+    for (const skill of characterSkills.skills) {
+      const groupId = skill.groupId;
+      if (groupId == null) continue;
+      const existing = grouped.get(groupId);
+      if (existing) {
+        existing.total_levels += 5;
+        existing.trained_levels += skill.trainedSkillLevel;
+        if (skill.trainedSkillLevel > 0) existing.has_trained_skills = true;
+      } else {
+        grouped.set(groupId, {
+          group_id: groupId,
+          group_name: skill.groupName ?? `Group ${groupId}`,
+          total_levels: 5,
+          trained_levels: skill.trainedSkillLevel,
+          has_trained_skills: skill.trainedSkillLevel > 0,
+        });
+      }
+    }
+    return Array.from(grouped.values()).sort((a, b) =>
+      a.group_name.localeCompare(b.group_name)
+    );
+  }, [characterSkills]);
+
   const defaultGroupIds = useMemo(() => {
-    if (
-      characterSkills?.character_id === characterId &&
-      characterSkills.groups.length > 0
-    ) {
-      return new Set(characterSkills.groups.map((g) => g.group_id));
+    if (characterSkills?.characterId === characterId && groups.length > 0) {
+      return new Set<number>(groups.map((g) => g.group_id));
     }
     return new Set<number>();
-  }, [characterId, characterSkills]);
+  }, [characterId, characterSkills, groups]);
 
   const effectiveIncludedGroupIds = hasUserChangedGroups
     ? includedGroupIds
@@ -79,8 +103,6 @@ export function CreatePlanFromCharacterDialog({
     const accountChars = accountsData.accounts.flatMap((acc) => acc.characters);
     return [...accountChars, ...accountsData.unassigned_characters];
   }, [accountsData]);
-
-  const groups = characterSkills?.groups ?? [];
 
   const handleCharacterChange = (value: string) => {
     const id = value ? Number(value) : null;
@@ -128,7 +150,7 @@ export function CreatePlanFromCharacterDialog({
       const planId = await createPlanMutation.mutateAsync({
         characterId,
         planName: planName.trim(),
-        description: description.trim() || null,
+        description: description.trim() || undefined,
         includedGroupIds: Array.from(effectiveIncludedGroupIds),
       });
       handleOpenChange(false);

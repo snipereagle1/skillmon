@@ -1,13 +1,16 @@
 use serde::Serialize;
 use tauri::State;
+use typeshare::typeshare;
 
 use crate::db;
 use crate::sde;
+use crate::ts_types::i64_ts;
 use crate::utils;
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct TypeNameEntry {
-    pub type_id: i64,
+    pub type_id: i64_ts,
     pub name: String,
 }
 

@@ -1,15 +1,23 @@
-import { useQuery } from '@tanstack/react-query';
+import type { LocationPayload } from '@/generated/types';
+import { useEsiStore } from '@/stores/esiStore';
 
-import { getAllCharactersLocations } from '@/generated/commands';
-import type { CharacterLocationOverview } from '@/generated/types';
+export function useAllCharactersLocations(): {
+  data: LocationPayload[];
+  isLoading: boolean;
+  error: string | null;
+} {
+  const locations = useEsiStore((state) => state.locations);
 
-import { queryKeys } from './queryKeys';
+  const entries = Object.values(locations);
+  const data = entries
+    .map((s) => s.data)
+    .filter((d): d is LocationPayload => d !== null)
+    .sort((a, b) => Number(b.isOnline ?? false) - Number(a.isOnline ?? false));
+  const hasError = entries.find((s) => s.lastError !== null);
 
-export function useAllCharactersLocations() {
-  return useQuery<CharacterLocationOverview[]>({
-    queryKey: queryKeys.locationsOverview(),
-    queryFn: () => getAllCharactersLocations(),
-    refetchInterval: 60_000,
-    staleTime: 55_000,
-  });
+  return {
+    data,
+    isLoading: entries.length === 0,
+    error: hasError?.lastError ?? null,
+  };
 }

@@ -11,9 +11,8 @@ use crate::esi;
 use crate::esi_helpers;
 use crate::utils;
 
-use crate::commands::attributes::CharacterAttributesResponse;
 use crate::commands::skill_queues::{
-    is_skill_actively_training, CharacterSkillQueue, SkillQueueItem,
+    is_skill_actively_training, CharacterAttributesResponse, CharacterSkillQueue, SkillQueueItem,
 };
 
 #[allow(dead_code)]

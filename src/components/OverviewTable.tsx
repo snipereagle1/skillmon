@@ -6,18 +6,28 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { useTrainingCharactersOverview } from '@/hooks/tauri/useOverview';
+import { useAccountsAndCharacters } from '@/hooks/tauri/useAccountsAndCharacters';
+import { useEsiStore } from '@/stores/esiStore';
 
 import { OverviewTableRow } from './OverviewTableRow';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Skeleton } from './ui/skeleton';
 
 export function OverviewTable() {
-  const {
-    data: trainingCharacters,
-    isLoading,
-    error,
-  } = useTrainingCharactersOverview();
+  const { isLoading, error } = useAccountsAndCharacters();
+  const overview = useEsiStore((state) => state.overview);
+
+  const trainingCharacters = Object.values(overview).sort((a, b) => {
+    if (
+      a.queueTimeRemainingSeconds != null &&
+      b.queueTimeRemainingSeconds != null
+    ) {
+      return a.queueTimeRemainingSeconds - b.queueTimeRemainingSeconds;
+    }
+    if (a.queueTimeRemainingSeconds != null) return -1;
+    if (b.queueTimeRemainingSeconds != null) return 1;
+    return 0;
+  });
 
   if (isLoading) {
     return (
@@ -79,7 +89,7 @@ export function OverviewTable() {
     );
   }
 
-  if (!trainingCharacters || trainingCharacters.length === 0) {
+  if (trainingCharacters.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -114,7 +124,7 @@ export function OverviewTable() {
           </TableHeader>
           <TableBody>
             {trainingCharacters.map((char) => (
-              <OverviewTableRow key={char.character_id} character={char} />
+              <OverviewTableRow key={char.characterId} character={char} />
             ))}
           </TableBody>
         </Table>

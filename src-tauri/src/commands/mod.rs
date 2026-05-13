@@ -1,11 +1,9 @@
 pub mod accounts;
-pub mod attributes;
 pub mod auth;
 pub mod characters;
 pub mod clones;
-pub mod location;
+pub mod esi_snapshot;
 pub mod notifications;
-pub mod overview;
 pub mod rate_limits;
 pub mod remaps;
 pub mod sde;

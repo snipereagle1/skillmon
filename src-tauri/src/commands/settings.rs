@@ -1,15 +1,25 @@
 use crate::db;
 use crate::esi::EsiScope;
 use crate::features::{self, FeatureId, OptionalFeature};
+use crate::ts_types::i64_ts;
 use serde::Serialize;
 use std::collections::HashMap;
 use tauri::State;
+use typeshare::typeshare;
 
+#[typeshare]
+#[derive(Debug, Clone, Serialize)]
+pub struct FeatureScopeEntry {
+    pub feature_id: String,
+    pub has_scopes: bool,
+}
+
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct CharacterFeatureScopeStatus {
-    pub character_id: i64,
+    pub character_id: i64_ts,
     pub character_name: String,
-    pub feature_has_scopes: Vec<(String, bool)>,
+    pub feature_has_scopes: Vec<FeatureScopeEntry>,
 }
 
 #[tauri::command]
@@ -69,7 +79,7 @@ pub async fn get_character_feature_scope_status(
                 )
             })?;
 
-        let mut feature_has_scopes: Vec<(String, bool)> = Vec::new();
+        let mut feature_has_scopes: Vec<FeatureScopeEntry> = Vec::new();
 
         if let Some(tokens) = tokens {
             // Parse scopes from JSON string
@@ -84,12 +94,18 @@ pub async fn get_character_feature_scope_status(
                 let has_all_scopes = required_scopes
                     .iter()
                     .all(|scope| token_scopes.contains(&scope.as_str().to_string()));
-                feature_has_scopes.push((feature_id.as_str().to_string(), has_all_scopes));
+                feature_has_scopes.push(FeatureScopeEntry {
+                    feature_id: feature_id.as_str().to_string(),
+                    has_scopes: has_all_scopes,
+                });
             }
         } else {
             // No tokens = no scopes for any feature
             for feature_id in enabled_feature_scopes.keys() {
-                feature_has_scopes.push((feature_id.as_str().to_string(), false));
+                feature_has_scopes.push(FeatureScopeEntry {
+                    feature_id: feature_id.as_str().to_string(),
+                    has_scopes: false,
+                });
             }
         }
 

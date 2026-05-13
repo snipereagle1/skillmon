@@ -11,7 +11,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "typegen": "cargo tauri-typegen generate --output-path src/generated",
+    "typegen": "typeshare src-tauri/src --lang typescript --output-file src/generated/types.ts",
     "tauri:dev": "pnpm typegen && tauri dev",
     "tauri:build": "pnpm typegen && tauri build",
     "test": "TZ=UTC vitest",

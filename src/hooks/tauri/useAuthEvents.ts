@@ -1,10 +1,16 @@
 import { useQueryClient } from '@tanstack/react-query';
-import { useEffect } from 'react';
+import { invoke } from '@tauri-apps/api/core';
+import { useEffect, useRef } from 'react';
+
+import type { CharacterSnapshot } from '@/generated/types';
+import { listenCharacterChannels } from '@/lib/esiEvents';
+import { useEsiStore } from '@/stores/esiStore';
 
 import { queryKeys } from './queryKeys';
 
 export function useAuthEvents() {
   const queryClient = useQueryClient();
+  const characterUnlisteners = useRef<Map<number, () => void>>(new Map());
 
   useEffect(() => {
     let cleanup: (() => void) | null = null;
@@ -16,19 +22,30 @@ export function useAuthEvents() {
         const unlistenSuccess = await listen<number>(
           'auth-success',
           async (event) => {
-            const characterId = event.payload;
-            await queryClient.invalidateQueries({
-              queryKey: queryKeys.skillQueue(characterId),
-            });
-            await queryClient.invalidateQueries({
-              queryKey: queryKeys.characterSkills(characterId),
-            });
-            await queryClient.invalidateQueries({
-              queryKey: queryKeys.attributes(characterId),
-            });
-            await queryClient.invalidateQueries({
-              queryKey: queryKeys.clones(characterId),
-            });
+            const newCharacterId = event.payload;
+
+            // Register event listeners for the newly authenticated character
+            const unlisten = await listenCharacterChannels(newCharacterId);
+            characterUnlisteners.current.set(newCharacterId, unlisten);
+
+            try {
+              const snapshots =
+                await invoke<CharacterSnapshot[]>('get_esi_snapshot');
+              const snapshot = snapshots.find(
+                (s) => s.characterId === newCharacterId
+              );
+              if (snapshot) {
+                const { setQueue, setSkills, setAttributes, setClones } =
+                  useEsiStore.getState();
+                if (snapshot.queue) setQueue(newCharacterId, snapshot.queue);
+                if (snapshot.skills) setSkills(newCharacterId, snapshot.skills);
+                if (snapshot.attributes)
+                  setAttributes(newCharacterId, snapshot.attributes);
+                setClones(newCharacterId, snapshot.clones);
+              }
+            } catch (err) {
+              console.error('Failed to hydrate ESI snapshot after auth:', err);
+            }
             await queryClient.invalidateQueries({
               queryKey: queryKeys.accountsAndCharacters(),
             });
@@ -42,6 +59,8 @@ export function useAuthEvents() {
         cleanup = () => {
           unlistenSuccess();
           unlistenError();
+          characterUnlisteners.current.forEach((fn) => fn());
+          characterUnlisteners.current.clear();
         };
       } catch (error) {
         console.error('Failed to setup auth listeners:', error);
@@ -53,5 +72,6 @@ export function useAuthEvents() {
 
     setup();
     return () => cleanup?.();
-  }, [queryClient]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 }

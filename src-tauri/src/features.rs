@@ -1,6 +1,8 @@
 use crate::esi::EsiScope;
 use serde::{Deserialize, Serialize};
+use typeshare::typeshare;
 
+#[typeshare]
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq, Hash)]
 #[serde(rename_all = "kebab-case")]
 pub enum FeatureId {
@@ -24,6 +26,7 @@ impl FeatureId {
         }
     }
 
+    #[allow(dead_code)]
     pub fn scopes(self) -> Vec<EsiScope> {
         get_optional_features()
             .into_iter()
@@ -41,6 +44,7 @@ impl std::str::FromStr for FeatureId {
     }
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OptionalFeature {
     pub id: FeatureId,

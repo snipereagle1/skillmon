@@ -1,9 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
+import { invoke } from '@tauri-apps/api/core';
 
-import {
-  optimizePlanAttributes,
-  optimizePlanReordering,
-} from '@/generated/commands';
 import type {
   Attributes,
   OptimizationResult,
@@ -37,7 +34,7 @@ export function useOptimization(
       ),
       queryFn: async () => {
         if (mode === 'reorder') {
-          return await optimizePlanReordering({
+          return invoke<ReorderOptimizationResult>('optimize_plan_reordering', {
             planId,
             implants,
             baselineRemap,
@@ -46,7 +43,7 @@ export function useOptimization(
             maxRemaps,
           });
         } else {
-          return await optimizePlanAttributes({
+          return invoke<OptimizationResult>('optimize_plan_attributes', {
             planId,
             implants,
             baselineRemap,

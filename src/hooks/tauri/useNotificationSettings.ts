@@ -1,9 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { invoke } from '@tauri-apps/api/core';
 
-import {
-  getNotificationSettings,
-  upsertNotificationSetting,
-} from '@/generated/commands';
 import type { NotificationSettingResponse } from '@/generated/types';
 
 import { queryKeys } from './queryKeys';
@@ -15,7 +12,10 @@ export function useNotificationSettings(characterId: number | null) {
       if (!characterId) {
         return [];
       }
-      return await getNotificationSettings({ characterId });
+      return invoke<NotificationSettingResponse[]>(
+        'get_notification_settings',
+        { characterId }
+      );
     },
     enabled: characterId !== null,
   });
@@ -34,7 +34,7 @@ export function useUpdateNotificationSetting() {
       const serializedConfig =
         params.config != null ? JSON.stringify(params.config) : undefined;
 
-      return await upsertNotificationSetting({
+      return invoke<void>('upsert_notification_setting', {
         characterId: params.characterId,
         notificationType: params.notificationType,
         enabled: params.enabled,

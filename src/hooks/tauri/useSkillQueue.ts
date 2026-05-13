@@ -1,23 +1,18 @@
-import { useQuery } from '@tanstack/react-query';
+import type { QueuePayload } from '@/generated/types';
+import { useEsiStore } from '@/stores/esiStore';
 
-import { getSkillQueueForCharacter } from '@/generated/commands';
-import type { CharacterSkillQueue } from '@/generated/types';
+export function useSkillQueue(characterId: number | null): {
+  data: QueuePayload | null;
+  isLoading: boolean;
+  error: string | null;
+} {
+  const slice = useEsiStore((state) =>
+    characterId !== null ? state.queues[characterId] : undefined
+  );
 
-import { queryKeys } from './queryKeys';
-
-export function useSkillQueue(
-  characterId: number | null,
-  options?: { refetchInterval?: number | false }
-) {
-  return useQuery<CharacterSkillQueue>({
-    queryKey: queryKeys.skillQueue(characterId),
-    queryFn: async () => {
-      if (characterId === null) {
-        throw new Error('Character ID is required');
-      }
-      return await getSkillQueueForCharacter({ characterId });
-    },
-    enabled: characterId !== null,
-    refetchInterval: options?.refetchInterval,
-  });
+  return {
+    data: slice?.data ?? null,
+    isLoading: characterId !== null && slice === undefined,
+    error: slice?.lastError ?? null,
+  };
 }

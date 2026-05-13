@@ -1,22 +1,25 @@
 use std::sync::{
     atomic::{AtomicU8, Ordering},
-    Arc,
+    Arc, Mutex,
 };
 
 use tauri::{Emitter, Listener, Manager, WindowEvent};
 
 mod auth;
 mod cache;
+mod clone_sync;
 mod commands;
 mod db;
 mod esi;
 mod esi_helpers;
 mod features;
 mod notifications;
+mod refresh;
 mod sde;
 mod skill_plans;
 mod skill_queue;
 mod tray;
+pub mod ts_types;
 mod utils;
 
 #[cfg(test)]
@@ -56,6 +59,24 @@ pub fn run() {
 
                 let pool_for_tray = app.state::<db::Pool>().inner().clone();
                 let rate_limits_for_tray = app.state::<esi::RateLimitStore>().inner().clone();
+
+                let supervisor = Mutex::new(refresh::RefreshSupervisor::new());
+
+                // Seed with existing characters
+                let characters_for_refresh = db::get_all_characters(&pool_for_tray).await.unwrap_or_default();
+                {
+                    let mut sup = supervisor.lock().unwrap();
+                    for character in characters_for_refresh {
+                        sup.spawn_character(
+                            character.character_id,
+                            pool_for_tray.clone(),
+                            app.handle().clone(),
+                            rate_limits_for_tray.clone(),
+                        );
+                    }
+                }
+
+                app.manage(supervisor);
 
                 let training_count_item = tauri::menu::MenuItem::with_id(
                     app,
@@ -264,7 +285,18 @@ pub fn run() {
                 }
             }
             "quit" => {
-                app.exit(0);
+                let app_handle = app.clone();
+                tokio::spawn(async move {
+                    let handles = app_handle
+                        .state::<Mutex<refresh::RefreshSupervisor>>()
+                        .lock()
+                        .unwrap()
+                        .cancel_all();
+                    for h in handles {
+                        let _ = h.await;
+                    }
+                    app_handle.exit(0);
+                });
             }
             _ => {}
         })
@@ -278,8 +310,6 @@ pub fn run() {
             commands::auth::get_base_scope_strings,
             commands::auth::start_eve_login,
             is_startup_complete,
-            commands::location::get_character_location,
-            commands::location::get_all_characters_locations,
             commands::characters::logout_character,
             commands::accounts::get_accounts_and_characters,
             commands::accounts::create_account,
@@ -290,19 +320,12 @@ pub fn run() {
             commands::accounts::reorder_accounts,
             commands::accounts::reorder_characters_in_account,
             commands::accounts::reorder_unassigned_characters,
-            commands::skill_queues::get_skill_queues,
-            commands::skill_queues::get_training_characters_count,
-            commands::skill_queues::get_skill_queue_for_character,
             commands::skill_queues::force_refresh_skill_queue,
-            commands::overview::get_training_characters_overview,
-            commands::skills::get_character_skills_with_groups,
             commands::skills::get_sde_skills_with_groups,
             commands::skills::get_skill_details,
             commands::sde::refresh_sde,
-            commands::clones::get_clones,
             commands::clones::update_clone_name,
             commands::sde::get_type_names,
-            commands::attributes::get_character_attributes_breakdown,
             commands::rate_limits::get_rate_limits,
             commands::notifications::get_notifications,
             commands::notifications::dismiss_notification,
@@ -344,7 +367,8 @@ pub fn run() {
             commands::settings::get_enabled_features,
             commands::settings::set_feature_enabled,
             commands::settings::get_optional_features,
-            commands::settings::get_character_feature_scope_status
+            commands::settings::get_character_feature_scope_status,
+            commands::esi_snapshot::get_esi_snapshot
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

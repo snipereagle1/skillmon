@@ -4,14 +4,11 @@ import { UserPlus, Zap } from 'lucide-react';
 import { CharacterPortrait } from '@/components/Accounts/CharacterPortrait';
 import { AlphaIcon } from '@/components/AlphaIcon';
 import { TableCell, TableRow } from '@/components/ui/table';
-import type {
-  SkillQueueItem,
-  TrainingCharacterOverview,
-} from '@/generated/types';
+import type { OverviewRow, SkillQueueItem } from '@/generated/types';
 import { cn, formatDuration, formatNumber, toRoman } from '@/lib/utils';
 
 interface OverviewTableRowProps {
-  character: TrainingCharacterOverview;
+  character: OverviewRow;
 }
 
 export function OverviewTableRow({ character }: OverviewTableRowProps) {
@@ -20,50 +17,49 @@ export function OverviewTableRow({ character }: OverviewTableRowProps) {
       <TableCell className="font-medium">
         <Link
           to="/characters/$characterId"
-          params={{ characterId: character.character_id.toString() }}
+          params={{ characterId: character.characterId.toString() }}
           className="flex items-center gap-3 hover:underline"
         >
           <CharacterPortrait
             character={{
-              character_id: character.character_id,
-              character_name: character.character_name,
+              character_id: character.characterId,
+              character_name: character.characterName,
               unallocated_sp: 0,
               sort_order: 0,
               is_omega: false,
             }}
             skillQueue={[
               {
-                skill_id: 0,
-                queue_position: 0,
-                finished_level: 0,
+                skillId: 0,
+                queuePosition: 0,
+                finishedLevel: 0,
               } satisfies SkillQueueItem,
             ]}
             size={32}
           />
-          <span>{character.character_name}</span>
+          <span>{character.characterName}</span>
         </Link>
       </TableCell>
       <TableCell>
-        {character.account_name ?? (
+        {character.accountName ?? (
           <span className="text-muted-foreground">—</span>
         )}
       </TableCell>
       <TableCell>
-        {character.queue_time_remaining_seconds != null
-          ? formatDuration(character.queue_time_remaining_seconds, {
+        {character.queueTimeRemainingSeconds != null
+          ? formatDuration(character.queueTimeRemainingSeconds, {
               showSeconds: false,
             })
           : 'None'}
       </TableCell>
       <TableCell className="max-w-[200px] truncate">
-        {character.current_skill_name || 'Unknown'}{' '}
-        {character.current_skill_level &&
-          toRoman(character.current_skill_level)}
+        {character.currentSkillName || 'Unknown'}{' '}
+        {character.currentSkillLevel && toRoman(character.currentSkillLevel)}
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-1.5">
-          <span>{formatNumber(Math.round(character.sp_per_hour))} SP/hr</span>
-          {!character.is_omega && (
+          <span>{formatNumber(Math.round(character.spPerHour))} SP/hr</span>
+          {!character.isOmega && (
             <span title="Alpha Clone">
               <AlphaIcon className="h-4 w-4 text-white" />
             </span>
@@ -73,7 +69,7 @@ export function OverviewTableRow({ character }: OverviewTableRowProps) {
       <TableCell>
         <span
           title={
-            character.has_implants
+            character.hasImplants
               ? 'Clone with attribute implants'
               : 'Clone without attribute implants'
           }
@@ -81,7 +77,7 @@ export function OverviewTableRow({ character }: OverviewTableRowProps) {
           <UserPlus
             className={cn(
               'h-4 w-4',
-              character.has_implants
+              character.hasImplants
                 ? 'text-primary'
                 : 'text-muted-foreground/50'
             )}
@@ -91,7 +87,7 @@ export function OverviewTableRow({ character }: OverviewTableRowProps) {
       <TableCell>
         <span
           title={
-            character.has_booster
+            character.hasBooster
               ? 'Active accelerator'
               : 'No active accelerator'
           }
@@ -99,7 +95,7 @@ export function OverviewTableRow({ character }: OverviewTableRowProps) {
           <Zap
             className={cn(
               'h-4 w-4',
-              character.has_booster
+              character.hasBooster
                 ? 'text-yellow-500 fill-yellow-500'
                 : 'text-muted-foreground/50'
             )}

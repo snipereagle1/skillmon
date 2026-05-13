@@ -36,7 +36,7 @@ export function CreatePlanDialog({
     try {
       const planId = await createPlanMutation.mutateAsync({
         name: name.trim(),
-        description: description.trim() || null,
+        description: description.trim() || undefined,
       });
       setName('');
       setDescription('');

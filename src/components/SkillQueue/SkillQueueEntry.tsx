@@ -38,11 +38,11 @@ export function SkillQueueEntry({
   );
   const isTraining = isCurrentlyTraining(skill);
   const levelRoman =
-    ['I', 'II', 'III', 'IV', 'V'][skill.finished_level - 1] ||
-    skill.finished_level.toString();
-  const spPerHour = skill.sp_per_minute ? skill.sp_per_minute * 60 : null;
+    ['I', 'II', 'III', 'IV', 'V'][skill.finishedLevel - 1] ||
+    skill.finishedLevel.toString();
+  const spPerHour = skill.spPerMinute ? skill.spPerMinute * 60 : null;
   const timeToTrain = calculateTimeToTrain(skill);
-  const completionTime = formatTimeRemaining(skill.finish_date);
+  const completionTime = formatTimeRemaining(skill.finishDate);
 
   const completionPercentage = isTraining
     ? calculateCompletionPercentage(skill)
@@ -77,13 +77,13 @@ export function SkillQueueEntry({
       )}
       <div className="flex items-center justify-between gap-4 relative z-10">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <LevelIndicator level={skill.finished_level} />
+          <LevelIndicator level={skill.finishedLevel} />
           <div className="flex flex-col flex-1 min-w-0">
             <span
               className="text-foreground font-medium truncate cursor-pointer hover:underline"
-              onClick={() => openSkillDetail(skill.skill_id, characterId)}
+              onClick={() => openSkillDetail(skill.skillId, characterId)}
             >
-              {skill.skill_name || `Skill #${skill.skill_id}`} {levelRoman}
+              {skill.skillName || `Skill #${skill.skillId}`} {levelRoman}
             </span>
             {spPerHour !== null && spPerHour > 0 && (
               <span className="text-xs text-muted-foreground">

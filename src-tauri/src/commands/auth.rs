@@ -1,14 +1,20 @@
+use std::sync::Mutex;
+
 use anyhow::{Context, Result};
 use chrono::Utc;
 use serde::Serialize;
 use tauri::{Emitter, Manager, State};
+use typeshare::typeshare;
 
 use crate::auth;
 use crate::cache;
 use crate::db;
+use crate::esi;
+use crate::refresh;
 
 pub type AuthStateMap = std::sync::Mutex<std::collections::HashMap<String, auth::AuthState>>;
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct BaseScopeStrings {
     pub scopes: Vec<String>,
@@ -169,6 +175,24 @@ pub async fn handle_oauth_callback(
     cache::clear_character_cache(&pool, character_info.character_id)
         .await
         .context("Failed to clear character cache")?;
+
+    // Spawn (or re-spawn) the background refresher for this character
+    if let Some(supervisor) = app.try_state::<Mutex<refresh::RefreshSupervisor>>() {
+        let rate_limits = app.state::<esi::RateLimitStore>().inner().clone();
+        let old_handle = supervisor
+            .lock()
+            .unwrap()
+            .cancel_character(character_info.character_id);
+        if let Some(h) = old_handle {
+            let _ = h.await;
+        }
+        supervisor.lock().unwrap().spawn_character(
+            character_info.character_id,
+            pool.inner().clone(),
+            app.clone(),
+            rate_limits,
+        );
+    }
 
     tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 

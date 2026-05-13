@@ -52,10 +52,7 @@ export function Attributes({ characterId }: AttributesProps) {
   }
 
   if (attributeError) {
-    const errorMessage =
-      attributeError instanceof Error
-        ? attributeError.message
-        : String(attributeError);
+    const errorMessage = attributeError;
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-destructive">Error: {errorMessage}</p>
@@ -120,7 +117,7 @@ export function Attributes({ characterId }: AttributesProps) {
             Next Primary Remap
           </span>
           <span className="text-lg font-semibold">
-            {match(data.accrued_remap_cooldown_date)
+            {match(data.accruedRemapCooldownDate)
               .with(P.nullish, () => 'Available Now')
               .with(
                 P.when((d) => !d || isPast(parseISO(d))),
@@ -135,8 +132,8 @@ export function Attributes({ characterId }: AttributesProps) {
             Bonus Remaps
           </span>
           <div className="flex items-center gap-2">
-            <span className="text-2xl font-bold">{data.bonus_remaps ?? 0}</span>
-            {(data.bonus_remaps ?? 0) > 0 && (
+            <span className="text-2xl font-bold">{data.bonusRemaps ?? 0}</span>
+            {(data.bonusRemaps ?? 0) > 0 && (
               <Badge
                 variant="secondary"
                 className="bg-green-500/10 text-green-500 border-green-500/20"
@@ -147,13 +144,13 @@ export function Attributes({ characterId }: AttributesProps) {
           </div>
         </div>
 
-        {data.last_remap_date && (
+        {data.lastRemapDate && (
           <div className="flex flex-col gap-1 border rounded-md p-3 bg-muted/20 flex-1 min-w-[200px]">
             <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
               Last Remap
             </span>
             <span className="text-lg font-semibold">
-              {formatDate(data.last_remap_date, 'PPP')}
+              {formatDate(data.lastRemapDate, 'PPP')}
             </span>
           </div>
         )}

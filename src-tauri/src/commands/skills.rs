@@ -2,164 +2,43 @@ use std::collections::HashMap;
 
 use serde::Serialize;
 use tauri::State;
+use typeshare::typeshare;
 
-use crate::auth;
 use crate::db;
-use crate::esi;
-use crate::esi_helpers;
+use crate::ts_types::i64_ts;
 use crate::utils;
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct CharacterSkillResponse {
-    pub skill_id: i64,
+    pub skill_id: i64_ts,
     pub skill_name: String,
-    pub group_id: i64,
+    pub group_id: i64_ts,
     pub group_name: String,
-    pub trained_skill_level: i64,
-    pub active_skill_level: i64,
-    pub skillpoints_in_skill: i64,
+    pub trained_skill_level: i64_ts,
+    pub active_skill_level: i64_ts,
+    pub skillpoints_in_skill: i64_ts,
     pub is_in_queue: bool,
-    pub queue_level: Option<i64>,
+    pub queue_level: Option<i64_ts>,
     pub is_injected: bool,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillGroupResponse {
-    pub group_id: i64,
+    pub group_id: i64_ts,
     pub group_name: String,
-    pub total_levels: i64,
-    pub trained_levels: i64,
+    pub total_levels: i64_ts,
+    pub trained_levels: i64_ts,
     pub has_trained_skills: bool,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct CharacterSkillsResponse {
-    pub character_id: i64,
+    pub character_id: i64_ts,
     pub skills: Vec<CharacterSkillResponse>,
     pub groups: Vec<SkillGroupResponse>,
-}
-
-#[tauri::command]
-pub async fn get_character_skills_with_groups(
-    pool: State<'_, db::Pool>,
-    rate_limits: State<'_, esi::RateLimitStore>,
-    character_id: i64,
-) -> Result<CharacterSkillsResponse, String> {
-    const SKILL_CATEGORY_ID: i64 = 16;
-
-    let skill_groups = db::get_skill_groups_for_category(&pool, SKILL_CATEGORY_ID)
-        .await
-        .map_err(|e| format!("Failed to get skill groups: {}", e))?;
-
-    let character_skills = db::get_character_skills(&pool, character_id)
-        .await
-        .map_err(|e| format!("Failed to get character skills: {}", e))?;
-    let character_skills_map: HashMap<i64, db::CharacterSkill> = character_skills
-        .into_iter()
-        .map(|s| (s.skill_id, s))
-        .collect();
-
-    let (queued_skills, trained_from_queue): (HashMap<i64, i64>, HashMap<i64, i64>) = {
-        let mut queued = HashMap::new();
-        let mut trained = HashMap::new();
-        if let Ok(access_token) = auth::ensure_valid_access_token(&pool, character_id).await {
-            if let Ok(client) = esi_helpers::create_authenticated_client(&access_token) {
-                if let Ok(Some(queue_data)) =
-                    esi_helpers::get_cached_skill_queue(&pool, &client, character_id, &rate_limits)
-                        .await
-                {
-                    let now = chrono::Utc::now();
-                    for item in queue_data {
-                        let skill_id = item.skill_id;
-                        let finished_level = item.finished_level;
-                        if let Some(finish_utc) = item.finish_date {
-                            if now >= finish_utc {
-                                trained.insert(skill_id, finished_level);
-                                continue;
-                            }
-                        }
-                        queued.insert(skill_id, finished_level);
-                    }
-                }
-            }
-        }
-        (queued, trained)
-    };
-
-    let mut all_skill_ids = Vec::new();
-    let mut skills_by_group: HashMap<i64, Vec<db::SkillInfo>> = HashMap::new();
-
-    for group in &skill_groups {
-        let skills_in_group = db::get_skills_for_group(&pool, group.group_id)
-            .await
-            .map_err(|e| format!("Failed to get skills for group {}: {}", group.group_id, e))?;
-
-        for skill in &skills_in_group {
-            all_skill_ids.push(skill.type_id);
-        }
-        skills_by_group.insert(group.group_id, skills_in_group);
-    }
-
-    let mut skills_response = Vec::new();
-    let mut groups_response = Vec::new();
-
-    for group in &skill_groups {
-        let skills_in_group = skills_by_group
-            .get(&group.group_id)
-            .cloned()
-            .unwrap_or_default();
-        let mut total_levels = 0i64;
-        let mut trained_levels = 0i64;
-        let mut has_trained_skills = false;
-
-        for skill in &skills_in_group {
-            let skill_id = &skill.type_id;
-            let skill_name = &skill.name;
-            total_levels += 5;
-
-            let char_skill = character_skills_map.get(skill_id);
-            let db_trained_level = char_skill.map(|s| s.trained_skill_level).unwrap_or(0);
-            let trained_level =
-                db_trained_level.max(trained_from_queue.get(skill_id).copied().unwrap_or(0));
-            let active_level = char_skill.map(|s| s.active_skill_level).unwrap_or(0);
-            let skillpoints = char_skill.map(|s| s.skillpoints_in_skill).unwrap_or(0);
-            let is_injected = char_skill.is_some();
-            let is_in_queue = queued_skills.contains_key(skill_id);
-            let queue_level = queued_skills.get(skill_id).copied();
-
-            if trained_level > 0 {
-                trained_levels += trained_level;
-                has_trained_skills = true;
-            }
-
-            skills_response.push(CharacterSkillResponse {
-                skill_id: *skill_id,
-                skill_name: skill_name.clone(),
-                group_id: group.group_id,
-                group_name: group.group_name.clone(),
-                trained_skill_level: trained_level,
-                active_skill_level: active_level,
-                skillpoints_in_skill: skillpoints,
-                is_in_queue,
-                queue_level,
-                is_injected,
-            });
-        }
-
-        groups_response.push(SkillGroupResponse {
-            group_id: group.group_id,
-            group_name: group.group_name.clone(),
-            total_levels,
-            trained_levels,
-            has_trained_skills,
-        });
-    }
-
-    Ok(CharacterSkillsResponse {
-        character_id,
-        skills: skills_response,
-        groups: groups_response,
-    })
 }
 
 #[tauri::command]
@@ -217,58 +96,64 @@ pub async fn get_sde_skills_with_groups(
     })
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct AttributeInfo {
-    pub attribute_id: i64,
+    pub attribute_id: i64_ts,
     pub name: String,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct BonusAttribute {
-    pub attribute_id: i64,
+    pub attribute_id: i64_ts,
     pub attribute_name: String,
     pub value: f64,
-    pub unit_id: Option<i64>,
+    pub unit_id: Option<i64_ts>,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillAttributesDetails {
     pub primary_attribute: Option<AttributeInfo>,
     pub secondary_attribute: Option<AttributeInfo>,
-    pub rank: Option<i64>,
+    pub rank: Option<i64_ts>,
     pub volume: Option<f64>,
     pub bonuses: Vec<BonusAttribute>,
     pub training_speed_sp_per_hour: Option<f64>,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillRequirement {
-    pub required_skill_id: i64,
+    pub required_skill_id: i64_ts,
     pub required_skill_name: String,
-    pub required_level: i64,
+    pub required_level: i64_ts,
     pub is_met: bool,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct RequiredForItem {
-    pub type_id: i64,
+    pub type_id: i64_ts,
     pub type_name: String,
-    pub required_level: i64,
-    pub category_id: i64,
+    pub required_level: i64_ts,
+    pub category_id: i64_ts,
     pub category_name: Option<String>,
-    pub group_id: i64,
+    pub group_id: i64_ts,
     pub group_name: String,
     pub is_skill: bool,
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct SkillDetailsResponse {
-    pub skill_id: i64,
+    pub skill_id: i64_ts,
     pub skill_name: String,
     pub description: Option<String>,
-    pub group_id: i64,
+    pub group_id: i64_ts,
     pub group_name: String,
-    pub category_id: i64,
+    pub category_id: i64_ts,
     pub attributes: SkillAttributesDetails,
     pub prerequisites: Vec<SkillRequirement>,
     pub required_for: Vec<RequiredForItem>,

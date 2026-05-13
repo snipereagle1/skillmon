@@ -1,19 +1,18 @@
-import { useQuery } from '@tanstack/react-query';
+import type { AttributesPayload } from '@/generated/types';
+import { useEsiStore } from '@/stores/esiStore';
 
-import { getCharacterAttributesBreakdown } from '@/generated/commands';
-import type { CharacterAttributesBreakdown } from '@/generated/types';
+export function useAttributes(characterId: number | null): {
+  data: AttributesPayload | null;
+  isLoading: boolean;
+  error: string | null;
+} {
+  const slice = useEsiStore((state) =>
+    characterId !== null ? state.attributes[characterId] : undefined
+  );
 
-import { queryKeys } from './queryKeys';
-
-export function useAttributes(characterId: number | null) {
-  return useQuery<CharacterAttributesBreakdown>({
-    queryKey: queryKeys.attributes(characterId),
-    queryFn: async () => {
-      if (characterId === null) {
-        throw new Error('Character ID is required');
-      }
-      return await getCharacterAttributesBreakdown({ characterId });
-    },
-    enabled: characterId !== null,
-  });
+  return {
+    data: slice?.data ?? null,
+    isLoading: characterId !== null && slice === undefined,
+    error: slice?.lastError ?? null,
+  };
 }

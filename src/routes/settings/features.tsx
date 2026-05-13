@@ -141,9 +141,9 @@ function FeaturesPage() {
                     </TableCell>
                     {enabledFeatures.map((featureId) => {
                       const scopeEntry = character.feature_has_scopes.find(
-                        ([id]) => id === featureId
+                        (entry) => entry.feature_id === featureId
                       );
-                      const hasScopes = scopeEntry?.[1] ?? false;
+                      const hasScopes = scopeEntry?.has_scopes ?? false;
                       return (
                         <TableCell key={featureId} className="text-center">
                           {hasScopes ? (

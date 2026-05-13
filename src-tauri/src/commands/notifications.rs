@@ -1,13 +1,16 @@
 use chrono::NaiveDateTime;
 use serde::Serialize;
 use tauri::State;
+use typeshare::typeshare;
 
 use crate::db;
+use crate::ts_types::i64_ts;
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct NotificationResponse {
-    pub id: i64,
-    pub character_id: i64,
+    pub id: i64_ts,
+    pub character_id: i64_ts,
     pub notification_type: String,
     pub title: String,
     pub message: String,
@@ -38,10 +41,11 @@ impl From<db::Notification> for NotificationResponse {
     }
 }
 
+#[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct NotificationSettingResponse {
-    pub id: i64,
-    pub character_id: i64,
+    pub id: i64_ts,
+    pub character_id: i64_ts,
     pub notification_type: String,
     pub enabled: bool,
     pub config: Option<String>,

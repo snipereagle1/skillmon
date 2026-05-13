@@ -28,14 +28,14 @@ function getTrainingStatus(
   const now = new Date();
 
   for (const item of skillQueue) {
-    if (item.queue_position === 0) {
+    if (item.queuePosition === 0) {
       return 'training';
     }
 
-    if (item.start_date != null && item.finish_date != null) {
+    if (item.startDate != null && item.finishDate != null) {
       try {
-        const startDate = parseISO(item.start_date);
-        const finishDate = parseISO(item.finish_date);
+        const startDate = parseISO(item.startDate);
+        const finishDate = parseISO(item.finishDate);
 
         const isAfterOrEqualStart =
           isAfter(now, startDate) || isEqual(now, startDate);

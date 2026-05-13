@@ -6,7 +6,7 @@ import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TooltipProvider } from '@/components/ui/tooltip';
-import type { CharacterSkillQueue, SkillmonPlan } from '@/generated/types';
+import type { QueuePayload, SkillmonPlan } from '@/generated/types';
 import { useForceRefreshSkillQueue } from '@/hooks/tauri/useForceRefreshSkillQueue';
 import { useCharacterRemaps } from '@/hooks/tauri/useRemaps';
 import { useImportSkillPlanJson } from '@/hooks/tauri/useSkillPlans';
@@ -17,34 +17,34 @@ import { SkillQueueEntry } from './SkillQueueEntry';
 import { calculateTrainingHours, formatDurationFromHours } from './utils';
 
 interface CharacterQueueProps {
-  queue: CharacterSkillQueue;
+  queue: QueuePayload;
   characterId: number | null;
 }
 
 export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
   const MAX_QUEUE_SIZE = 150;
-  const queueSize = queue.skill_queue.length;
+  const queueSize = queue.queue.length;
   const forceRefresh = useForceRefreshSkillQueue();
   const importPlan = useImportSkillPlanJson();
   const { data: remaps } = useCharacterRemaps(characterId);
   const navigate = useNavigate();
 
   const handleCreatePlanFromQueue = () => {
-    if (queue.skill_queue.length === 0) {
+    if (queue.queue.length === 0) {
       toast.error('Cannot create a plan from an empty queue');
       return;
     }
 
     const plan: SkillmonPlan = {
       version: 1,
-      name: `${queue.character_name} Queue Plan`,
+      name: `${queue.characterName} Queue Plan`,
       description: `Imported from training queue on ${formatDate(new Date())}`,
       auto_prerequisites: true,
-      entries: queue.skill_queue.map((item) => ({
-        skill_type_id: item.skill_id,
-        level: item.finished_level,
+      entries: queue.queue.map((item) => ({
+        skill_type_id: item.skillId,
+        level: item.finishedLevel,
         entry_type: 'Planned',
-        notes: null,
+        notes: undefined,
       })),
       remaps: [],
     };
@@ -69,11 +69,11 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
   };
 
   const calculateTotalTime = (): string => {
-    if (queue.skill_queue.length === 0) return '0d 0h 0m';
+    if (queue.queue.length === 0) return '0d 0h 0m';
 
     let totalHours = 0;
 
-    for (const skill of queue.skill_queue) {
+    for (const skill of queue.queue) {
       totalHours += calculateTrainingHours(skill);
     }
 
@@ -85,11 +85,11 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
   };
 
   const calculateTotalTimeHours = (): number => {
-    if (queue.skill_queue.length === 0) return 0;
+    if (queue.queue.length === 0) return 0;
 
     let totalHours = 0;
 
-    for (const skill of queue.skill_queue) {
+    for (const skill of queue.queue) {
       totalHours += calculateTrainingHours(skill);
     }
 
@@ -97,9 +97,9 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
   };
 
   const calculateTotalSP = (): number => {
-    return queue.skill_queue.reduce((total, skill) => {
-      if (skill.level_start_sp != null && skill.level_end_sp != null) {
-        return total + (skill.level_end_sp - skill.level_start_sp);
+    return queue.queue.reduce((total, skill) => {
+      if (skill.levelStartSp != null && skill.levelEndSp != null) {
+        return total + (skill.levelEndSp - skill.levelStartSp);
       }
       return total;
     }, 0);
@@ -107,10 +107,10 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
 
   const totalTime = calculateTotalTime();
   const totalSP = calculateTotalSP();
-  const unallocatedSP = queue.unallocated_sp;
+  const unallocatedSP = queue.unallocatedSp;
 
   const progressPercentage = Math.min((queueSize / MAX_QUEUE_SIZE) * 100, 100);
-  console.table(queue.skill_queue);
+  console.table(queue.queue);
   return (
     <TooltipProvider>
       <div className="flex flex-col h-full">
@@ -120,7 +120,7 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
               <h2 className="text-lg font-semibold text-foreground">
                 Training Queue {queueSize}/{MAX_QUEUE_SIZE}
               </h2>
-              {queue.is_paused && (
+              {queue.isPaused && (
                 <Badge
                   variant="outline"
                   className="border-yellow-500 text-yellow-500"
@@ -134,9 +134,7 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
                 variant="outline"
                 size="sm"
                 onClick={handleCreatePlanFromQueue}
-                disabled={
-                  importPlan.isPending || queue.skill_queue.length === 0
-                }
+                disabled={importPlan.isPending || queue.queue.length === 0}
               >
                 <Plus className="w-4 h-4 mr-2" />
                 {importPlan.isPending
@@ -156,7 +154,7 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
         </div>
 
         <div className="flex-1 overflow-y-auto min-h-0" id="skill-queue">
-          {queue.skill_queue.length === 0 ? (
+          {queue.queue.length === 0 ? (
             <div className="flex items-center justify-center h-full p-8">
               <p className="text-muted-foreground">No skills in queue</p>
             </div>
@@ -171,23 +169,23 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
                   {startRemap && (
                     <RemapRow remap={startRemap} showGripPlaceholder={false} />
                   )}
-                  {queue.skill_queue.map((skill, idx) => {
+                  {queue.queue.map((skill, idx) => {
                     const offsetPercentage =
                       totalHours > 0 ? (cumulativeHours / totalHours) * 100 : 0;
                     const skillHours = calculateTrainingHours(skill);
                     cumulativeHours += skillHours;
                     const remapAfter = remaps?.find(
                       (r) =>
-                        r.after_skill_type_id === skill.skill_id &&
-                        r.after_skill_level === skill.finished_level
+                        r.after_skill_type_id === skill.skillId &&
+                        r.after_skill_level === skill.finishedLevel
                     );
                     return (
-                      <React.Fragment key={`${skill.skill_id}-${idx}`}>
+                      <React.Fragment key={`${skill.skillId}-${idx}`}>
                         <SkillQueueEntry
                           skill={skill}
                           totalQueueHours={totalHours}
                           offsetPercentage={offsetPercentage}
-                          isPaused={queue.is_paused ?? false}
+                          isPaused={queue.isPaused ?? false}
                           characterId={characterId}
                         />
                         {remapAfter && (

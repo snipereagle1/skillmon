@@ -13,7 +13,7 @@ EVE Online skill monitoring/planning desktop app. Tauri v2 (Rust backend) + Reac
 ```bash
 pnpm tauri:dev       # dev (runs typegen first)
 pnpm tauri:build     # prod build (runs typegen first)
-pnpm typegen         # generate TS types from Rust structs → src/generated/
+pnpm typegen         # typeshare: generate types.ts from Rust structs → src/generated/
 pnpm typecheck       # tsc --noEmit
 pnpm test            # vitest (TZ=UTC)
 pnpm lint            # eslint
@@ -24,7 +24,7 @@ pnpm verify          # typegen + lint:full + format:check:all + typecheck
 
 ## Critical Rules
 
-- **Never hand-edit `src/generated/`** — auto-generated from Rust structs. Run `pnpm typegen` after any Rust struct changes.
+- **Never hand-edit `src/generated/`** — auto-generated. `types.ts` by typeshare (`pnpm typegen`). Run after Rust struct changes.
 - **`routeTree.gen.ts` is generated** — run `pnpm generate-route-tree` or let Vite plugin handle it.
 - Husky + lint-staged enforce eslint/prettier on TS and clippy/fmt on Rust pre-commit.
 
@@ -35,7 +35,7 @@ pnpm verify          # typegen + lint:full + format:check:all + typecheck
 - `routes/` — TanStack Router file-based routes
 - `components/` — React components; `ui/` = shadcn primitives
 - `hooks/tauri/` — typed wrappers around Tauri commands (TanStack Query)
-- `generated/` — Tauri typegen output, never edit manually
+- `generated/` — typeshare output, never edit manually
 - `stores/` — Zustand stores
 - `lib/` — shared utilities
 
@@ -47,11 +47,40 @@ pnpm verify          # typegen + lint:full + format:check:all + typecheck
 - `auth/` — OAuth2 + callback server
 - `sde/` — Static Data Export import/management
 - `notifications/` — background notification checks
+- `refresh/` — `RefreshSupervisor` spawns per-character background loops that poll ESI on a timer, enrich raw data, and emit Tauri events (`character:{id}:queue`, `:skills`, `:attributes`, `:location`, `:clones`, `:overview`) to the frontend
+- `skill_plans/` — skill training plan engine: DAG-based prerequisite validation, optimization, simulation, and JSON import/export
+- `cache/` — ESI response cache with ETags and expiration timestamps to reduce redundant API calls
 
 ## Patterns
 
 - Tauri commands return `Result<T, String>` (anyhow errors stringified)
 - ESI calls go through rate-limiter in `esi/`
 - DB uses sqlx with SQLite; pool managed via Tauri state
-- Frontend uses TanStack Query for all async data; invalidate on mutations
 - Use `ts-pattern` for exhaustive matching on discriminated unions
+
+## Data Flow
+
+Live ESI data and mutations/static data use different layers. New hooks must go in the right place.
+
+**Zustand (`src/stores/`) — client state**
+
+- `esiStore` — live ESI data: character skills, skill queue, attributes, clones, remaps, locations. Populated by `RefreshSupervisor` events via `src/lib/esiEvents.ts` and `useAuthEvents` (auth-triggered snapshot hydration). Read via `useEsiStore`.
+- `skillDetailStore` — UI state for the skill detail modal (which skill/character is open)
+- `undoRedoStore` — undo/redo stacks for user actions
+- `updateStore` — app update availability and metadata
+
+**React Query** — mutations, SDE/static data, settings, and one-shot startup queries. No `refetchInterval` or sub-minute `staleTime`/`gcTime` — live ESI data belongs to Zustand.
+
+## Agent skills
+
+### Issue tracker
+
+Issues live in GitHub Issues (`snipereagle1/skillmon`). See `docs/agents/issue-tracker.md`.
+
+### Triage labels
+
+Default canonical label strings (`needs-triage`, `needs-info`, `ready-for-agent`, `ready-for-human`, `wontfix`). See `docs/agents/triage-labels.md`.
+
+### Domain docs
+
+Single-context layout — `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
