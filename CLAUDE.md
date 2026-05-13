@@ -58,19 +58,6 @@ pnpm verify          # typegen + lint:full + format:check:all + typecheck
 - DB uses sqlx with SQLite; pool managed via Tauri state
 - Use `ts-pattern` for exhaustive matching on discriminated unions
 
-## Data Flow
-
-Live ESI data and mutations/static data use different layers. New hooks must go in the right place.
-
-**Zustand (`src/stores/`) — client state**
-
-- `esiStore` — live ESI data: character skills, skill queue, attributes, clones, remaps, locations. Populated by `RefreshSupervisor` events via `src/lib/esiEvents.ts` and `useAuthEvents` (auth-triggered snapshot hydration). Read via `useEsiStore`.
-- `skillDetailStore` — UI state for the skill detail modal (which skill/character is open)
-- `undoRedoStore` — undo/redo stacks for user actions
-- `updateStore` — app update availability and metadata
-
-**React Query** — mutations, SDE/static data, settings, and one-shot startup queries. No `refetchInterval` or sub-minute `staleTime`/`gcTime` — live ESI data belongs to Zustand.
-
 ## Agent skills
 
 ### Issue tracker
