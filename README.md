@@ -28,6 +28,7 @@ This project is not yet in a stable state, no support will be provided yet. Your
   - **Timeline Simulation**: Visualize when your skills will finish.
   - **Remap Optimization**: Calculate the most efficient attribute remaps for your plan.
   - **Reorder Optimization**: Automatically reorder your plan to maximize training speed based on attributes.
+- **Character Location**: See where all your characters are and what ship they're currently flying.
 - **Character Notifications**: System tray notifications for low skill queues and other important events.
 - **Offline First**: All your data is stored in a local SQLite database. No external servers or account requirements beyond EVE SSO.
 - **SDE Integration**: Built-in EVE Static Data Export (SDE) management.
@@ -41,6 +42,7 @@ Skillmon leverages a modern, high-performance stack:
 - **Database**: [SQLite](https://www.sqlite.org/) via [sqlx](https://github.com/launchbadge/sqlx)
 - **Styling**: [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)
 - **State Management**: [Zustand](https://github.com/pmndrs/zustand) & [TanStack Query](https://tanstack.com/query/latest)
+- **Routing**: [TanStack Router](https://tanstack.com/router/latest)
 
 ## Getting Started
 
@@ -50,6 +52,8 @@ To build and run skillmon locally, you will need:
 
 - [Rust](https://www.rust-lang.org/tools/install) (latest stable)
 - [Node.js](https://nodejs.org/) & [pnpm](https://pnpm.io/)
+- [typeshare](https://github.com/1password/typeshare) — generates TypeScript types from Rust structs (`cargo install typeshare-cli`)
+- [oas3-gen](https://github.com/eklipse2k8/oas3-gen) — generates the ESI client from the OpenAPI schema (`cargo install oas3-gen`)
 - [EVE Online Developer Application](https://developers.eveonline.com/) credentials
 
 ### Environment Setup
@@ -83,7 +87,7 @@ _Note: Ensure your EVE Developer App has the correct callback URL configured._
 3. **Run in development mode**:
 
    ```bash
-   pnpm tauri dev
+   pnpm tauri:dev
    ```
 
 4. **Run tests**:
@@ -94,7 +98,12 @@ _Note: Ensure your EVE Developer App has the correct callback URL configured._
 
 ## Development Documentation
 
-Technical details and architecture overviews are documented in `.cursor/rules`. These files provide valuable context for developers and are optimized for AI-assisted development.
+Technical details and architecture overviews are documented in the following locations:
+
+- [`.claude/rules/`](.claude/rules/) — code organization, development guidelines, and project setup rules (optimized for AI-assisted development)
+- [`docs/context/eve.md`](docs/context/eve.md) — EVE Online domain glossary (shared across frontend and backend)
+- [`src/CONTEXT.md`](src/CONTEXT.md) — frontend architecture context
+- [`src-tauri/CONTEXT.md`](src-tauri/CONTEXT.md) — backend architecture context
 
 ## Contributing
 
