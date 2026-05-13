@@ -60,7 +60,7 @@ Look for: query keys for `skill_queue`, `character_skills`, `locations_overview`
 ## Success Criteria (Technical)
 
 - `grep -rn "refetchInterval" src/hooks/tauri/` returns no hits for ESI live-data hooks.
-- `queryKeys.ts` contains no keys for `queue`, `skills`, `locations`, `attributes`, `clones`, `remaps`.
+- `queryKeys.ts` contains no keys for `queue`, `skills`, `locations`, `attributes`, `clones`, `remaps.character`. (`remaps.plan` is kept — it's plan-level local DB data, not ESI live data.)
 - `CLAUDE.md` documents the Zustand-for-live / RQ-for-mutations+static pattern.
 - `pnpm verify` passes clean.
 
