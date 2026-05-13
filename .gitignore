@@ -21,6 +21,7 @@ dist-ssr
 *.sln
 *.sw?
 .specstory/
+.turbo/
 
 # Generated ESI code
 src-tauri/src/esi/client.rs

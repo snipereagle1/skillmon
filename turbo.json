@@ -1,0 +1,45 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "tasks": {
+    "lint": {
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "src/**/*.js",
+        "eslint.config.mjs",
+        ".prettierrc"
+      ]
+    },
+    "lint:rust": {
+      "inputs": [
+        "src-tauri/src/**/*.rs",
+        "src-tauri/Cargo.toml",
+        "src-tauri/Cargo.lock",
+        ".clippy.toml",
+        "rustfmt.toml"
+      ]
+    },
+    "typecheck": {
+      "inputs": [
+        "src/**/*.ts",
+        "src/**/*.tsx",
+        "tsconfig.json",
+        "src/generated/**"
+      ]
+    },
+    "format:check": {
+      "inputs": [
+        "src/**/*.{ts,tsx,js,jsx}",
+        "**/*.md",
+        ".prettierrc",
+        ".prettierignore"
+      ]
+    },
+    "format:check:rust": {
+      "inputs": [
+        "src-tauri/src/**/*.rs",
+        "rustfmt.toml"
+      ]
+    }
+  }
+}
