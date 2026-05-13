@@ -67,8 +67,6 @@ export const queryKeys = {
     ['skillDetails', skillId, characterId] as const,
 
   remaps: {
-    character: (characterId: number | null) =>
-      ['remaps', 'character', characterId] as const,
     plan: (planId: number | null) => ['remaps', 'plan', planId] as const,
   },
 
