@@ -35,3 +35,13 @@ Game concepts used across the skillmon codebase. Load this before any frontend o
 **Training time** — how long a skill level takes to complete. Determined by SP required, character attributes, and any implant bonuses.
 
 **Certificate** — a CCP-defined collection of skills at specified levels representing a competency. Not directly used in skillmon yet but present in SDE.
+
+**Alpha clone** — a character on a free (unsubscribed) EVE account. Alphas train at 50% of the Omega SP/min rate and cannot train or actively use skills above certain level caps (varies per skill; Omega-only skills drop to active level 0). ESI does not expose subscription status directly — alpha status must be inferred.
+
+**Omega clone** — a character on an active paid subscription. Trains at full SP/min rate (primary + secondary/2) and has no skill level restrictions.
+
+**Alpha inference** — skillmon's heuristic for determining account type since ESI has no subscription status field. Two signals are checked on every refresh:
+
+1. **Lapsed signal** (`active_skill_level < trained_skill_level` on any skill): reliable; indicates a skill was trained above the alpha cap and is now restricted.
+2. **Rate signal** (active training rate < 55% of expected Omega rate): catches accounts that have never held an Omega skill but are actively training at the reduced alpha rate. Less reliable than the lapsed signal; only fires when a skill is actively training.
+   If neither signal fires, the character is treated as Omega. This means a true alpha with an empty queue and no over-cap skills will be undetectable — an acceptable gap given ESI constraints.
