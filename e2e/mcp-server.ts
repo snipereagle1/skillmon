@@ -6,7 +6,8 @@ import {
 } from '@modelcontextprotocol/sdk/types.js';
 import { PluginClient, TauriPage } from '@srsholmes/tauri-playwright';
 
-const SOCKET_PATH = process.env.TAURI_MCP_SOCKET ?? '/tmp/tauri-playwright.sock';
+const SOCKET_PATH =
+  process.env.TAURI_MCP_SOCKET ?? '/tmp/tauri-playwright.sock';
 
 let client: PluginClient | null = null;
 let page: TauriPage | null = null;
@@ -16,7 +17,10 @@ async function getPage(): Promise<TauriPage> {
   client = new PluginClient(SOCKET_PATH);
   await client.connect();
   const ping = await client.send({ type: 'ping' });
-  if (!ping.ok) throw new Error('Tauri plugin ping failed — is the app running with --features e2e-testing?');
+  if (!ping.ok)
+    throw new Error(
+      'Tauri plugin ping failed — is the app running with --features e2e-testing?'
+    );
   page = new TauriPage(client);
   return page;
 }
@@ -29,7 +33,7 @@ function disconnect() {
 
 const server = new Server(
   { name: 'tauri-skillmon', version: '1.0.0' },
-  { capabilities: { tools: {} } },
+  { capabilities: { tools: {} } }
 );
 
 server.setRequestHandler(ListToolsRequestSchema, async () => ({
@@ -41,7 +45,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'click',
-      description: 'Click an element by CSS selector (auto-waits for visible + enabled)',
+      description:
+        'Click an element by CSS selector (auto-waits for visible + enabled)',
       inputSchema: {
         type: 'object',
         required: ['selector'],
@@ -83,7 +88,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       inputSchema: {
         type: 'object',
         required: ['selector'],
-        properties: { selector: { type: 'string' }, timeout_ms: { type: 'number' } },
+        properties: {
+          selector: { type: 'string' },
+          timeout_ms: { type: 'number' },
+        },
       },
     },
     {
@@ -92,7 +100,10 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       inputSchema: {
         type: 'object',
         required: ['selector'],
-        properties: { selector: { type: 'string' }, timeout_ms: { type: 'number' } },
+        properties: {
+          selector: { type: 'string' },
+          timeout_ms: { type: 'number' },
+        },
       },
     },
     {
@@ -131,7 +142,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'wait_for_selector',
-      description: 'Wait until an element matching the selector appears in the DOM',
+      description:
+        'Wait until an element matching the selector appears in the DOM',
       inputSchema: {
         type: 'object',
         required: ['selector'],
@@ -176,7 +188,8 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: 'disconnect',
-      description: 'Disconnect from the Tauri app socket (reconnects automatically on next call)',
+      description:
+        'Disconnect from the Tauri app socket (reconnects automatically on next call)',
       inputSchema: { type: 'object', properties: {} },
     },
   ],
@@ -197,21 +210,40 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       case 'screenshot': {
         const buf = await p.screenshot();
         return {
-          content: [{ type: 'image', data: buf.toString('base64'), mimeType: 'image/png' }],
+          content: [
+            {
+              type: 'image',
+              data: buf.toString('base64'),
+              mimeType: 'image/png',
+            },
+          ],
         };
       }
 
       case 'click':
-        await p.click(args!.selector as string, { timeout: args!.timeout_ms as number | undefined });
-        return { content: [{ type: 'text', text: `Clicked: ${args!.selector}` }] };
+        await p.click(args!.selector as string, {
+          timeout: args!.timeout_ms as number | undefined,
+        });
+        return {
+          content: [{ type: 'text', text: `Clicked: ${args!.selector}` }],
+        };
 
       case 'fill':
         await p.fill(args!.selector as string, args!.text as string);
-        return { content: [{ type: 'text', text: `Filled: ${args!.selector}` }] };
+        return {
+          content: [{ type: 'text', text: `Filled: ${args!.selector}` }],
+        };
 
       case 'press':
         await p.press(args!.selector as string, args!.key as string);
-        return { content: [{ type: 'text', text: `Pressed ${args!.key} on: ${args!.selector}` }] };
+        return {
+          content: [
+            {
+              type: 'text',
+              text: `Pressed ${args!.key} on: ${args!.selector}`,
+            },
+          ],
+        };
 
       case 'text_content': {
         const text = await p.textContent(args!.selector as string);
@@ -224,26 +256,38 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       case 'get_attribute': {
-        const val = await p.getAttribute(args!.selector as string, args!.name as string);
+        const val = await p.getAttribute(
+          args!.selector as string,
+          args!.name as string
+        );
         return { content: [{ type: 'text', text: val ?? '(null)' }] };
       }
 
       case 'evaluate': {
         const result = await p.evaluate(args!.script as string);
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       }
 
       case 'invoke': {
         const argsStr = JSON.stringify(args!.args ?? {});
         const result = await p.evaluate(
-          `window.__TAURI__.core.invoke(${JSON.stringify(args!.command)}, ${argsStr})`,
+          `window.__TAURI__.core.invoke(${JSON.stringify(args!.command)}, ${argsStr})`
         );
-        return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }] };
+        return {
+          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+        };
       }
 
       case 'wait_for_selector':
-        await p.waitForSelector(args!.selector as string, args!.timeout_ms as number | undefined);
-        return { content: [{ type: 'text', text: `Found: ${args!.selector}` }] };
+        await p.waitForSelector(
+          args!.selector as string,
+          args!.timeout_ms as number | undefined
+        );
+        return {
+          content: [{ type: 'text', text: `Found: ${args!.selector}` }],
+        };
 
       case 'is_visible': {
         const visible = await p.isVisible(args!.selector as string);
@@ -271,12 +315,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       }
 
       default:
-        return { content: [{ type: 'text', text: `Unknown tool: ${name}` }], isError: true };
+        return {
+          content: [{ type: 'text', text: `Unknown tool: ${name}` }],
+          isError: true,
+        };
     }
   } catch (err) {
     disconnect();
     const msg = err instanceof Error ? err.message : String(err);
-    return { content: [{ type: 'text', text: `Error: ${msg}` }], isError: true };
+    return {
+      content: [{ type: 'text', text: `Error: ${msg}` }],
+      isError: true,
+    };
   }
 });
 

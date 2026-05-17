@@ -15,9 +15,7 @@
     "tauri-skillmon": {
       "type": "stdio",
       "command": "node_modules/.bin/tsx",
-      "args": [
-        "e2e/mcp-server.ts"
-      ],
+      "args": ["e2e/mcp-server.ts"],
       "env": {
         "TAURI_MCP_SOCKET": "/tmp/tauri-playwright.sock"
       }
