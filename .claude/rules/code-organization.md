@@ -53,7 +53,7 @@
 | `hooks/` | General UI hooks |
 | `stores/` | Zustand stores (`esiStore`, `skillDetailStore`, `undoRedoStore`, `updateStore`) |
 | `lib/` | Shared utilities (`cn()`, `notificationTypes.ts`) |
-| `generated/` | Auto-generated types and command bindings — never edit manually |
+| `generated/` | Auto-generated types (`types.ts`) — never edit manually |
 
 ### Path Aliases
 
@@ -88,7 +88,7 @@ use crate::notifications;
 ```typescript
 import { Component } from '@/components/ui/component';
 import { useHook } from '@/hooks/tauri/useHook';
-import { commandName } from '@/generated/commands';
+import { invoke } from '@tauri-apps/api/core';
 import type { Type } from '@/generated/types';
 ```
 

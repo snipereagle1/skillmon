@@ -51,9 +51,8 @@ Always return `Result<T, String>`. Convert `anyhow::Result` at the boundary:
    ```rust
    commands::domain::command_name,
    ```
-5. Run `pnpm typegen` to regenerate frontend bindings
-6. Create a custom hook in `src/hooks/tauri/` if it fetches data
-7. Use the hook in components via the generated function from `@/generated/commands`
+5. Run `pnpm typegen` to regenerate frontend types
+6. Create a custom hook in `src/hooks/tauri/` using `invoke<ReturnType>('command_name')` from `@tauri-apps/api/core`
 
 ## Emitting Events
 
