@@ -110,6 +110,32 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Edges */
+  --color-border-strong: var(--border-strong);
+
+  /* Foreground shades */
+  --color-fg-dim: var(--fg-dim);
+  --color-fg-faint: var(--fg-faint);
+
+  /* Brand variants */
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-active: var(--brand-active);
+  --color-brand-deep: var(--brand-deep);
+  --color-brand-glow: var(--brand-glow);
+  --color-brand-glow-soft: var(--brand-glow-soft);
+
+  /* Status */
+  --color-status-training: var(--status-training);
+  --color-status-paused: var(--status-paused);
+  --color-status-empty: var(--status-empty);
+  --color-status-info: var(--status-info);
+  --color-status-omega: var(--status-omega);
+  --color-status-training-soft: var(--status-training-soft);
+  --color-status-paused-soft: var(--status-paused-soft);
+  --color-status-empty-soft: var(--status-empty-soft);
+  --color-status-info-soft: var(--status-info-soft);
+  --color-status-danger-soft: var(--status-danger-soft);
 }
 
 :root {
