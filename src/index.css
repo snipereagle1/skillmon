@@ -278,3 +278,9 @@
   --sidebar-border: var(--border);
   --sidebar-ring: var(--ring);
 }
+
+[data-slot="dialog-content"],
+[data-slot="drawer-content"],
+[data-slot="sheet-content"] {
+  background-color: var(--card);
+}
