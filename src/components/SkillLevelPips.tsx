@@ -11,6 +11,8 @@ interface SkillLevelPipsProps {
   plannedLevel?: number;
   /** The specific pip that glows — overlaid on top of other state. */
   activelyTrainingLevel?: number;
+  /** When false, pips render at 75% scale to indicate uninjected skill. */
+  isInjected?: boolean;
 }
 
 export function SkillLevelPips({
@@ -18,6 +20,7 @@ export function SkillLevelPips({
   queuedLevel,
   plannedLevel,
   activelyTrainingLevel,
+  isInjected = true,
 }: SkillLevelPipsProps) {
   return (
     <div className="flex gap-[3px] shrink-0">
@@ -40,7 +43,8 @@ export function SkillLevelPips({
             className={cn(
               'w-2 h-2 rounded-[2px]',
               bg,
-              isTraining && 'shadow-[0_0_6px_-1px_var(--primary)]'
+              isTraining && 'shadow-[0_0_6px_-1px_var(--primary)]',
+              !isInjected && 'scale-75'
             )}
           />
         );

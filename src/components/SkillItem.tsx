@@ -44,6 +44,7 @@ export function SkillItem({
                   : undefined
               }
               plannedLevel={plannedLevel || undefined}
+              isInjected={skill.is_injected}
             />
             {onAddStep && (
               <DropdownMenu>
