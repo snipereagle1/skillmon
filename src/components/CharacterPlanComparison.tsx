@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import { match, P } from 'ts-pattern';
 
+import { SkillLevelPips } from '@/components/SkillLevelPips';
 import type { PlanComparisonEntry } from '@/generated/types';
 import { usePlanComparison } from '@/hooks/tauri/usePlanComparison';
 import { useSkillPlans } from '@/hooks/tauri/useSkillPlans';
 import { cn, formatSkillpoints, toRoman } from '@/lib/utils';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
-import { LevelIndicator } from './SkillQueue/LevelIndicator';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 
@@ -52,7 +52,7 @@ function ComparisonEntryRow({
     >
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <LevelIndicator level={entry.planned_level} />
+          <SkillLevelPips queuedLevel={entry.planned_level} />
           <div className="flex flex-col flex-1 min-w-0">
             <span
               className={cn(

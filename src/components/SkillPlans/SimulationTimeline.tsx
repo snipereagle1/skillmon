@@ -1,13 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useEffect, useState } from 'react';
 
+import { SkillLevelPips } from '@/components/SkillLevelPips';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SimulationProfile, SimulationResult } from '@/generated/types';
 import { formatDuration } from '@/lib/utils';
-
-import { LevelIndicator } from '../SkillQueue/LevelIndicator';
 
 const ATTRIBUTE_NAME_MAP: Record<number, string> = {
   164: 'Charisma',
@@ -97,7 +96,7 @@ export function SimulationTimeline({
                   )}
                   <div className="flex items-center justify-between gap-4 relative z-10">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <LevelIndicator level={segment.level} />
+                      <SkillLevelPips queuedLevel={segment.level} />
                       <div className="flex flex-col flex-1 min-w-0">
                         <span className="text-foreground font-medium truncate">
                           {skillNames[segment.skill_type_id] ||

@@ -2,6 +2,7 @@ import { Check, OmegaIcon } from 'lucide-react';
 import { useState } from 'react';
 import { match, P } from 'ts-pattern';
 
+import { SkillLevelPips } from '@/components/SkillLevelPips';
 import {
   Accordion,
   AccordionContent,
@@ -182,38 +183,14 @@ export function SkillDetail({
                                   {req.required_skill_name}
                                 </span>
                               </div>
-                              <div className="flex gap-1">
-                                {[1, 2, 3, 4, 5].map((level) => {
-                                  const className = match({
-                                    levelMet: level <= req.required_level,
-                                    isMet: req.is_met,
-                                  })
-                                    .with(
-                                      { levelMet: true, isMet: true },
-                                      () => 'bg-foreground border-foreground'
-                                    )
-                                    .with(
-                                      { levelMet: true, isMet: false },
-                                      () =>
-                                        'bg-status-paused border-status-paused'
-                                    )
-                                    .with(
-                                      { levelMet: false },
-                                      () => 'bg-muted border-border'
-                                    )
-                                    .exhaustive();
-
-                                  return (
-                                    <div
-                                      key={level}
-                                      className={cn(
-                                        'w-4 h-4 border rounded-sm',
-                                        className
-                                      )}
-                                    />
-                                  );
-                                })}
-                              </div>
+                              <SkillLevelPips
+                                trainedLevel={
+                                  req.is_met ? req.required_level : 0
+                                }
+                                plannedLevel={
+                                  req.is_met ? undefined : req.required_level
+                                }
+                              />
                             </div>
                           ))
                         )}

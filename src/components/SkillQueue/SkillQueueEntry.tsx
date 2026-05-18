@@ -1,3 +1,4 @@
+import { SkillLevelPips } from '@/components/SkillLevelPips';
 import {
   Tooltip,
   TooltipContent,
@@ -7,7 +8,6 @@ import type { SkillQueueItem } from '@/generated/types';
 import { cn } from '@/lib/utils';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
-import { LevelIndicator } from './LevelIndicator';
 import {
   calculateCompletionPercentage,
   calculateTimeToTrain,
@@ -84,7 +84,10 @@ export function SkillQueueEntry({
       )}
       <div className="flex items-center justify-between gap-4 relative z-10">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <LevelIndicator level={skill.finishedLevel} />
+          <SkillLevelPips
+            queuedLevel={skill.finishedLevel}
+            activelyTrainingLevel={isTraining ? skill.finishedLevel : undefined}
+          />
           <div className="flex flex-col flex-1 min-w-0">
             <span
               className="text-foreground font-medium truncate cursor-pointer hover:underline"

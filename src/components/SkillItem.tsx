@@ -1,5 +1,6 @@
 import { Plus } from 'lucide-react';
 
+import { SkillLevelPips } from '@/components/SkillLevelPips';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -24,32 +25,6 @@ export function SkillItem({
   plannedLevel = 0,
   onAddStep,
 }: SkillItemProps) {
-  const squareSize = skill.is_injected ? 'w-2 h-2' : 'w-1.5 h-1.5';
-  const squareOpacity = skill.is_injected ? 'opacity-100' : 'opacity-50';
-
-  const renderLevelSquare = (level: number) => {
-    const isTrained = skill.trained_skill_level >= level;
-    const isQueued =
-      skill.is_in_queue && skill.queue_level && skill.queue_level >= level;
-    const isPlanned = plannedLevel >= level;
-
-    let bgColor = 'bg-muted';
-    if (isTrained) {
-      bgColor = 'bg-foreground';
-    } else if (isQueued) {
-      bgColor = 'bg-primary';
-    } else if (isPlanned) {
-      bgColor = 'bg-primary/60';
-    }
-
-    return (
-      <div
-        key={level}
-        className={cn(squareSize, squareOpacity, bgColor, 'rounded-sm')}
-      />
-    );
-  };
-
   return (
     <Item
       variant="outline"
@@ -61,9 +36,15 @@ export function SkillItem({
         <div className="flex items-center gap-3">
           <ItemTitle className="flex-1 text-sm">{skill.skill_name}</ItemTitle>
           <div className="flex items-center gap-2">
-            <div className="flex gap-0.5 shrink-0">
-              {[1, 2, 3, 4, 5].map((level) => renderLevelSquare(level))}
-            </div>
+            <SkillLevelPips
+              trainedLevel={skill.trained_skill_level}
+              queuedLevel={
+                skill.is_in_queue && skill.queue_level
+                  ? skill.queue_level
+                  : undefined
+              }
+              plannedLevel={plannedLevel || undefined}
+            />
             {onAddStep && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>

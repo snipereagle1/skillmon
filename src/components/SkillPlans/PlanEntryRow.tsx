@@ -4,6 +4,7 @@ import { GripVertical, MoreHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { SkillLevelPips } from '@/components/SkillLevelPips';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -34,7 +35,6 @@ import { cn, formatNumber, toRoman } from '@/lib/utils';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
 import { RemapRow } from '../Remaps/RemapRow';
-import { LevelIndicator } from '../SkillQueue/LevelIndicator';
 
 interface PlanEntryRowProps {
   entry: SkillPlanEntryResponse;
@@ -270,7 +270,7 @@ export function PlanEntryRow({
               >
                 <GripVertical className="h-4 w-4" />
               </div>
-              <LevelIndicator level={entry.planned_level} />
+              <SkillLevelPips queuedLevel={entry.planned_level} />
               <div className="flex flex-col flex-1 min-w-0">
                 <span
                   className={cn(
