@@ -93,7 +93,7 @@ export function LocationTableRow({ character }: LocationTableRowProps) {
     }))
     .otherwise(() => ({
       dockedIcon: (
-        <Rocket className="h-4 w-4 text-yellow-500" />
+        <Rocket className="h-4 w-4 text-status-paused" />
       ) as React.ReactNode,
       dockedLabel: 'Undocked (offline)',
     }));
@@ -107,8 +107,8 @@ export function LocationTableRow({ character }: LocationTableRowProps) {
           className={cn(
             'h-2 w-2 rounded-full mx-auto',
             isOnline
-              ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.5)]'
-              : 'bg-gray-400'
+              ? 'bg-status-training shadow-status-training-glow'
+              : 'bg-fg-dim'
           )}
         />
       </TableCell>

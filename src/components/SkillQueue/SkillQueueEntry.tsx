@@ -61,8 +61,8 @@ export function SkillQueueEntry({
   const displayWidth = Math.max(timePercentage, MIN_WIDTH_PERCENTAGE);
 
   const useYellow = isPaused === true && isTraining;
-  const progressColor = useYellow ? 'bg-yellow-500/20' : 'bg-primary/20';
-  const textColor = useYellow ? 'text-yellow-400' : 'text-primary';
+  const progressColor = useYellow ? 'bg-status-paused-soft' : 'bg-primary/20';
+  const textColor = useYellow ? 'text-status-paused' : 'text-primary';
 
   return (
     <div
@@ -104,7 +104,7 @@ export function SkillQueueEntry({
             <TooltipTrigger asChild>
               <span
                 className={cn(
-                  'text-sm whitespace-nowrap cursor-help',
+                  'text-sm whitespace-nowrap cursor-help tabular-nums',
                   isTraining
                     ? cn(textColor, 'font-medium')
                     : 'text-muted-foreground'

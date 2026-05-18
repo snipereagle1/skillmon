@@ -97,7 +97,7 @@ export function NotificationSettings({
   }
 
   return (
-    <div className="p-4 space-y-6">
+    <div className="p-4 space-y-6 bg-card h-full">
       <div>
         <h3 className="h-section mb-4">Notification Settings</h3>
         <div className="space-y-4">

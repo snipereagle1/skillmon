@@ -54,8 +54,8 @@ function getTrainingStatus(
 }
 
 const PIP_CLASS: Record<TrainingStatus, string | null> = {
-  training: 'bg-[var(--status-training)]',
-  paused: 'bg-[var(--status-paused)]',
+  training: 'bg-status-training',
+  paused: 'bg-status-paused',
   empty: null,
 };
 

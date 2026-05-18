@@ -127,7 +127,7 @@ function AboutPage() {
             <div className="bg-accent/50 rounded-lg p-4 border border-green-500/20 space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="h-card text-green-600 dark:text-green-400">
+                  <h3 className="h-card text-status-training">
                     New Version Available: v{update.version}
                   </h3>
                   <p className="text-sm text-muted-foreground">
@@ -137,7 +137,7 @@ function AboutPage() {
                 <Button
                   onClick={handleInstallUpdate}
                   disabled={downloading}
-                  className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+                  className="gap-2 bg-primary hover:bg-brand-hover text-primary-foreground"
                 >
                   <Download className="h-4 w-4" />
                   {downloading ? 'Downloading...' : 'Install Update'}
@@ -148,7 +148,7 @@ function AboutPage() {
                 <div className="space-y-2">
                   <div className="h-2 bg-background rounded-full overflow-hidden">
                     <div
-                      className="h-full bg-green-500 transition-all duration-300"
+                      className="h-full bg-status-training transition-all duration-300"
                       style={{ width: `${downloadProgress}%` }}
                     />
                   </div>
@@ -161,7 +161,7 @@ function AboutPage() {
               {update.body && (
                 <div className="space-y-2">
                   <h4 className="p-overline">What&apos;s New</h4>
-                  <div className="text-sm prose prose-sm dark:prose-invert max-w-none bg-background/50 rounded p-3 border whitespace-pre-wrap">
+                  <div className="text-sm prose prose-sm prose-invert max-w-none bg-background/50 rounded p-3 border whitespace-pre-wrap">
                     {update.body}
                   </div>
                 </div>
@@ -171,7 +171,7 @@ function AboutPage() {
 
           {!updateAvailable && (
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
+              <div className="h-1.5 w-1.5 rounded-full bg-status-training" />
               You&apos;re up to date
             </div>
           )}

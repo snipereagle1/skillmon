@@ -213,7 +213,7 @@ export function Skills({
   };
 
   return (
-    <div className="@container flex flex-col h-full min-h-0">
+    <div className="@container flex flex-col h-full min-h-0 bg-card">
       {/* Search section */}
       <div className="border-b border-border p-2 shrink-0">
         <div className="relative">

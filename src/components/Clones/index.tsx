@@ -90,7 +90,7 @@ export function Clones({ characterId }: ClonesProps) {
   }
 
   return (
-    <div className="flex flex-col h-full overflow-y-auto p-4">
+    <div className="flex flex-col h-full overflow-y-auto p-4 bg-card">
       <div className="space-y-2">
         {sortedClones.map((clone) => (
           <CloneRow key={clone.id} clone={clone} implantNames={implantNames} />

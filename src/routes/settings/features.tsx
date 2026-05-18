@@ -147,7 +147,7 @@ function FeaturesPage() {
                       return (
                         <TableCell key={featureId} className="text-center">
                           {hasScopes ? (
-                            <CircleCheck className="h-5 w-5 text-green-500 mx-auto" />
+                            <CircleCheck className="h-5 w-5 text-status-training mx-auto" />
                           ) : (
                             <CircleSlash className="h-5 w-5 text-muted-foreground mx-auto" />
                           )}

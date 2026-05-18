@@ -207,7 +207,7 @@ export function AccountSidebar() {
                       'p-3 transition-all relative border-transparent shadow-none',
                       activeUnassignedCharacter.character_id ===
                         selectedCharacterId &&
-                        'border-[var(--border-strong)] bg-muted/50'
+                        'border-border-strong bg-muted/50'
                     )}
                   >
                     <div className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-muted-foreground transition-opacity z-10">

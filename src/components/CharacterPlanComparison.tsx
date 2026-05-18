@@ -33,8 +33,8 @@ function ComparisonEntryRow({
   );
 
   const statusBgColors = {
-    complete: 'bg-green-400/20',
-    in_progress: 'bg-yellow-400/20',
+    complete: 'bg-status-training-soft',
+    in_progress: 'bg-status-paused-soft',
     not_started: 'bg-muted/30',
   };
 
@@ -76,7 +76,7 @@ function ComparisonEntryRow({
               {entry.missing_skillpoints > 0 && (
                 <>
                   <span>•</span>
-                  <span className="text-yellow-400">
+                  <span className="text-status-paused">
                     Missing: {formatSkillpoints(entry.missing_skillpoints)}
                   </span>
                 </>
@@ -141,7 +141,7 @@ export function CharacterPlanComparison({
   }
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-full min-h-0 bg-card">
       <div className="w-64 border-r border-border shrink-0 overflow-hidden flex flex-col">
         <div className="p-4 border-b border-border">
           <h2 className="h-nav">Skill Plans</h2>
@@ -171,7 +171,7 @@ export function CharacterPlanComparison({
                     className={cn(
                       'p-3 rounded-md cursor-pointer transition-colors',
                       selectedPlanId === plan.plan_id
-                        ? 'bg-muted text-white'
+                        ? 'bg-muted text-foreground'
                         : 'hover:bg-muted'
                     )}
                   >
@@ -182,7 +182,7 @@ export function CharacterPlanComparison({
                           className={cn(
                             'text-xs mt-1 line-clamp-2',
                             selectedPlanId === plan.plan_id
-                              ? 'text-white/80'
+                              ? 'text-foreground/80'
                               : 'text-muted-foreground'
                           )}
                         >
@@ -240,7 +240,7 @@ export function CharacterPlanComparison({
                     <div className="text-xs text-muted-foreground">
                       Complete
                     </div>
-                    <div className="text-lg font-semibold text-green-400">
+                    <div className="text-lg font-semibold text-status-training">
                       {stats.complete}
                     </div>
                   </div>
@@ -248,7 +248,7 @@ export function CharacterPlanComparison({
                     <div className="text-xs text-muted-foreground">
                       In Progress
                     </div>
-                    <div className="text-lg font-semibold text-yellow-400">
+                    <div className="text-lg font-semibold text-status-paused">
                       {stats.in_progress}
                     </div>
                   </div>
@@ -266,7 +266,7 @@ export function CharacterPlanComparison({
                     <span className="text-muted-foreground">
                       Total Missing SP:{' '}
                     </span>
-                    <span className="font-semibold text-yellow-400">
+                    <span className="font-semibold text-status-paused">
                       {formatSkillpoints(stats.totalMissingSP)}
                     </span>
                   </div>

@@ -77,7 +77,7 @@ export function Attributes({ characterId }: AttributesProps) {
   };
 
   return (
-    <div className="p-4 space-y-8">
+    <div className="p-4 space-y-8 bg-card h-full">
       <div className="space-y-4">
         <h3 className="h-section px-1">Current Attributes</h3>
         <Table>
@@ -132,7 +132,7 @@ export function Attributes({ characterId }: AttributesProps) {
             {(data.bonusRemaps ?? 0) > 0 && (
               <Badge
                 variant="secondary"
-                className="bg-green-500/10 text-green-500 border-green-500/20"
+                className="bg-status-training-soft text-status-training border-status-training/20"
               >
                 Available
               </Badge>

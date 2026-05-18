@@ -125,7 +125,7 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
               {queue.isPaused && (
                 <Badge
                   variant="outline"
-                  className="border-yellow-500 text-yellow-500"
+                  className="border-status-paused text-status-paused"
                 >
                   Paused
                 </Badge>
@@ -209,7 +209,7 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
           className="border-t border-border bg-muted/30 px-4 py-3 space-y-3 shrink-0"
           id="bottom-bar"
         >
-          <div className="text-sm text-green-400">
+          <div className="text-sm text-status-training">
             {formatNumber(unallocatedSP)} unallocated skill points
           </div>
 
@@ -223,7 +223,7 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
 
             <div className="w-full h-2 bg-muted rounded-full overflow-hidden">
               <div
-                className="h-full bg-white/80 transition-all"
+                className="h-full bg-foreground/80 transition-all"
                 style={{ width: `${progressPercentage}%` }}
               />
             </div>

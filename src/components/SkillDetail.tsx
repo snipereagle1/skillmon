@@ -60,10 +60,10 @@ export function SkillDetail({
             .with({ isLoading: false, data: P.not(P.nullish) }, ({ data }) => (
               <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
                 <SheetHeader className="shrink-0 pb-2">
-                  <SheetTitle className="text-xl flex items-center gap-2">
+                  <SheetTitle className="h-section flex items-center gap-2">
                     {data.skill_name}
                     {data.requires_omega && (
-                      <OmegaIcon className="w-4 h-4 text-yellow-500" />
+                      <OmegaIcon className="w-4 h-4 text-status-omega" />
                     )}
                   </SheetTitle>
                   <p className="text-sm text-muted-foreground">
@@ -176,7 +176,7 @@ export function SkillDetail({
                             >
                               <div className="flex items-center gap-2">
                                 {req.is_met && (
-                                  <Check className="h-4 w-4 text-green-500" />
+                                  <Check className="h-4 w-4 text-status-training" />
                                 )}
                                 <span className="text-sm font-medium">
                                   {req.required_skill_name}
@@ -190,11 +190,12 @@ export function SkillDetail({
                                   })
                                     .with(
                                       { levelMet: true, isMet: true },
-                                      () => 'bg-white border-white'
+                                      () => 'bg-foreground border-foreground'
                                     )
                                     .with(
                                       { levelMet: true, isMet: false },
-                                      () => 'bg-yellow-500 border-yellow-500'
+                                      () =>
+                                        'bg-status-paused border-status-paused'
                                     )
                                     .with(
                                       { levelMet: false },

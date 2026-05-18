@@ -303,7 +303,7 @@ export function OptimizationDialog({
                   </div>
 
                   {timeSaved > 0 ? (
-                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400 bg-green-500/10 p-3 rounded-md text-sm font-medium">
+                    <div className="flex items-center gap-2 text-status-info bg-status-info-soft p-3 rounded-md text-sm font-medium">
                       <Check className="h-4 w-4" />
                       Total savings: {formatDuration(timeSaved)}
                     </div>

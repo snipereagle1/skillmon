@@ -35,7 +35,7 @@ export function SkillItem({
 
     let bgColor = 'bg-muted';
     if (isTrained) {
-      bgColor = 'bg-white';
+      bgColor = 'bg-foreground';
     } else if (isQueued) {
       bgColor = 'bg-primary';
     } else if (isPlanned) {

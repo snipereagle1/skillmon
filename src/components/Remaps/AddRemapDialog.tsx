@@ -186,7 +186,7 @@ export function AddRemapDialog({
           <div className="flex items-center justify-between px-1">
             <span className="text-sm font-medium">Points Distributed</span>
             <span
-              className={`text-sm font-bold ${totalPoints === 14 ? 'text-green-600' : 'text-muted-foreground'}`}
+              className={`text-sm font-bold ${totalPoints === 14 ? 'text-status-training' : 'text-muted-foreground'}`}
             >
               {totalPoints} / 14
             </span>

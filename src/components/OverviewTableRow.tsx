@@ -61,7 +61,7 @@ export function OverviewTableRow({ character }: OverviewTableRowProps) {
           <span>{formatNumber(Math.round(character.spPerHour))} SP/hr</span>
           {!character.isOmega && (
             <span title="Alpha Clone">
-              <AlphaIcon className="h-4 w-4 text-white" />
+              <AlphaIcon className="h-4 w-4 text-primary-foreground" />
             </span>
           )}
         </div>

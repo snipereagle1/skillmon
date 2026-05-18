@@ -42,7 +42,7 @@ function CharacterDetailLayout() {
   if (isLoading) {
     return (
       <div className="flex h-full">
-        <div className="w-64 shrink-0 bg-[var(--surface)] border-r border-border">
+        <div className="w-64 shrink-0 bg-card border-r border-border">
           <p className="text-muted-foreground p-4">Loading characters...</p>
         </div>
         <div className="flex-1 flex items-center justify-center">
@@ -55,7 +55,7 @@ function CharacterDetailLayout() {
   if (error) {
     return (
       <div className="flex h-full">
-        <div className="w-64 shrink-0 bg-[var(--surface)] border-r border-border">
+        <div className="w-64 shrink-0 bg-card border-r border-border">
           <p className="text-destructive p-4">
             Error:{' '}
             {error instanceof Error
@@ -73,7 +73,7 @@ function CharacterDetailLayout() {
   if (!selectedCharacter) {
     return (
       <div className="flex h-full">
-        <div className="w-64 shrink-0 overflow-y-auto bg-[var(--surface)] border-r border-border">
+        <div className="w-64 shrink-0 overflow-y-auto bg-card border-r border-border">
           <AccountSidebar />
         </div>
         <div className="flex-1 overflow-hidden flex items-center justify-center">
@@ -85,11 +85,11 @@ function CharacterDetailLayout() {
 
   return (
     <div className="flex h-full">
-      <div className="w-64 shrink-0 overflow-y-auto bg-[var(--surface)] border-r border-border">
+      <div className="w-64 shrink-0 overflow-y-auto bg-card border-r border-border">
         <AccountSidebar />
       </div>
       <div className="flex-1 overflow-hidden flex flex-col">
-        <div className="border-b px-4 py-2 flex items-center justify-between bg-[var(--surface)]">
+        <div className="border-b px-4 py-2 flex items-center justify-between bg-card">
           <NavigationTabs
             items={[
               {

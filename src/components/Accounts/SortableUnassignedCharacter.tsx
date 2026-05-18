@@ -71,7 +71,7 @@ export function SortableUnassignedCharacter({
             className={cn(
               'p-3 cursor-pointer transition-all border-transparent shadow-none',
               isSelected
-                ? 'border-[var(--border-strong)] bg-muted/50'
+                ? 'border-border-strong bg-muted/50'
                 : 'hover:bg-muted/30'
             )}
           >

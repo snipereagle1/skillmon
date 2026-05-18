@@ -48,8 +48,8 @@ export function SkillPlanValidationDisplay({
       })
         .with({ isValid: true, hasIssues: false }, () => (
           <>
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-            <span className="text-xs font-medium text-green-600 dark:text-green-400">
+            <CheckCircle2 className="h-4 w-4 text-status-training" />
+            <span className="text-xs font-medium text-status-training">
               {isProposed ? 'Proposed order is valid' : 'Plan is valid'}
             </span>
           </>
@@ -64,8 +64,8 @@ export function SkillPlanValidationDisplay({
         ))
         .otherwise(() => (
           <>
-            <AlertTriangle className="h-4 w-4 text-yellow-600 dark:text-yellow-500" />
-            <span className="text-xs font-bold text-yellow-700 dark:text-yellow-400">
+            <AlertTriangle className="h-4 w-4 text-status-paused" />
+            <span className="text-xs font-bold text-status-paused">
               {isProposed ? 'Proposed order has warnings' : 'Plan has warnings'}
             </span>
           </>
@@ -114,10 +114,7 @@ export function SkillPlanValidationDisplay({
                 >
                   <ul className="list-disc pl-6 space-y-0.5">
                     {validation.warnings.map((warning, idx) => (
-                      <li
-                        key={idx}
-                        className="text-xs text-yellow-700 dark:text-yellow-400"
-                      >
+                      <li key={idx} className="text-xs text-status-paused">
                         {formatError(warning)}
                       </li>
                     ))}

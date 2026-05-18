@@ -66,6 +66,8 @@
   .t-mono     { font-family: var(--font-mono); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
   .t-mono-sm  { font-family: var(--font-mono); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
   .t-numeric  { font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
+
+  .shadow-status-training-glow { box-shadow: 0 0 8px color-mix(in srgb, var(--status-training) 50%, transparent); }
 }
 
 @theme inline {

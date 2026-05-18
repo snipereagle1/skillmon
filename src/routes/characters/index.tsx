@@ -9,7 +9,7 @@ function CharactersIndexPage() {
   if (isLoading) {
     return (
       <div className="flex h-full">
-        <div className="w-64 shrink-0 bg-[var(--surface)] border-r border-border">
+        <div className="w-64 shrink-0 bg-card border-r border-border">
           <p className="text-muted-foreground p-4">Loading characters...</p>
         </div>
         <div className="flex-1 flex items-center justify-center">
@@ -22,7 +22,7 @@ function CharactersIndexPage() {
   if (error) {
     return (
       <div className="flex h-full">
-        <div className="w-64 shrink-0 bg-[var(--surface)] border-r border-border">
+        <div className="w-64 shrink-0 bg-card border-r border-border">
           <p className="text-destructive p-4">
             Error:{' '}
             {error instanceof Error
@@ -39,7 +39,7 @@ function CharactersIndexPage() {
 
   return (
     <div className="flex h-full">
-      <div className="w-64 shrink-0 overflow-y-auto bg-[var(--surface)] border-r border-border">
+      <div className="w-64 shrink-0 overflow-y-auto bg-card border-r border-border">
         {accountsData &&
         accountsData.accounts.length === 0 &&
         accountsData.unassigned_characters.length === 0 ? (

@@ -5,7 +5,7 @@ import { PlanList } from '@/components/SkillPlans/PlanList';
 function PlansIndexPage() {
   return (
     <>
-      <div className="w-64 border-r border-border shrink-0 overflow-hidden flex flex-col h-full bg-[var(--surface)]">
+      <div className="w-64 border-r border-border shrink-0 overflow-hidden flex flex-col h-full bg-card">
         <PlanList />
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">

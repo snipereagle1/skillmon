@@ -254,7 +254,7 @@ export function PlanEntryRow({
             validationStatus === 'error' &&
               'bg-destructive/10 border-destructive/50',
             validationStatus === 'warning' &&
-              'bg-yellow-500/10 border-yellow-500/50'
+              'bg-status-paused-soft border-status-paused/50'
           )}
         >
           <div className="flex items-center justify-between gap-4 relative z-10">
@@ -265,8 +265,7 @@ export function PlanEntryRow({
                 className={cn(
                   'cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded',
                   validationStatus === 'error' && 'text-destructive',
-                  validationStatus === 'warning' &&
-                    'text-yellow-600 dark:text-yellow-500'
+                  validationStatus === 'warning' && 'text-status-paused'
                 )}
               >
                 <GripVertical className="h-4 w-4" />
@@ -278,8 +277,7 @@ export function PlanEntryRow({
                     'text-foreground font-medium truncate cursor-pointer hover:underline',
                     isPrerequisite && 'text-muted-foreground',
                     validationStatus === 'error' && 'text-destructive',
-                    validationStatus === 'warning' &&
-                      'text-yellow-600 dark:text-yellow-500'
+                    validationStatus === 'warning' && 'text-status-paused'
                   )}
                   onClick={() => openSkillDetail(entry.skill_type_id, null)}
                 >
