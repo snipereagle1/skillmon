@@ -37,7 +37,8 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/lint-and-typecheck.sh"
+            "command": "bash ${CLAUDE_PROJECT_DIR}/.claude/hooks/lint-and-typecheck.sh",
+            "asyncRewake": true
           }
         ]
       }
