@@ -8,7 +8,11 @@
       "mcp__plugin_context7_context7__resolve-library-id",
       "mcp__plugin_context7_context7__query-docs",
       "mcp__codegraph__*",
-      "mcp__shadcn__*"
+      "mcp__shadcn__*",
+      "Read(.claude/design/*)",
+      "Bash(pnpm view *)",
+      "Bash(pnpm typecheck)",
+      "Bash(pnpm info *)"
     ],
     "deny": [
       "mcp__skillmon-sqlite__create_record",
