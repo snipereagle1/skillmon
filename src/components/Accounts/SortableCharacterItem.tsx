@@ -3,6 +3,7 @@ import { CSS } from '@dnd-kit/utilities';
 import { Link, useMatches } from '@tanstack/react-router';
 import { GripVertical } from 'lucide-react';
 
+import { Card } from '@/components/ui/card';
 import type {
   AccountWithCharacters,
   Character,
@@ -67,23 +68,28 @@ export function SortableCharacterItem({
             to={targetRoute}
             params={{ characterId: String(character.character_id) }}
             search={true}
+            className="block"
           >
-            <div
+            <Card
               className={cn(
-                'flex items-center gap-2 cursor-pointer rounded p-1 hover:bg-muted/30',
-                isSelected && 'bg-muted/50 ring-1 ring-[var(--border-strong)]'
+                'p-3 cursor-pointer transition-all border-transparent shadow-none',
+                isSelected
+                  ? 'border-(--border-strong) bg-muted/50'
+                  : 'hover:bg-muted/30'
               )}
             >
-              <CharacterPortrait
-                character={character}
-                skillQueue={queueData?.skillQueue}
-                isPaused={queueData?.isPaused}
-                size={48}
-              />
-              <span className="text-sm font-medium">
-                {character.character_name}
-              </span>
-            </div>
+              <div className="flex items-center gap-2">
+                <CharacterPortrait
+                  character={character}
+                  skillQueue={queueData?.skillQueue}
+                  isPaused={queueData?.isPaused}
+                  size={48}
+                />
+                <span className="text-sm font-medium">
+                  {character.character_name}
+                </span>
+              </div>
+            </Card>
           </Link>
         </CharacterContextMenu>
       </div>

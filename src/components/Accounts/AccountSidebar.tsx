@@ -115,7 +115,7 @@ export function AccountSidebar() {
 
   return (
     <>
-      <div className="flex flex-col gap-2 overflow-y-auto pr-4">
+      <div className="flex flex-col gap-2 px-4 py-2">
         <DndContext
           id="accounts-dnd-context"
           sensors={accountSensors}

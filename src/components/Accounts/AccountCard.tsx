@@ -62,7 +62,7 @@ export function AccountCard({
   const canAddCharacter = account.characters.length < 3;
 
   return (
-    <Card className="p-3 border-0 shadow-none bg-transparent">
+    <Card className="p-0 border-0 shadow-none bg-transparent">
       {isExpanded ? (
         <div className="flex flex-col gap-2">
           <DndContext
