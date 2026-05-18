@@ -8,6 +8,7 @@ use sqlx::{
 use tauri::Manager;
 
 pub mod accounts;
+pub mod app_settings;
 pub mod character_attributes;
 pub mod character_skills;
 pub mod characters;
@@ -26,6 +27,7 @@ pub use accounts::{
     reorder_accounts, reorder_characters_in_account, reorder_unassigned_characters,
     update_account_name,
 };
+pub use app_settings::{get_boolean_app_setting, set_boolean_app_setting};
 pub use character_attributes::{
     get_character_attributes, set_character_attributes, CharacterAttributes,
 };

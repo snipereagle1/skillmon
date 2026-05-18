@@ -39,7 +39,7 @@ Components land in `src/components/ui/` automatically. Config is in `components.
 
 - Always use TanStack Query (`@tanstack/react-query`) for data fetching
 - Never use `fetch` or `axios` directly for Tauri commands
-- Use generated command functions from `@/generated/commands` instead of calling `invoke()` directly
+- Call Tauri commands with `invoke<ReturnType>('command_name', { ...args })` from `@tauri-apps/api/core`
 - Use custom hooks in `src/hooks/tauri/` to wrap Tauri commands
 - Invalidate queries after mutations to refresh data
 - Use `@/generated/types` — never manually define types that mirror Rust structs
@@ -82,6 +82,6 @@ Components land in `src/components/ui/` automatically. Config is in `components.
 
 ## Generated Files — Never Hand-Edit
 
-- `src/generated/` — run `pnpm typegen` after any Rust struct change
+- `src/generated/` (types only) — run `pnpm typegen` after any Rust struct change
 - `routeTree.gen.ts` — managed by the TanStack Router Vite plugin
 - `src-tauri/src/esi/client.rs`, `types.rs` — run `./scripts/generate-esi.sh` to regenerate

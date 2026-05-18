@@ -2,7 +2,7 @@ use crate::db;
 use crate::esi::EsiScope;
 use crate::features::{self, FeatureId, OptionalFeature};
 use crate::ts_types::i64_ts;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use tauri::State;
 use typeshare::typeshare;
@@ -20,6 +20,47 @@ pub struct CharacterFeatureScopeStatus {
     pub character_id: i64_ts,
     pub character_name: String,
     pub feature_has_scopes: Vec<FeatureScopeEntry>,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum BooleanAppSettingKey {
+    StartMinimized,
+}
+
+impl BooleanAppSettingKey {
+    fn as_str(&self) -> &'static str {
+        match self {
+            BooleanAppSettingKey::StartMinimized => "start_minimized",
+        }
+    }
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AppSettings {
+    pub start_minimized: bool,
+}
+
+#[tauri::command]
+pub async fn get_app_settings(pool: State<'_, db::Pool>) -> Result<AppSettings, String> {
+    let start_minimized = db::get_boolean_app_setting(&pool, "start_minimized")
+        .await
+        .map_err(|e| format!("Failed to get app settings: {}", e))?;
+
+    Ok(AppSettings { start_minimized })
+}
+
+#[tauri::command]
+pub async fn set_boolean_app_setting(
+    pool: State<'_, db::Pool>,
+    key: BooleanAppSettingKey,
+    value: bool,
+) -> Result<(), String> {
+    db::set_boolean_app_setting(&pool, key.as_str(), value)
+        .await
+        .map_err(|e| format!("Failed to set {}: {}", key.as_str(), e))
 }
 
 #[tauri::command]

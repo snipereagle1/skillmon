@@ -14,13 +14,13 @@ Never use `fetch` or `axios` directly for Tauri commands. Always go through TanS
 
 ```typescript
 import { useQuery } from '@tanstack/react-query';
-import { getMyData } from '@/generated/commands';
+import { invoke } from '@tauri-apps/api/core';
 import type { MyDataType } from '@/generated/types';
 
 export function useMyData() {
   return useQuery<MyDataType[]>({
     queryKey: ['myData'],
-    queryFn: () => getMyData(),
+    queryFn: () => invoke<MyDataType[]>('get_my_data'),
   });
 }
 ```
@@ -29,13 +29,13 @@ export function useMyData() {
 
 ```typescript
 import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { myMutation } from '@/generated/commands';
+import { invoke } from '@tauri-apps/api/core';
 
 export function useMyMutation() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (data: InputType) => myMutation(data),
+    mutationFn: (data: InputType) => invoke<void>('my_mutation', { data }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['myData'] });
     },
@@ -62,13 +62,14 @@ export function useMyMutation() {
 
 ## Tauri Commands
 
-Use auto-generated functions from `@/generated/commands` — never call `invoke()` directly:
+Call commands with `invoke` from `@tauri-apps/api/core`. Command names are snake_case matching the Rust function name:
 
 ```typescript
-import { getCharacters, logoutCharacter } from '@/generated/commands';
+import { invoke } from '@tauri-apps/api/core';
+import type { Character } from '@/generated/types';
 
-const characters = await getCharacters();
-await logoutCharacter({ characterId: 123 });
+const characters = await invoke<Character[]>('get_characters');
+await invoke<void>('logout_character', { characterId: 123 });
 ```
 
 ## Types
@@ -79,7 +80,7 @@ Import from `@/generated/types` — never manually define types that mirror Rust
 import type { Character, SkillQueue } from '@/generated/types';
 ```
 
-The deprecated `src/types/tauri.ts` should not be used — use `@/generated/types` instead.
+The deprecated `src/types/tauri.ts` should not be used — use `@/generated/types` instead. Do not import from `@/generated/commands` — that file no longer exists.
 
 ## Custom Hooks Location
 
