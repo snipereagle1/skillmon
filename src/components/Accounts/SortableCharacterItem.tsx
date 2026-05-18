@@ -70,8 +70,8 @@ export function SortableCharacterItem({
           >
             <div
               className={cn(
-                'flex items-center gap-2 cursor-pointer rounded p-1 hover:bg-muted/50',
-                isSelected && 'bg-muted!'
+                'flex items-center gap-2 cursor-pointer rounded p-1 hover:bg-muted/30',
+                isSelected && 'bg-muted/50 ring-1 ring-[var(--border-strong)]'
               )}
             >
               <CharacterPortrait

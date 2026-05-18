@@ -100,9 +100,7 @@ export function AddCharacterDialog({
         <div className="space-y-6">
           {/* Base Scopes Section */}
           <div className="space-y-2">
-            <h3 className="text-sm font-semibold text-foreground">
-              Base Permissions
-            </h3>
+            <h3 className="h-nav text-foreground">Base Permissions</h3>
             <p className="text-xs text-muted-foreground">
               These permissions are always required for core functionality:
             </p>
@@ -123,9 +121,7 @@ export function AddCharacterDialog({
             <div className="space-y-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="text-sm font-semibold text-foreground">
-                    Optional Features
-                  </h3>
+                  <h3 className="h-nav text-foreground">Optional Features</h3>
                   <p className="text-xs text-muted-foreground">
                     {enabledFeatures && enabledFeatures.length > 0
                       ? `${enabledFeatures.length} feature${enabledFeatures.length > 1 ? 's' : ''} enabled`

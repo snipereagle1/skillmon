@@ -28,6 +28,21 @@ Live ESI data and mutations/static data use different layers. New hooks must go 
 
 **React Query** — mutations, SDE/static data, settings, and one-shot startup queries. No `refetchInterval` or sub-minute `staleTime`/`gcTime` — live ESI data belongs to Zustand.
 
+## Semantic type utilities
+
+Defined in `src/index.css` (`@layer utilities`). Use these instead of raw Tailwind font/size/weight combos on any heading, label, or overline.
+
+| Class        | Role                      | Font         | Size                              |
+| ------------ | ------------------------- | ------------ | --------------------------------- |
+| `h-display`  | Hero/splash heading       | Chakra Petch | 32px                              |
+| `h-page`     | Page title                | Chakra Petch | 24px                              |
+| `h-section`  | Section heading           | Chakra Petch | 20px                              |
+| `h-card`     | Card/panel title          | Chakra Petch | 16px                              |
+| `h-nav`      | Nav label / small heading | Chakra Petch | 13px                              |
+| `p-overline` | Uppercase section label   | Fira Sans    | 12px, `fg-dim`, `tracking-widest` |
+
+All classes bundle font-family, size, weight, tracking, and line-height. Compose with spacing/color utilities as needed (e.g. `h-page mb-2`, `h-card text-primary`).
+
 ## Architectural rules
 
 - Live ESI data → Zustand (`esiStore`). No `refetchInterval` or sub-minute `staleTime`/`gcTime` on React Query for live data.

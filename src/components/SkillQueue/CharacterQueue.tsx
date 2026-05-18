@@ -119,7 +119,7 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
         <div className="px-4 py-3 border-b border-border" id="top-bar">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
-              <h2 className="text-lg font-semibold text-foreground">
+              <h2 className="h-card text-foreground">
                 Training Queue {queueSize}/{MAX_QUEUE_SIZE}
               </h2>
               {queue.isPaused && (

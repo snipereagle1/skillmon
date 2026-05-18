@@ -44,7 +44,7 @@ function GeneralPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h2 className="text-2xl font-bold mb-1">General</h2>
+        <h2 className="h-page mb-1">General</h2>
         <p className="text-muted-foreground">Application-wide settings.</p>
       </div>
 

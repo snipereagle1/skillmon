@@ -124,7 +124,7 @@ function RootComponent() {
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
-      <div className="flex items-center justify-between border-b px-4 py-2">
+      <div className="flex items-center justify-between border-b px-4 py-2 bg-[var(--surface)]">
         <NavigationTabs
           items={[
             { to: '/overview', label: 'Overview' },

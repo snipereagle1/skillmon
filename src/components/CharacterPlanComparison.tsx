@@ -144,7 +144,7 @@ export function CharacterPlanComparison({
     <div className="flex h-full min-h-0">
       <div className="w-64 border-r border-border shrink-0 overflow-hidden flex flex-col">
         <div className="p-4 border-b border-border">
-          <h2 className="font-semibold text-sm">Skill Plans</h2>
+          <h2 className="h-nav">Skill Plans</h2>
         </div>
         <div className="flex-1 overflow-y-auto">
           {match({ isLoadingPlans, plans })
@@ -176,9 +176,7 @@ export function CharacterPlanComparison({
                     )}
                   >
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold truncate text-sm">
-                        {plan.name}
-                      </h3>
+                      <h3 className="h-nav truncate">{plan.name}</h3>
                       {plan.description && (
                         <p
                           className={cn(
@@ -223,9 +221,7 @@ export function CharacterPlanComparison({
               <div className="border-b border-border p-4 space-y-3 shrink-0">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-lg font-semibold truncate">
-                      {comp.plan.name}
-                    </h2>
+                    <h2 className="h-card truncate">{comp.plan.name}</h2>
                     {comp.plan.description && (
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
                         {comp.plan.description}

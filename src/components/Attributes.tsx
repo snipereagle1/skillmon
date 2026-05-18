@@ -79,7 +79,7 @@ export function Attributes({ characterId }: AttributesProps) {
   return (
     <div className="p-4 space-y-8">
       <div className="space-y-4">
-        <h3 className="text-lg font-semibold px-1">Current Attributes</h3>
+        <h3 className="h-section px-1">Current Attributes</h3>
         <Table>
           <TableHeader>
             <TableRow>
@@ -113,9 +113,7 @@ export function Attributes({ characterId }: AttributesProps) {
 
       <div className="flex flex-wrap gap-4 px-1">
         <div className="flex flex-col gap-1 border rounded-md p-3 bg-muted/20 flex-1 min-w-[200px]">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Next Primary Remap
-          </span>
+          <span className="p-overline">Next Primary Remap</span>
           <span className="text-lg font-semibold">
             {match(data.accruedRemapCooldownDate)
               .with(P.nullish, () => 'Available Now')
@@ -128,9 +126,7 @@ export function Attributes({ characterId }: AttributesProps) {
         </div>
 
         <div className="flex flex-col gap-1 border rounded-md p-3 bg-muted/20 flex-1 min-w-[200px]">
-          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-            Bonus Remaps
-          </span>
+          <span className="p-overline">Bonus Remaps</span>
           <div className="flex items-center gap-2">
             <span className="text-2xl font-bold">{data.bonusRemaps ?? 0}</span>
             {(data.bonusRemaps ?? 0) > 0 && (
@@ -146,9 +142,7 @@ export function Attributes({ characterId }: AttributesProps) {
 
         {data.lastRemapDate && (
           <div className="flex flex-col gap-1 border rounded-md p-3 bg-muted/20 flex-1 min-w-[200px]">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
-              Last Remap
-            </span>
+            <span className="p-overline">Last Remap</span>
             <span className="text-lg font-semibold">
               {formatDate(data.lastRemapDate, 'PPP')}
             </span>
@@ -158,7 +152,7 @@ export function Attributes({ characterId }: AttributesProps) {
 
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
-          <h3 className="text-lg font-semibold">Planned Remaps</h3>
+          <h3 className="h-section">Planned Remaps</h3>
           <Button
             size="sm"
             onClick={() => setIsAddDialogOpen(true)}

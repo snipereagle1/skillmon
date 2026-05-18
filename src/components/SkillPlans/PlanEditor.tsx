@@ -466,7 +466,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
               </div>
             ) : (
               <h2
-                className="text-2xl font-bold cursor-pointer hover:text-primary"
+                className="h-page cursor-pointer hover:text-primary"
                 onClick={() => {
                   setEditName(data.plan.name);
                   setIsEditingName(true);

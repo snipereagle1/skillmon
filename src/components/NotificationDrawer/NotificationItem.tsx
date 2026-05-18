@@ -35,7 +35,7 @@ export function NotificationItem({
       <div className="flex items-start justify-between gap-2">
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <h4 className="font-semibold text-sm">{notification.title}</h4>
+            <h4 className="h-nav">{notification.title}</h4>
             {character && (
               <span className="text-xs text-muted-foreground">
                 {character.character_name}

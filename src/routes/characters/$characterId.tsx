@@ -41,9 +41,9 @@ function CharacterDetailLayout() {
 
   if (isLoading) {
     return (
-      <div className="flex h-full gap-2 p-4">
-        <div className="w-64 shrink-0">
-          <p className="text-muted-foreground">Loading characters...</p>
+      <div className="flex h-full">
+        <div className="w-64 shrink-0 bg-[var(--surface)] border-r border-border">
+          <p className="text-muted-foreground p-4">Loading characters...</p>
         </div>
         <div className="flex-1 flex items-center justify-center">
           <p className="text-muted-foreground">Loading...</p>
@@ -54,9 +54,9 @@ function CharacterDetailLayout() {
 
   if (error) {
     return (
-      <div className="flex h-full gap-2 p-4">
-        <div className="w-64 shrink-0">
-          <p className="text-destructive">
+      <div className="flex h-full">
+        <div className="w-64 shrink-0 bg-[var(--surface)] border-r border-border">
+          <p className="text-destructive p-4">
             Error:{' '}
             {error instanceof Error
               ? error.message
@@ -72,11 +72,11 @@ function CharacterDetailLayout() {
 
   if (!selectedCharacter) {
     return (
-      <div className="flex h-full gap-2 p-4">
-        <div className="w-64 shrink-0 overflow-y-auto">
+      <div className="flex h-full">
+        <div className="w-64 shrink-0 overflow-y-auto bg-[var(--surface)] border-r border-border">
           <AccountSidebar />
         </div>
-        <div className="flex-1 border rounded-lg overflow-hidden flex items-center justify-center">
+        <div className="flex-1 overflow-hidden flex items-center justify-center">
           <p className="text-muted-foreground">Character not found</p>
         </div>
       </div>
@@ -84,12 +84,12 @@ function CharacterDetailLayout() {
   }
 
   return (
-    <div className="flex h-full gap-2 p-4">
-      <div className="w-64 shrink-0 overflow-y-auto">
+    <div className="flex h-full">
+      <div className="w-64 shrink-0 overflow-y-auto bg-[var(--surface)] border-r border-border">
         <AccountSidebar />
       </div>
-      <div className="flex-1 border rounded-lg overflow-hidden flex flex-col">
-        <div className="border-b px-4 py-2 flex items-center justify-between">
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="border-b px-4 py-2 flex items-center justify-between bg-[var(--surface)]">
           <NavigationTabs
             items={[
               {

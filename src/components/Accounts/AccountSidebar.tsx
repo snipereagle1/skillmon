@@ -169,9 +169,7 @@ export function AccountSidebar() {
 
         {localUnassigned.length > 0 && (
           <div className="flex flex-col gap-2 pt-4">
-            <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider px-1">
-              Unassigned Characters
-            </h3>
+            <h3 className="p-overline px-1">Unassigned Characters</h3>
             <DndContext
               id="unassigned-chars-dnd-context"
               sensors={unassignedSensors}
@@ -206,9 +204,10 @@ export function AccountSidebar() {
                 {activeUnassignedCharacter ? (
                   <Card
                     className={cn(
-                      'p-3 transition-all relative',
+                      'p-3 transition-all relative border-transparent shadow-none',
                       activeUnassignedCharacter.character_id ===
-                        selectedCharacterId && 'bg-muted/50'
+                        selectedCharacterId &&
+                        'border-[var(--border-strong)] bg-muted/50'
                     )}
                   >
                     <div className="absolute right-1 top-1/2 -translate-y-1/2 p-1 text-muted-foreground transition-opacity z-10">

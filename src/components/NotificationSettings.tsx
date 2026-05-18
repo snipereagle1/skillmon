@@ -99,7 +99,7 @@ export function NotificationSettings({
   return (
     <div className="p-4 space-y-6">
       <div>
-        <h3 className="text-lg font-semibold mb-4">Notification Settings</h3>
+        <h3 className="h-section mb-4">Notification Settings</h3>
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5 flex-1">

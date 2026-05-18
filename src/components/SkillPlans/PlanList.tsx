@@ -126,7 +126,7 @@ export function PlanList() {
                   className="flex-1 block p-3 min-w-0"
                 >
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold truncate">{plan.name}</h3>
+                    <h3 className="h-card truncate">{plan.name}</h3>
                     {plan.description && (
                       <p
                         className={`text-sm mt-1 line-clamp-2 ${

@@ -46,8 +46,8 @@ export function SimulationTimeline({
   return (
     <Card className="h-full flex flex-col overflow-hidden">
       <CardHeader className="shrink-0">
-        <CardTitle>Simulation Results</CardTitle>
-        <div className="text-2xl font-bold">
+        <CardTitle className="h-card">Simulation Results</CardTitle>
+        <div className="h-page">
           Total Time: {formatDuration(result.total_seconds)}
         </div>
       </CardHeader>
