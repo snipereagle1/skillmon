@@ -41,3 +41,7 @@ Default canonical label strings (`needs-triage`, `needs-info`, `ready-for-agent`
 ### Domain docs
 
 Multi-context layout — `docs/context/eve.md` (shared EVE domain) + `src/CONTEXT.md` (frontend) + `src-tauri/CONTEXT.md` (backend), each with their own `docs/adr/`. See `docs/agents/domain.md`.
+
+### Claude Design Handoff
+
+If you are presented with a handoff from Claude Design (recognized by links starting with https://api.anthropic.com/v1/design) extract to `.claude/design/` in a subdirectory based on the last part of the url. Use existing components and patterns from the design system. Surface ambiguity to the user, don't assume.
