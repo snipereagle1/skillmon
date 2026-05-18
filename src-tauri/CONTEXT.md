@@ -22,6 +22,8 @@ Rust + Tauri v2 backend for skillmon. Always load `docs/context/eve.md` first fo
 
 **Cache** — ESI response cache in `src-tauri/src/cache/`. Stores ETags and expiration timestamps to avoid redundant API calls.
 
+**App settings** — app-wide key/value settings stored in the `app_settings` SQLite table (`key TEXT PRIMARY KEY, value TEXT`). DB operations in `src-tauri/src/db/app_settings.rs`; commands in `src-tauri/src/commands/settings.rs`. Distinct from per-character `notification_settings` and the `enabled_features` table.
+
 ## Architectural rules
 
 - Tauri commands return `Result<T, String>`; use `anyhow` internally and stringify errors at the command boundary.

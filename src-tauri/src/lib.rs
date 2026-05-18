@@ -57,6 +57,19 @@ pub fn run() {
                 let startup_state: StartupState = Arc::new(AtomicU8::new(1));
                 app.manage(startup_state.clone());
 
+                let start_minimized = db::get_boolean_app_setting(app.state::<db::Pool>().inner(), "start_minimized")
+                    .await
+                    .unwrap_or_else(|e| {
+                        log::warn!("Failed to read start_minimized setting: {}", e);
+                        false
+                    });
+
+                if !start_minimized {
+                    if let Some(window) = app.get_webview_window("main") {
+                        let _ = window.show();
+                    }
+                }
+
                 let pool_for_tray = app.state::<db::Pool>().inner().clone();
                 let rate_limits_for_tray = app.state::<esi::RateLimitStore>().inner().clone();
 
@@ -364,6 +377,8 @@ pub fn run() {
             commands::remaps::get_plan_remaps,
             commands::remaps::get_character_remaps,
             commands::remaps::delete_remap,
+            commands::settings::get_app_settings,
+            commands::settings::set_boolean_app_setting,
             commands::settings::get_enabled_features,
             commands::settings::set_feature_enabled,
             commands::settings::get_optional_features,

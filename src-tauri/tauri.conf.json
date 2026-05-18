@@ -14,7 +14,8 @@
       {
         "title": "skillmon",
         "width": 1600,
-        "height": 900
+        "height": 900,
+        "visible": false
       }
     ],
     "security": {

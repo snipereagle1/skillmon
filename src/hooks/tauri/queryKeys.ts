@@ -78,6 +78,7 @@ export const queryKeys = {
 
   sdeSkills: () => ['sdeSkills'] as const,
 
+  appSettings: () => ['app-settings'] as const,
   baseScopeStrings: () => ['base-scope-strings'] as const,
   enabledFeatures: () => ['enabled-features'] as const,
   optionalFeatures: () => ['optional-features'] as const,

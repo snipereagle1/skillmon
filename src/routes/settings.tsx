@@ -8,7 +8,10 @@ function SettingsLayout() {
       <div className="border rounded-lg overflow-hidden flex flex-col flex-1">
         <div className="border-b px-4 py-2">
           <NavigationTabs
-            items={[{ to: '/settings/features', label: 'Features' }]}
+            items={[
+              { to: '/settings/general', label: 'General' },
+              { to: '/settings/features', label: 'Features' },
+            ]}
           />
         </div>
         <div className="flex-1 overflow-auto p-4">
