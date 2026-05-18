@@ -151,7 +151,7 @@ export function AccountCard({
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd}
           >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 pl-3">
               <SortableContext
                 items={localCharacters.map((c) => c.character_id)}
                 strategy={horizontalListSortingStrategy}
@@ -203,7 +203,7 @@ export function AccountCard({
               ) : null}
             </DragOverlay>
           </DndContext>
-          <p className="text-xs text-muted-foreground">{account.name}</p>
+          <p className="text-xs text-muted-foreground pl-3">{account.name}</p>
         </div>
       )}
     </Card>
