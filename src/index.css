@@ -58,6 +58,14 @@
   .h-card     { font-family: var(--font-display); font-size: var(--text-lg);  font-weight: var(--weight-semibold); letter-spacing: var(--tracking-normal); }
   .h-nav      { font-family: var(--font-display); font-size: var(--text-sm);  font-weight: var(--weight-semibold); letter-spacing: var(--tracking-wide); }
   .p-overline { font-family: var(--font-sans); font-size: var(--text-xs); font-weight: var(--weight-semibold); color: var(--fg-dim); text-transform: uppercase; letter-spacing: var(--tracking-widest); }
+
+  .p-body     { font-family: var(--font-sans); font-size: var(--text-md); font-weight: var(--weight-regular); }
+  .p-medium   { font-family: var(--font-sans); font-size: var(--text-md); font-weight: var(--weight-medium); }
+  .p-muted    { font-family: var(--font-sans); font-size: var(--text-md); font-weight: var(--weight-regular); color: var(--fg-muted); }
+  .p-meta     { font-family: var(--font-sans); font-size: var(--text-xs); font-weight: var(--weight-regular); color: var(--fg-dim); }
+  .t-mono     { font-family: var(--font-mono); font-size: var(--text-sm); font-variant-numeric: tabular-nums; }
+  .t-mono-sm  { font-family: var(--font-mono); font-size: var(--text-xs); font-variant-numeric: tabular-nums; }
+  .t-numeric  { font-family: var(--font-sans); font-variant-numeric: tabular-nums; }
 }
 
 @theme inline {
@@ -117,10 +125,10 @@
     'Fira Code', ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 
   /* ── Surfaces ── */
-  --bg: #0a141a;
-  --surface: #111f28;
-  --surface-elevated: #192a35;
-  --surface-hover: #213443;
+  --bg: #020507;
+  --surface: #081117;
+  --surface-elevated: #0e1b23;
+  --surface-hover: #132129;
   --overlay: rgba(2, 5, 7, 0.72);
 
   /* ── Brand ── */
@@ -139,9 +147,11 @@
   --fg-faint: #3a4750;
 
   /* ── Edges ── */
+  --border:        rgba(20, 184, 166, 0.14);
   --border-strong: rgba(20, 184, 166, 0.28);
   --border-subtle: rgba(255, 255, 255, 0.06);
-  --input-border: rgba(255, 255, 255, 0.1);
+  --input-border:  rgba(255, 255, 255, 0.1);
+  --ring:          rgba(20, 184, 166, 0.5);
 
   /* ── Status ── */
   --status-training: #10b981;
@@ -225,9 +235,7 @@
   --accent: var(--surface-hover);
   --accent-foreground: var(--fg);
   --destructive: var(--status-danger);
-  --border: rgba(20, 184, 166, 0.14);
   --input: var(--input-border);
-  --ring: rgba(20, 184, 166, 0.5);
   --chart-1: var(--status-training);
   --chart-2: var(--brand);
   --chart-3: var(--status-info);

@@ -115,7 +115,7 @@ export function CharacterQueue({ queue, characterId }: CharacterQueueProps) {
   console.table(queue.queue);
   return (
     <TooltipProvider>
-      <div className="flex flex-col h-full">
+      <div className="flex flex-col h-full bg-card">
         <div className="px-4 py-3 border-b border-border" id="top-bar">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
