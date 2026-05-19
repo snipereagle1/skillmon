@@ -8,7 +8,7 @@ import {
 } from '@/components/ui/sheet';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useDismissNotification } from '@/hooks/tauri/useDismissNotification';
-import { useNotifications } from '@/hooks/tauri/useNotifications';
+import { useNotificationsForCharacter } from '@/stores/notificationsStore';
 
 import { CharacterFilter } from './CharacterFilter';
 import { NotificationList } from './NotificationList';
@@ -28,10 +28,14 @@ export function NotificationDrawer({
     initialSelectedCharacterId ?? null
   );
   const previousInitialIdRef = useRef(initialSelectedCharacterId);
-  const { data: activeNotifications = [], isLoading: isLoadingActive } =
-    useNotifications(filterCharacterId ?? undefined, 'active');
-  const { data: dismissedNotifications = [], isLoading: isLoadingDismissed } =
-    useNotifications(filterCharacterId ?? undefined, 'dismissed');
+  const activeNotifications = useNotificationsForCharacter(
+    filterCharacterId,
+    'active'
+  );
+  const dismissedNotifications = useNotificationsForCharacter(
+    filterCharacterId,
+    'dismissed'
+  );
   const dismissNotification = useDismissNotification();
 
   useEffect(() => {
@@ -47,10 +51,7 @@ export function NotificationDrawer({
   }, [initialSelectedCharacterId]);
 
   const handleDismiss = (id: number) => {
-    dismissNotification.mutate({
-      notificationId: id,
-      characterId: filterCharacterId,
-    });
+    dismissNotification.mutate({ notificationId: id });
   };
 
   return (
@@ -84,33 +85,21 @@ export function NotificationDrawer({
             value="active"
             className="flex-1 overflow-hidden m-0 flex flex-col"
           >
-            {isLoadingActive ? (
-              <div className="flex items-center justify-center h-32 text-muted-foreground">
-                <p>Loading...</p>
-              </div>
-            ) : (
-              <NotificationList
-                notifications={activeNotifications}
-                onDismiss={handleDismiss}
-                canDismiss={true}
-              />
-            )}
+            <NotificationList
+              notifications={activeNotifications}
+              onDismiss={handleDismiss}
+              canDismiss={true}
+            />
           </TabsContent>
           <TabsContent
             value="dismissed"
             className="flex-1 overflow-hidden m-0 flex flex-col"
           >
-            {isLoadingDismissed ? (
-              <div className="flex items-center justify-center h-32 text-muted-foreground">
-                <p>Loading...</p>
-              </div>
-            ) : (
-              <NotificationList
-                notifications={dismissedNotifications}
-                onDismiss={handleDismiss}
-                canDismiss={false}
-              />
-            )}
+            <NotificationList
+              notifications={dismissedNotifications}
+              onDismiss={handleDismiss}
+              canDismiss={false}
+            />
           </TabsContent>
         </Tabs>
       </SheetContent>

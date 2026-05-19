@@ -1,27 +1,15 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation } from '@tanstack/react-query';
 import { invoke } from '@tauri-apps/api/core';
 
-import { queryKeys } from './queryKeys';
+import { useNotificationsStore } from '@/stores/notificationsStore';
 
 export function useDismissNotification() {
-  const queryClient = useQueryClient();
-
   return useMutation({
-    mutationFn: async ({
-      notificationId,
-    }: {
-      notificationId: number;
-      characterId?: number | null;
-    }) => {
+    mutationFn: async ({ notificationId }: { notificationId: number }) => {
       return invoke<void>('dismiss_notification', { notificationId });
     },
-    onSuccess: (_, { characterId }) => {
-      queryClient.invalidateQueries({
-        queryKey:
-          characterId != null
-            ? queryKeys.notifications(characterId)
-            : queryKeys.notifications(),
-      });
+    onMutate: ({ notificationId }) => {
+      useNotificationsStore.getState().markDismissed(notificationId);
     },
   });
 }

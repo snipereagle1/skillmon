@@ -1,15 +1,17 @@
-import type { QueryClient } from '@tanstack/react-query';
+import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
 
 import type {
   AttributesPayload,
   ClonesPayload,
   LocationPayload,
+  NotificationResponse,
   OverviewRow,
   QueuePayload,
   SkillsPayload,
 } from '@/generated/types';
 import { useEsiStore } from '@/stores/esiStore';
+import { useNotificationsStore } from '@/stores/notificationsStore';
 
 export async function listenCharacterChannels(
   characterId: number
@@ -41,15 +43,21 @@ export async function listenCharacterChannels(
 }
 
 export async function bootstrapEsiEvents(
-  queryClient: QueryClient,
   characterIds: number[]
 ): Promise<() => void> {
   const characterCleanups = await Promise.all(
     characterIds.map(listenCharacterChannels)
   );
 
-  const unlistenNotifications = await listen('notifications:new', () => {
-    queryClient.invalidateQueries({ queryKey: ['notifications'] });
+  const unlistenNotifications = await listen<NotificationResponse[]>(
+    'notifications:changed',
+    ({ payload }) => {
+      useNotificationsStore.getState().setAll(payload);
+    }
+  );
+
+  void invoke('request_notifications_snapshot').catch((e) => {
+    console.error('Failed to request notifications snapshot:', e);
   });
 
   return () => {

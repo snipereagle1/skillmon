@@ -58,10 +58,6 @@ export const queryKeys = {
       maxRemaps,
     ] as const,
 
-  notifications: (
-    characterId?: number | null,
-    status?: 'active' | 'dismissed'
-  ) => ['notifications', characterId, status] as const,
   notificationSettings: (characterId: number | null) =>
     ['notificationSettings', characterId] as const,
 

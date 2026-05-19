@@ -1,4 +1,4 @@
-import { useIsFetching, useQueryClient } from '@tanstack/react-query';
+import { useIsFetching } from '@tanstack/react-query';
 import { createRootRoute, Link, Outlet } from '@tanstack/react-router';
 import { invoke } from '@tauri-apps/api/core';
 import { check } from '@tauri-apps/plugin-updater';
@@ -28,7 +28,6 @@ function RootComponent() {
   useAuthEvents();
   const { isStartingUp } = useStartupState();
   const isFetching = useIsFetching();
-  const queryClient = useQueryClient();
   const [addCharacterOpen, setAddCharacterOpen] = useState(false);
   const [notificationDrawerOpen, setNotificationDrawerOpen] = useState(false);
   const { open, skillId, characterId, closeSkillDetail } =
@@ -95,7 +94,7 @@ function RootComponent() {
           }
         }
 
-        cleanup = await bootstrapEsiEvents(queryClient, characterIds);
+        cleanup = await bootstrapEsiEvents(characterIds);
       } catch (err) {
         console.warn('Failed to hydrate ESI store:', err);
       }
@@ -106,7 +105,6 @@ function RootComponent() {
     return () => {
       cleanup?.();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   if (isStartingUp) {
