@@ -100,7 +100,7 @@ export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
   return (
     <div className="flex flex-col h-full space-y-4 p-4">
       <div className="flex justify-between items-center">
-        <h3 className="text-lg font-semibold">Character Progress Comparison</h3>
+        <h3 className="h-section">Character Progress Comparison</h3>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="outline" size="sm">

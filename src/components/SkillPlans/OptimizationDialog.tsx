@@ -303,7 +303,7 @@ export function OptimizationDialog({
                   </div>
 
                   {timeSaved > 0 ? (
-                    <div className="flex items-center gap-2 text-green-600 dark:text-green-400 bg-green-500/10 p-3 rounded-md text-sm font-medium">
+                    <div className="flex items-center gap-2 text-status-info bg-status-info-soft p-3 rounded-md text-sm font-medium">
                       <Check className="h-4 w-4" />
                       Total savings: {formatDuration(timeSaved)}
                     </div>
@@ -408,7 +408,7 @@ export function OptimizationDialog({
                         })}
                       />
                     )}
-                    <div className="mt-4 p-3 bg-blue-500/5 border border-blue-500/20 rounded-md text-xs text-blue-600 dark:text-blue-400">
+                    <div className="mt-4 p-3 bg-primary/5 border border-primary/20 rounded-md text-xs text-primary">
                       <strong>Note:</strong> Up to {maxRemaps} remap
                       {maxRemaps > 1 ? 's' : ''} will be automatically scheduled
                       to match the new skill order.

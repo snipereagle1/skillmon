@@ -115,7 +115,7 @@ export function PlanList() {
                   relative flex items-center rounded-md transition-colors
                   ${
                     selectedPlanId === plan.plan_id
-                      ? 'bg-muted text-white'
+                      ? 'bg-muted text-foreground'
                       : 'hover:bg-muted'
                   }
                 `}
@@ -126,12 +126,12 @@ export function PlanList() {
                   className="flex-1 block p-3 min-w-0"
                 >
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold truncate">{plan.name}</h3>
+                    <h3 className="h-card truncate">{plan.name}</h3>
                     {plan.description && (
                       <p
                         className={`text-sm mt-1 line-clamp-2 ${
                           selectedPlanId === plan.plan_id
-                            ? 'text-white/80'
+                            ? 'text-foreground/80'
                             : 'text-muted-foreground'
                         }`}
                       >
@@ -147,7 +147,7 @@ export function PlanList() {
                   disabled={deletePlanMutation.isPending}
                   className={`
                     absolute right-2 top-3 shrink-0 size-6 p-0 hover:bg-destructive hover:text-destructive-foreground
-                    ${selectedPlanId === plan.plan_id ? 'text-white/60' : ''}
+                    ${selectedPlanId === plan.plan_id ? 'text-foreground/60' : ''}
                   `}
                 >
                   ×

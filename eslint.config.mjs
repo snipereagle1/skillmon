@@ -95,6 +95,8 @@ export default [
       'src-tauri/**',
       '*.config.{js,ts,mjs}',
       'src/components/ui/**',
+      'e2e/**',
+      '.claude/**',
     ],
   },
 ];

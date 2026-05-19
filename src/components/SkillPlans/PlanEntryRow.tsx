@@ -4,6 +4,7 @@ import { GripVertical, MoreHorizontal } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 
+import { SkillLevelPips } from '@/components/SkillLevelPips';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -34,7 +35,6 @@ import { cn, formatNumber, toRoman } from '@/lib/utils';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
 import { RemapRow } from '../Remaps/RemapRow';
-import { LevelIndicator } from '../SkillQueue/LevelIndicator';
 
 interface PlanEntryRowProps {
   entry: SkillPlanEntryResponse;
@@ -254,7 +254,7 @@ export function PlanEntryRow({
             validationStatus === 'error' &&
               'bg-destructive/10 border-destructive/50',
             validationStatus === 'warning' &&
-              'bg-yellow-500/10 border-yellow-500/50'
+              'bg-status-paused-soft border-status-paused/50'
           )}
         >
           <div className="flex items-center justify-between gap-4 relative z-10">
@@ -265,21 +265,19 @@ export function PlanEntryRow({
                 className={cn(
                   'cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-muted rounded',
                   validationStatus === 'error' && 'text-destructive',
-                  validationStatus === 'warning' &&
-                    'text-yellow-600 dark:text-yellow-500'
+                  validationStatus === 'warning' && 'text-status-paused'
                 )}
               >
                 <GripVertical className="h-4 w-4" />
               </div>
-              <LevelIndicator level={entry.planned_level} />
+              <SkillLevelPips queuedLevel={entry.planned_level} />
               <div className="flex flex-col flex-1 min-w-0">
                 <span
                   className={cn(
                     'text-foreground font-medium truncate cursor-pointer hover:underline',
                     isPrerequisite && 'text-muted-foreground',
                     validationStatus === 'error' && 'text-destructive',
-                    validationStatus === 'warning' &&
-                      'text-yellow-600 dark:text-yellow-500'
+                    validationStatus === 'warning' && 'text-status-paused'
                   )}
                   onClick={() => openSkillDetail(entry.skill_type_id, null)}
                 >
@@ -341,7 +339,7 @@ export function PlanEntryRow({
           <div className="absolute bottom-0 left-0 right-0 h-0.5 pointer-events-none">
             {offsetPercentage > 0 && (
               <div
-                className="absolute h-full bg-blue-400/20 dark:bg-blue-500/20"
+                className="absolute h-full bg-primary/20"
                 style={{ left: '0%', width: `${offsetPercentage}%` }}
               />
             )}
@@ -349,9 +347,7 @@ export function PlanEntryRow({
               <div
                 className={cn(
                   'absolute h-full',
-                  isPrerequisite
-                    ? 'bg-muted-foreground/50'
-                    : 'bg-blue-400 dark:bg-blue-500'
+                  isPrerequisite ? 'bg-muted-foreground/50' : 'bg-primary'
                 )}
                 style={{
                   left: `${offsetPercentage}%`,

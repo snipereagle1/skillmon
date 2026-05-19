@@ -1,13 +1,13 @@
 import { useMemo, useState } from 'react';
 import { match, P } from 'ts-pattern';
 
+import { SkillLevelPips } from '@/components/SkillLevelPips';
 import type { PlanComparisonEntry } from '@/generated/types';
 import { usePlanComparison } from '@/hooks/tauri/usePlanComparison';
 import { useSkillPlans } from '@/hooks/tauri/useSkillPlans';
 import { cn, formatSkillpoints, toRoman } from '@/lib/utils';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
-import { LevelIndicator } from './SkillQueue/LevelIndicator';
 import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 
@@ -33,8 +33,8 @@ function ComparisonEntryRow({
   );
 
   const statusBgColors = {
-    complete: 'bg-green-400/20',
-    in_progress: 'bg-yellow-400/20',
+    complete: 'bg-status-training-soft',
+    in_progress: 'bg-status-paused-soft',
     not_started: 'bg-muted/30',
   };
 
@@ -52,7 +52,7 @@ function ComparisonEntryRow({
     >
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-3 flex-1 min-w-0">
-          <LevelIndicator level={entry.planned_level} />
+          <SkillLevelPips queuedLevel={entry.planned_level} />
           <div className="flex flex-col flex-1 min-w-0">
             <span
               className={cn(
@@ -76,7 +76,7 @@ function ComparisonEntryRow({
               {entry.missing_skillpoints > 0 && (
                 <>
                   <span>•</span>
-                  <span className="text-yellow-400">
+                  <span className="text-status-paused">
                     Missing: {formatSkillpoints(entry.missing_skillpoints)}
                   </span>
                 </>
@@ -141,10 +141,10 @@ export function CharacterPlanComparison({
   }
 
   return (
-    <div className="flex h-full min-h-0">
+    <div className="flex h-full min-h-0 bg-card">
       <div className="w-64 border-r border-border shrink-0 overflow-hidden flex flex-col">
         <div className="p-4 border-b border-border">
-          <h2 className="font-semibold text-sm">Skill Plans</h2>
+          <h2 className="h-nav">Skill Plans</h2>
         </div>
         <div className="flex-1 overflow-y-auto">
           {match({ isLoadingPlans, plans })
@@ -171,20 +171,18 @@ export function CharacterPlanComparison({
                     className={cn(
                       'p-3 rounded-md cursor-pointer transition-colors',
                       selectedPlanId === plan.plan_id
-                        ? 'bg-muted text-white'
+                        ? 'bg-muted text-foreground'
                         : 'hover:bg-muted'
                     )}
                   >
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold truncate text-sm">
-                        {plan.name}
-                      </h3>
+                      <h3 className="h-nav truncate">{plan.name}</h3>
                       {plan.description && (
                         <p
                           className={cn(
                             'text-xs mt-1 line-clamp-2',
                             selectedPlanId === plan.plan_id
-                              ? 'text-white/80'
+                              ? 'text-foreground/80'
                               : 'text-muted-foreground'
                           )}
                         >
@@ -223,9 +221,7 @@ export function CharacterPlanComparison({
               <div className="border-b border-border p-4 space-y-3 shrink-0">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <h2 className="text-lg font-semibold truncate">
-                      {comp.plan.name}
-                    </h2>
+                    <h2 className="h-card truncate">{comp.plan.name}</h2>
                     {comp.plan.description && (
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
                         {comp.plan.description}
@@ -244,7 +240,7 @@ export function CharacterPlanComparison({
                     <div className="text-xs text-muted-foreground">
                       Complete
                     </div>
-                    <div className="text-lg font-semibold text-green-400">
+                    <div className="text-lg font-semibold text-status-training">
                       {stats.complete}
                     </div>
                   </div>
@@ -252,7 +248,7 @@ export function CharacterPlanComparison({
                     <div className="text-xs text-muted-foreground">
                       In Progress
                     </div>
-                    <div className="text-lg font-semibold text-yellow-400">
+                    <div className="text-lg font-semibold text-status-paused">
                       {stats.in_progress}
                     </div>
                   </div>
@@ -270,7 +266,7 @@ export function CharacterPlanComparison({
                     <span className="text-muted-foreground">
                       Total Missing SP:{' '}
                     </span>
-                    <span className="font-semibold text-yellow-400">
+                    <span className="font-semibold text-status-paused">
                       {formatSkillpoints(stats.totalMissingSP)}
                     </span>
                   </div>

@@ -45,7 +45,7 @@ export function OverviewTableRow({ character }: OverviewTableRowProps) {
           <span className="text-muted-foreground">—</span>
         )}
       </TableCell>
-      <TableCell>
+      <TableCell className="tabular-nums">
         {character.queueTimeRemainingSeconds != null
           ? formatDuration(character.queueTimeRemainingSeconds, {
               showSeconds: false,
@@ -58,10 +58,12 @@ export function OverviewTableRow({ character }: OverviewTableRowProps) {
       </TableCell>
       <TableCell>
         <div className="flex items-center gap-1.5">
-          <span>{formatNumber(Math.round(character.spPerHour))} SP/hr</span>
+          <span className="tabular-nums">
+            {formatNumber(Math.round(character.spPerHour))} SP/hr
+          </span>
           {!character.isOmega && (
             <span title="Alpha Clone">
-              <AlphaIcon className="h-4 w-4 text-white" />
+              <AlphaIcon className="h-4 w-4 text-primary-foreground" />
             </span>
           )}
         </div>

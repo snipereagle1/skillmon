@@ -47,7 +47,7 @@ export function PlanRemapsTab({ planId }: PlanRemapsTabProps) {
     <div className="p-4 space-y-6">
       <div className="flex items-center justify-between px-1">
         <div className="space-y-1">
-          <h3 className="text-lg font-semibold">Plan Remap Schedule</h3>
+          <h3 className="h-section">Plan Remap Schedule</h3>
           <p className="text-sm text-muted-foreground">
             Saved remaps that will be applied during simulation of this plan.
           </p>

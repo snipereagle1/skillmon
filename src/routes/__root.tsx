@@ -124,7 +124,7 @@ function RootComponent() {
 
   return (
     <div className="flex flex-col h-screen bg-background text-foreground">
-      <div className="flex items-center justify-between border-b px-4 py-2">
+      <div className="flex items-center justify-between border-b px-4 py-2 bg-card">
         <NavigationTabs
           items={[
             { to: '/overview', label: 'Overview' },
@@ -143,7 +143,7 @@ function RootComponent() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="text-green-500 hover:text-green-600 hover:bg-green-100/50"
+                className="text-primary hover:text-brand-hover hover:bg-brand-glow-soft"
                 title="Update available"
               >
                 <Download className="h-5 w-5" />

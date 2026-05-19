@@ -1,13 +1,12 @@
 import { invoke } from '@tauri-apps/api/core';
 import { useEffect, useState } from 'react';
 
+import { SkillLevelPips } from '@/components/SkillLevelPips';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { SimulationProfile, SimulationResult } from '@/generated/types';
 import { formatDuration } from '@/lib/utils';
-
-import { LevelIndicator } from '../SkillQueue/LevelIndicator';
 
 const ATTRIBUTE_NAME_MAP: Record<number, string> = {
   164: 'Charisma',
@@ -46,8 +45,8 @@ export function SimulationTimeline({
   return (
     <Card className="h-full flex flex-col overflow-hidden">
       <CardHeader className="shrink-0">
-        <CardTitle>Simulation Results</CardTitle>
-        <div className="text-2xl font-bold">
+        <CardTitle className="h-card">Simulation Results</CardTitle>
+        <div className="h-page">
           Total Time: {formatDuration(result.total_seconds)}
         </div>
       </CardHeader>
@@ -86,7 +85,7 @@ export function SimulationTimeline({
                   {remapAtThisEntry && (
                     <div className="mb-2">
                       <Badge variant="secondary" className="gap-1.5 py-1">
-                        <div className="h-2 w-2 rounded-full bg-blue-500" />
+                        <div className="h-2 w-2 rounded-full bg-primary" />
                         Remap: {remapAtThisEntry.attributes.intelligence}/
                         {remapAtThisEntry.attributes.memory}/
                         {remapAtThisEntry.attributes.perception}/
@@ -97,7 +96,7 @@ export function SimulationTimeline({
                   )}
                   <div className="flex items-center justify-between gap-4 relative z-10">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <LevelIndicator level={segment.level} />
+                      <SkillLevelPips queuedLevel={segment.level} />
                       <div className="flex flex-col flex-1 min-w-0">
                         <span className="text-foreground font-medium truncate">
                           {skillNames[segment.skill_type_id] ||
@@ -131,13 +130,13 @@ export function SimulationTimeline({
                   <div className="absolute bottom-0 left-0 right-0 h-0.5 pointer-events-none">
                     {offsetPercentage > 0 && (
                       <div
-                        className="absolute h-full bg-blue-400/20 dark:bg-blue-500/20"
+                        className="absolute h-full bg-primary/20"
                         style={{ left: '0%', width: `${offsetPercentage}%` }}
                       />
                     )}
                     {spPercentage > 0 && (
                       <div
-                        className="absolute h-full bg-blue-400 dark:bg-blue-500"
+                        className="absolute h-full bg-primary"
                         style={{
                           left: `${offsetPercentage}%`,
                           width: `${spPercentage}%`,

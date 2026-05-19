@@ -98,7 +98,11 @@ fn compute_breakdown_from_db_attrs(
         .unwrap_or(0);
     let max_accelerator = *remainders.iter().min().unwrap_or(&0);
 
-    let mut accelerator = min_accelerator;
+    // Default to no accelerator; only commit if the math finds a consistent solution.
+    // Stale implant data causes min_accelerator > max_accelerator (impossible range), which
+    // would leave a non-zero min_accelerator as a false positive — mirror the alpha-detection
+    // fail-safe: assume absent unless evidence supports it.
+    let mut accelerator = 0i64;
     let mut remaps = [0i64; 5];
 
     for test_acc in min_accelerator..=max_accelerator {

@@ -69,8 +69,10 @@ export function SortableUnassignedCharacter({
         >
           <Card
             className={cn(
-              'p-3 cursor-pointer transition-all hover:shadow-md',
-              isSelected && 'bg-muted/50'
+              'p-3 cursor-pointer transition-all border-transparent shadow-none',
+              isSelected
+                ? 'border-border-strong bg-muted/50'
+                : 'hover:bg-muted/30'
             )}
           >
             <div className="flex items-center gap-2">

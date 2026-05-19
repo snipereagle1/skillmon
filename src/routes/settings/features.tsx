@@ -59,7 +59,7 @@ function FeaturesPage() {
   return (
     <div className="max-w-7xl space-y-6">
       <div>
-        <h2 className="text-2xl font-bold mb-1">Optional Features</h2>
+        <h2 className="h-page mb-1">Optional Features</h2>
         <p className="text-muted-foreground">
           Enable optional features to request additional permissions from EVE
           Online.
@@ -115,7 +115,7 @@ function FeaturesPage() {
 
       {enabledFeatures && enabledFeatures.length > 0 && (
         <div className="pt-4 border-t">
-          <h3 className="text-lg font-semibold mb-4">Feature Availability</h3>
+          <h3 className="h-section mb-4">Feature Availability</h3>
           {scopeStatusData && scopeStatusData.length > 0 ? (
             <Table>
               <TableHeader>
@@ -147,7 +147,7 @@ function FeaturesPage() {
                       return (
                         <TableCell key={featureId} className="text-center">
                           {hasScopes ? (
-                            <CircleCheck className="h-5 w-5 text-green-500 mx-auto" />
+                            <CircleCheck className="h-5 w-5 text-status-training mx-auto" />
                           ) : (
                             <CircleSlash className="h-5 w-5 text-muted-foreground mx-auto" />
                           )}

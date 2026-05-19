@@ -6,8 +6,8 @@ import { PlanList } from '@/components/SkillPlans/PlanList';
 function PlanDetailPage() {
   const { planId } = Route.useParams();
   return (
-    <div className="flex h-full min-h-0">
-      <div className="w-64 border-r border-border shrink-0 overflow-hidden flex flex-col">
+    <div className="flex h-full min-h-0 bg-card">
+      <div className="w-64 border-r border-border shrink-0 overflow-hidden flex flex-col bg-card">
         <PlanList />
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">

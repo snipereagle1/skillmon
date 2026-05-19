@@ -232,9 +232,7 @@ export function SimulationPanel({
             <>
               <Separator className="my-2" />
               <div className="space-y-3">
-                <Label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                  Saved Plan Remaps
-                </Label>
+                <Label className="p-overline">Saved Plan Remaps</Label>
                 {savedRemaps.map((remap) => {
                   const skillName = entries.find(
                     (e) =>

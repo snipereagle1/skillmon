@@ -38,12 +38,12 @@ export function SkillCategoryItem({
       <div className="absolute inset-0 bg-primary/20 rounded-md z-0" />
       {/* Trained progress bar fill */}
       <div
-        className="absolute inset-y-0 left-0 bg-primary/30 transition-all rounded-l-md z-0"
+        className="absolute inset-y-0 left-0 bg-primary/30 transition-[width] rounded-l-md z-0"
         style={{ width: `${trainedPercentage}%` }}
       />
       {/* Planned progress bar fill - starting from trained percentage */}
       <div
-        className="absolute inset-y-0 bg-yellow-400/30 transition-all z-0"
+        className="absolute inset-y-0 bg-primary/15 transition-[width,left] z-0"
         style={{
           left: `${trainedPercentage}%`,
           width: `${plannedPercentage}%`,

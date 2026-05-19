@@ -89,93 +89,93 @@ function AboutPage() {
   };
 
   return (
-    <div className="flex flex-col gap-8 p-8 max-w-2xl mx-auto overflow-y-auto h-full">
-      <div className="flex items-start justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight mb-2">
-            About Skillmon
-          </h2>
-          <p className="text-muted-foreground text-lg">
-            A modern EVE Online skill monitoring and planning application.
-          </p>
-        </div>
-        <img src="/skillmon.svg" alt="Skillmon Logo" className="w-16 h-16" />
-      </div>
-
-      <div className="space-y-4">
-        <div className="flex items-center justify-between border-b pb-4">
+    <div className="h-full overflow-y-auto p-6">
+      <div className="flex flex-col gap-8 p-8 max-w-2xl mx-auto bg-card border rounded-lg">
+        <div className="flex items-start justify-between">
           <div>
-            <h3 className="text-lg font-medium">Version</h3>
-            <p className="text-muted-foreground font-mono">
-              {version || 'Loading...'}
+            <h2 className="h-display mb-2">About Skillmon</h2>
+            <p className="text-muted-foreground text-lg">
+              A modern EVE Online skill monitoring and planning application.
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleCheckUpdate}
-            disabled={checking || downloading}
-            className="gap-2"
-          >
-            <RefreshCw className={cn('h-4 w-4', checking && 'animate-spin')} />
-            Check for updates
-          </Button>
+          <img src="/skillmon.svg" alt="Skillmon Logo" className="w-16 h-16" />
         </div>
 
-        {updateAvailable && update && (
-          <div className="bg-accent/50 rounded-lg p-4 border border-green-500/20 space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-green-600 dark:text-green-400">
-                  New Version Available: v{update.version}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  Released on {formatDate(update.date || '')}
-                </p>
-              </div>
-              <Button
-                onClick={handleInstallUpdate}
-                disabled={downloading}
-                className="gap-2 bg-green-600 hover:bg-green-700 text-white"
-              >
-                <Download className="h-4 w-4" />
-                {downloading ? 'Downloading...' : 'Install Update'}
-              </Button>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between border-b pb-4">
+            <div>
+              <h3 className="h-card">Version</h3>
+              <p className="text-muted-foreground font-mono">
+                {version || 'Loading...'}
+              </p>
             </div>
-
-            {downloading && downloadProgress !== null && (
-              <div className="space-y-2">
-                <div className="h-2 bg-background rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-green-500 transition-all duration-300"
-                    style={{ width: `${downloadProgress}%` }}
-                  />
-                </div>
-                <p className="text-xs text-center text-muted-foreground">
-                  {downloadProgress}% downloaded
-                </p>
-              </div>
-            )}
-
-            {update.body && (
-              <div className="space-y-2">
-                <h4 className="text-sm font-medium uppercase tracking-wider text-muted-foreground">
-                  What&apos;s New
-                </h4>
-                <div className="text-sm prose prose-sm dark:prose-invert max-w-none bg-background/50 rounded p-3 border whitespace-pre-wrap">
-                  {update.body}
-                </div>
-              </div>
-            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleCheckUpdate}
+              disabled={checking || downloading}
+              className="gap-2"
+            >
+              <RefreshCw
+                className={cn('h-4 w-4', checking && 'animate-spin')}
+              />
+              Check for updates
+            </Button>
           </div>
-        )}
 
-        {!updateAvailable && (
-          <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <div className="h-1.5 w-1.5 rounded-full bg-green-500" />
-            You&apos;re up to date
-          </div>
-        )}
+          {updateAvailable && update && (
+            <div className="bg-accent/50 rounded-lg p-4 border border-green-500/20 space-y-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="h-card text-status-training">
+                    New Version Available: v{update.version}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    Released on {formatDate(update.date || '')}
+                  </p>
+                </div>
+                <Button
+                  onClick={handleInstallUpdate}
+                  disabled={downloading}
+                  className="gap-2 bg-primary hover:bg-brand-hover text-primary-foreground"
+                >
+                  <Download className="h-4 w-4" />
+                  {downloading ? 'Downloading...' : 'Install Update'}
+                </Button>
+              </div>
+
+              {downloading && downloadProgress !== null && (
+                <div className="space-y-2">
+                  <div className="h-2 bg-background rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-status-training transition-all duration-300"
+                      style={{ width: `${downloadProgress}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-center text-muted-foreground">
+                    {downloadProgress}% downloaded
+                  </p>
+                </div>
+              )}
+
+              {update.body && (
+                <div className="space-y-2">
+                  <h4 className="p-overline">What&apos;s New</h4>
+                  <div className="text-sm prose prose-sm prose-invert max-w-none bg-background/50 rounded p-3 border whitespace-pre-wrap">
+                    {update.body}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
+          {!updateAvailable && (
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <div className="h-1.5 w-1.5 rounded-full bg-status-training" />
+              You&apos;re up to date
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

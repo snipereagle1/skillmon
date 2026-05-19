@@ -2,6 +2,7 @@ import { Check, OmegaIcon } from 'lucide-react';
 import { useState } from 'react';
 import { match, P } from 'ts-pattern';
 
+import { SkillLevelPips } from '@/components/SkillLevelPips';
 import {
   Accordion,
   AccordionContent,
@@ -60,10 +61,10 @@ export function SkillDetail({
             .with({ isLoading: false, data: P.not(P.nullish) }, ({ data }) => (
               <div className="flex flex-col flex-1 min-h-0 overflow-hidden">
                 <SheetHeader className="shrink-0 pb-2">
-                  <SheetTitle className="text-xl flex items-center gap-2">
+                  <SheetTitle className="h-section flex items-center gap-2">
                     {data.skill_name}
                     {data.requires_omega && (
-                      <OmegaIcon className="w-4 h-4 text-yellow-500" />
+                      <OmegaIcon className="w-4 h-4 text-status-omega" />
                     )}
                   </SheetTitle>
                   <p className="text-sm text-muted-foreground">
@@ -176,43 +177,20 @@ export function SkillDetail({
                             >
                               <div className="flex items-center gap-2">
                                 {req.is_met && (
-                                  <Check className="h-4 w-4 text-green-500" />
+                                  <Check className="h-4 w-4 text-status-training" />
                                 )}
                                 <span className="text-sm font-medium">
                                   {req.required_skill_name}
                                 </span>
                               </div>
-                              <div className="flex gap-1">
-                                {[1, 2, 3, 4, 5].map((level) => {
-                                  const className = match({
-                                    levelMet: level <= req.required_level,
-                                    isMet: req.is_met,
-                                  })
-                                    .with(
-                                      { levelMet: true, isMet: true },
-                                      () => 'bg-white border-white'
-                                    )
-                                    .with(
-                                      { levelMet: true, isMet: false },
-                                      () => 'bg-yellow-500 border-yellow-500'
-                                    )
-                                    .with(
-                                      { levelMet: false },
-                                      () => 'bg-muted border-border'
-                                    )
-                                    .exhaustive();
-
-                                  return (
-                                    <div
-                                      key={level}
-                                      className={cn(
-                                        'w-4 h-4 border rounded-sm',
-                                        className
-                                      )}
-                                    />
-                                  );
-                                })}
-                              </div>
+                              <SkillLevelPips
+                                trainedLevel={
+                                  req.is_met ? req.required_level : 0
+                                }
+                                plannedLevel={
+                                  req.is_met ? undefined : req.required_level
+                                }
+                              />
                             </div>
                           ))
                         )}

@@ -53,18 +53,21 @@ function getTrainingStatus(
   return 'paused';
 }
 
-function getBorderColor(status: TrainingStatus): string {
-  switch (status) {
-    case 'training':
-      return 'border-green-500';
-    case 'empty':
-      return 'border-orange-500';
-    case 'paused':
-      return 'border-yellow-500';
-    default:
-      return 'border-border';
-  }
-}
+const PIP_CLASS: Record<TrainingStatus, string | null> = {
+  training: 'bg-status-training',
+  paused: 'bg-status-paused',
+  empty: null,
+};
+
+const SIZE_CLASS: Record<number, string> = {
+  32: 'size-8',
+  48: 'size-12',
+  64: 'size-16',
+  128: 'size-32',
+  256: 'size-64',
+  512: 'size-[512px]',
+  1024: 'size-[1024px]',
+};
 
 const VALID_SIZES = [32, 64, 128, 256, 512, 1024];
 
@@ -86,20 +89,35 @@ export function CharacterPortrait({
   className,
 }: CharacterPortraitProps) {
   const status = getTrainingStatus(skillQueue, isPaused);
-  const borderColor = getBorderColor(status);
+  const pipClass = PIP_CLASS[status];
   const validSize = getValidSize(size);
-  const displaySize = size;
+  const sizeClass = SIZE_CLASS[size] ?? `size-[${size}px]`;
 
   const portraitUrl = `https://images.evetech.net/characters/${character.character_id}/portrait?size=${validSize}`;
 
   return (
-    <img
-      src={portraitUrl}
-      alt={character.character_name}
-      className={cn('rounded border-2 shrink-0', borderColor, className)}
-      width={displaySize}
-      height={displaySize}
-      loading="lazy"
-    />
+    <div
+      className={cn(
+        'relative shrink-0 overflow-hidden rounded-sm shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]',
+        sizeClass,
+        className
+      )}
+    >
+      <img
+        src={portraitUrl}
+        alt={character.character_name}
+        className="block h-full w-full object-cover"
+        loading="lazy"
+      />
+      {pipClass && (
+        <span
+          aria-hidden="true"
+          className={cn(
+            'absolute bottom-0 right-0 size-[10px] rounded-sm',
+            pipClass
+          )}
+        />
+      )}
+    </div>
   );
 }

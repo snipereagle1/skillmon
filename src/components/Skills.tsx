@@ -31,11 +31,11 @@ export function Skills({
   const charSkillsQuery = useCharacterSkills(characterId);
   const sdeSkillsQuery = useSdeSkills();
 
-  // Use SDE skills if characterId is null, otherwise use character skills
   const isSdeMode = characterId === null;
-  const { data, isLoading, error } = isSdeMode
-    ? sdeSkillsQuery
-    : charSkillsQuery;
+
+  const error = isSdeMode
+    ? sdeSkillsQuery.error
+    : (sdeSkillsQuery.error ?? charSkillsQuery.error);
 
   const [selectedGroupId, setSelectedGroupId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState<string>('');
@@ -46,24 +46,48 @@ export function Skills({
   );
   const hasInitializedRef = useRef(false);
   const normalizedData = useMemo(() => {
-    if (!data) return null;
+    const sdeData = sdeSkillsQuery.data;
+    if (!sdeData) return null;
+
     if (isSdeMode) {
-      return data as CharacterSkillsResponse;
+      return sdeData as CharacterSkillsResponse;
     }
 
-    const payload = data as SkillsPayload;
-    const skills: CharacterSkillResponse[] = payload.skills.map((skill) => ({
-      skill_id: skill.skillId,
-      skill_name: skill.skillName ?? `Skill ${skill.skillId}`,
-      group_id: skill.groupId ?? 0,
-      group_name: skill.groupName ?? 'Unknown Group',
-      trained_skill_level: skill.trainedSkillLevel,
-      active_skill_level: skill.activeSkillLevel,
-      skillpoints_in_skill: skill.skillpointsInSkill,
-      is_in_queue: skill.isInQueue,
-      queue_level: undefined,
-      is_injected: skill.isInjected,
-    }));
+    const charPayload = charSkillsQuery.data as SkillsPayload | null;
+    const trainedMap = new Map<
+      number,
+      {
+        trainedLevel: number;
+        activeLevel: number;
+        spInSkill: number;
+        isInQueue: boolean;
+        isInjected: boolean;
+      }
+    >();
+    if (charPayload) {
+      for (const skill of charPayload.skills) {
+        trainedMap.set(skill.skillId, {
+          trainedLevel: skill.trainedSkillLevel,
+          activeLevel: skill.activeSkillLevel,
+          spInSkill: skill.skillpointsInSkill,
+          isInQueue: skill.isInQueue,
+          isInjected: skill.isInjected,
+        });
+      }
+    }
+
+    const skills: CharacterSkillResponse[] = sdeData.skills.map((skill) => {
+      const trained = trainedMap.get(skill.skill_id);
+      return {
+        ...skill,
+        trained_skill_level: trained?.trainedLevel ?? 0,
+        active_skill_level: trained?.activeLevel ?? 0,
+        skillpoints_in_skill: trained?.spInSkill ?? 0,
+        is_in_queue: trained?.isInQueue ?? false,
+        queue_level: undefined,
+        is_injected: trained?.isInjected ?? false,
+      };
+    });
 
     const groupMap = new Map<number, SkillGroupResponse>();
     for (const skill of skills) {
@@ -84,13 +108,13 @@ export function Skills({
     }
 
     return {
-      character_id: payload.characterId,
+      character_id: characterId,
       skills,
       groups: Array.from(groupMap.values()).sort((a, b) =>
         a.group_name.localeCompare(b.group_name)
       ),
     } satisfies CharacterSkillsResponse;
-  }, [data, isSdeMode]);
+  }, [sdeSkillsQuery.data, isSdeMode, charSkillsQuery.data, characterId]);
 
   useEffect(() => {
     if (
@@ -124,7 +148,7 @@ export function Skills({
     return map;
   }, [plannedSkills, normalizedData]);
 
-  if (isLoading) {
+  if (sdeSkillsQuery.isLoading || (!isSdeMode && charSkillsQuery.isLoading)) {
     return (
       <div className="flex items-center justify-center h-full">
         <p className="text-muted-foreground">Loading skills...</p>
@@ -213,7 +237,7 @@ export function Skills({
   };
 
   return (
-    <div className="@container flex flex-col h-full min-h-0">
+    <div className="@container flex flex-col h-full min-h-0 bg-card">
       {/* Search section */}
       <div className="border-b border-border p-2 shrink-0">
         <div className="relative">
