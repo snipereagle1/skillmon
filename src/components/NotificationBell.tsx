@@ -2,18 +2,14 @@ import { Bell } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { useNotifications } from '@/hooks/tauri/useNotifications';
+import { useUnreadCount } from '@/stores/notificationsStore';
 
 interface NotificationBellProps {
   onOpen: () => void;
 }
 
 export function NotificationBell({ onOpen }: NotificationBellProps) {
-  const { data: activeNotifications = [] } = useNotifications(
-    undefined,
-    'active'
-  );
-  const activeCount = activeNotifications.length;
+  const activeCount = useUnreadCount();
 
   return (
     <Button variant="ghost" size="icon" onClick={onOpen} className="relative">

@@ -47,6 +47,13 @@ pub fn run() {
             tauri::async_runtime::block_on(async {
                 let pool = db::init_db(app.handle()).await?;
                 app.manage(pool);
+
+                match db::cleanup_old_dismissed_notifications(app.state::<db::Pool>().inner()).await
+                {
+                    Ok(n) => log::info!("Cleaned up {} old dismissed notifications", n),
+                    Err(e) => log::warn!("Failed to clean up old notifications: {}", e),
+                }
+
                 app.manage(AuthStateMap::default());
                 app.manage(Arc::new(tokio::sync::RwLock::new(
                     std::collections::HashMap::<
@@ -250,7 +257,7 @@ pub fn run() {
                                     if let Err(e) = processor
                                         .process_data_updated(
                                             &ctx,
-                                            &payload.data_type,
+                                            payload.data_type,
                                             payload.character_id,
                                         )
                                         .await
@@ -357,8 +364,8 @@ pub fn run() {
             commands::clones::update_clone_name,
             commands::sde::get_type_names,
             commands::rate_limits::get_rate_limits,
-            commands::notifications::get_notifications,
             commands::notifications::dismiss_notification,
+            commands::notifications::request_notifications_snapshot,
             commands::notifications::get_notification_settings,
             commands::notifications::upsert_notification_setting,
             commands::skill_plans::create_skill_plan,

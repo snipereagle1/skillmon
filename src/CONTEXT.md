@@ -12,6 +12,8 @@ React 19 + TypeScript frontend for skillmon. Always load `docs/context/eve.md` f
 
 **Update store** — the Zustand store (`updateStore`) tracking app update availability and metadata.
 
+**Notifications store** — the Zustand store (`notificationsStore`) holding the full notification list (active + dismissed) for all characters. Populated by a single `notifications:changed` Tauri event whose payload is the complete snapshot. Hydrated at startup by a backend-emitted snapshot; re-emitted after every create, clear, or dismiss. Read via selectors (`useActiveNotifications`, `useNotificationsForCharacter`, `useUnreadCount`). Never fetched via React Query — see `docs/adr/0001-notifications-via-zustand.md`.
+
 **Tauri command** — a Rust function exposed to the frontend via `invoke()`. Typed wrappers live in `src/hooks/tauri/`.
 
 **Route** — a TanStack Router file-based route under `src/routes/`. The route tree is auto-generated; never edit `routeTree.gen.ts`.

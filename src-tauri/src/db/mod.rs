@@ -45,9 +45,9 @@ pub use enabled_features::{
 };
 pub use locations::{get_station, get_structure, upsert_station, upsert_structure};
 pub use notifications::{
-    clear_notification, create_notification, dismiss_notification, get_notification_setting,
-    get_notification_settings, get_notifications, upsert_notification_setting, Notification,
-    NotificationSetting,
+    cleanup_old_dismissed_notifications, clear_notification, create_notification,
+    dismiss_notification, get_notification_setting, get_notification_settings, get_notifications,
+    has_active_notification, upsert_notification_setting, Notification, NotificationSetting,
 };
 pub use sde::{get_skill_groups_for_category, get_skills_for_group};
 pub use tokens::{get_tokens, set_tokens, update_tokens};
