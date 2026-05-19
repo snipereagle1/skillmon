@@ -98,7 +98,7 @@ export function CharacterPortrait({
   return (
     <div
       className={cn(
-        'relative shrink-0 overflow-hidden rounded-sm shadow-[inset_0_0_0_1px_var(--border)]',
+        'relative shrink-0 overflow-hidden rounded-sm shadow-[inset_0_0_0_1px_rgba(255,255,255,0.1)]',
         sizeClass,
         className
       )}

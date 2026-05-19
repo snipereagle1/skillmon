@@ -85,7 +85,7 @@ export function CharacterCard({
   return (
     <Card
       className={cn(
-        'cursor-pointer transition-all hover:shadow-md py-4',
+        'cursor-pointer transition-[box-shadow,background-color] hover:shadow-md py-4',
         isSelected && 'bg-muted/50'
       )}
       onClick={onClick}

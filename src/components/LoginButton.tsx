@@ -34,7 +34,7 @@ export function LoginButton() {
       <button
         onClick={handleLogin}
         disabled={loginMutation.isPending}
-        className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50"
+        className="px-4 py-2 bg-primary text-primary-foreground rounded hover:bg-primary/90 disabled:opacity-50 transition-[color,background-color,scale] active:scale-[0.96]"
       >
         {loginMutation.isPending
           ? 'Opening browser...'
@@ -62,7 +62,7 @@ export function LoginButton() {
             />
             <button
               onClick={() => copyToClipboard(authUrl)}
-              className="px-3 py-2 bg-secondary hover:bg-secondary/80 text-foreground rounded text-sm"
+              className="px-3 py-2 bg-secondary hover:bg-secondary/80 text-foreground rounded text-sm transition-[color,background-color,scale] active:scale-[0.96]"
             >
               Copy
             </button>
