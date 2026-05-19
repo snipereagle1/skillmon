@@ -58,12 +58,13 @@ pub fn run() {
                 let startup_state: StartupState = Arc::new(AtomicU8::new(1));
                 app.manage(startup_state.clone());
 
-                let start_minimized = db::get_boolean_app_setting(app.state::<db::Pool>().inner(), "start_minimized")
-                    .await
-                    .unwrap_or_else(|e| {
-                        log::warn!("Failed to read start_minimized setting: {}", e);
-                        false
-                    });
+                let start_minimized =
+                    db::get_boolean_app_setting(app.state::<db::Pool>().inner(), "start_minimized")
+                        .await
+                        .unwrap_or_else(|e| {
+                            log::warn!("Failed to read start_minimized setting: {}", e);
+                            false
+                        });
 
                 if !start_minimized {
                     if let Some(window) = app.get_webview_window("main") {
