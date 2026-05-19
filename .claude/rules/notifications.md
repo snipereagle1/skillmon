@@ -9,133 +9,60 @@ Plugin-based architecture: individual checkers register and trigger when relevan
 
 ## Components
 
-- **`NotificationProcessor`** (`notifications/mod.rs`) — manages checkers, listens for `EVENT_DATA_UPDATED`
+- **`NotificationProcessor`** (`notifications/mod.rs`) — manages checkers, dispatches on `DataType`
 - **`NotificationChecker` trait** — interface all checkers implement
 - **`NotificationContext`** — provides `app`, `pool`, `rate_limits`
+- **`DataType` enum** (`notifications/mod.rs`) — typed identifiers for what changed (`SkillQueue`, `Skills`, `Attributes`, `Clones`, `Location`)
+- **`emit_snapshot`** (`notifications/mod.rs`) — broadcasts the full notification list to the frontend via `notifications:changed`. Call after any create/clear.
 - **`checkers/`** — individual checker implementations
 
 ## Flow
 
-1. Data updated → emit `EVENT_DATA_UPDATED` with `{ data_type, character_id }`
-2. `NotificationProcessor` identifies checkers whose `data_triggers()` match `data_type`
-3. Each matching checker's `check()` runs async
-4. Checkers create or clear notifications as needed
+1. Data updated → emit `EVENT_DATA_UPDATED` with `DataUpdatedPayload { data_type: DataType, character_id }`
+2. `NotificationProcessor` runs every checker whose `data_triggers()` contains the `DataType`
+3. Each checker's `check()` runs async, creates/clears notifications, and calls `emit_snapshot` only when state changed
 
 ## Adding a New Checker
 
-### 1. Create `src-tauri/src/notifications/checkers/<type>.rs`
-
-```rust
-use anyhow::Result;
-use tauri_plugin_notification::NotificationExt;
-use crate::{db, notifications::{NotificationChecker, NotificationContext}};
-
-pub const NOTIFICATION_TYPE_YOUR_TYPE: &str = "your_notification_type";
-
-pub struct YourNotificationChecker;
-
-#[async_trait::async_trait]
-impl NotificationChecker for YourNotificationChecker {
-    fn notification_type(&self) -> &'static str {
-        NOTIFICATION_TYPE_YOUR_TYPE
-    }
-
-    fn data_triggers(&self) -> &[&'static str] {
-        &["skill_queue"] // data types that trigger this checker
-    }
-
-    async fn check(&self, ctx: &NotificationContext<'_>, character_id: i64) -> Result<()> {
-        let setting = db::get_notification_setting(
-            ctx.pool, character_id, NOTIFICATION_TYPE_YOUR_TYPE
-        ).await?;
-
-        let Some(setting) = setting else { return Ok(()); };
-
-        if !setting.enabled {
-            db::clear_notification(ctx.pool, character_id, NOTIFICATION_TYPE_YOUR_TYPE).await.ok();
-            return Ok(());
-        }
-
-        // Check condition
-        let condition_met = /* your logic */;
-
-        let has_active = db::get_notifications(ctx.pool, Some(character_id), None)
-            .await.ok()
-            .map(|n| n.iter().any(|notif|
-                notif.notification_type == NOTIFICATION_TYPE_YOUR_TYPE
-                    && notif.status == "active"
-            ))
-            .unwrap_or(false);
-
-        if condition_met && !has_active {
-            let character_name = db::get_character(ctx.pool, character_id)
-                .await.ok().flatten()
-                .map(|c| c.character_name)
-                .unwrap_or_else(|| format!("Character {}", character_id));
-
-            db::create_notification(
-                ctx.pool, character_id, NOTIFICATION_TYPE_YOUR_TYPE,
-                "Title", "Message",
-            ).await?;
-
-            let _ = ctx.app.notification().builder()
-                .title(&format!("{} - Title", character_name))
-                .body("Message")
-                .show();
-        } else if !condition_met && has_active {
-            db::clear_notification(ctx.pool, character_id, NOTIFICATION_TYPE_YOUR_TYPE).await?;
-        }
-
-        Ok(())
-    }
-}
-```
-
-### 2. Export from `checkers/mod.rs`
-
-```rust
-pub mod your_notification_type;
-pub use your_notification_type::YourNotificationChecker;
-```
-
-### 3. Register in `NotificationProcessor::register_checkers()`
-
-```rust
-self.checkers.push(Arc::new(checkers::YourNotificationChecker));
-```
-
-### 4. Add frontend constant to `src/lib/notificationTypes.ts`
-
-```typescript
-export const NOTIFICATION_TYPES = {
-  SKILL_QUEUE_LOW: 'skill_queue_low',
-  YOUR_TYPE: 'your_notification_type', // must match NOTIFICATION_TYPE_YOUR_TYPE
-} as const;
-```
+1. Create `src-tauri/src/notifications/checkers/<type>.rs` — mirror the structure of `skill_queue_low.rs` (the canonical reference). Key rules:
+   - Bail early if the setting is missing or disabled (clear any existing notification first; emit snapshot only if `clear_notification` returned `true`)
+   - Use `db::has_active_notification` to deduplicate, not in-memory filtering
+   - Call `notifications::emit_snapshot(ctx.app, ctx.pool)` after every successful create or clear — log emit errors, don't fail the check
+2. Export from `checkers/mod.rs`:
+   ```rust
+   pub mod your_type;
+   pub use your_type::YourChecker;
+   ```
+3. Register in `NotificationProcessor::register_checkers()` (`notifications/mod.rs`)
+4. Add the frontend constant to `src/lib/notificationTypes.ts` — must match the Rust `NOTIFICATION_TYPE_*` value
 
 ## Triggering Checks
 
-Emit `EVENT_DATA_UPDATED` after updating data:
+Emit `EVENT_DATA_UPDATED` after updating data — use the typed `DataType`, not strings:
 
 ```rust
-use crate::notifications::{EVENT_DATA_UPDATED, DataUpdatedPayload};
+use crate::notifications::{DataUpdatedPayload, DataType, EVENT_DATA_UPDATED};
 
 app.emit(EVENT_DATA_UPDATED, DataUpdatedPayload {
-    data_type: "skill_queue".to_string(),
+    data_type: DataType::SkillQueue,
     character_id,
 })?;
 ```
 
-### Data Type Strings
+Add new variants to `DataType` in `notifications/mod.rs` when a new data category needs to trigger checks.
 
-- `"skill_queue"` — skill queue refreshed
-- `"skills"` — character skills updated
+## Frontend Wiring
+
+- Backend emits `notifications:changed` with the full snapshot whenever notifications change
+- `src/lib/esiEvents.ts` listens once at bootstrap and calls `invoke('request_notifications_snapshot')` to hydrate
+- Snapshot lands in `useNotificationsStore` (Zustand); components read via `useActiveNotifications`, `useNotificationsForCharacter`, `useUnreadCount`
+- Mutations (`useDismissNotification`) update the store optimistically in `onMutate` — the authoritative refresh arrives via the next `notifications:changed`
 
 ## Best Practices
 
-- Check notification setting first — bail early if disabled
-- Use cached ESI data where possible; avoid extra API calls in checkers
-- Always include character name in the system notification title
-- Check for existing active notifications before creating duplicates
-- Clear when condition is no longer met
-- Log errors, don't fail silently
+- Check the notification setting first — bail early if disabled
+- Use cached ESI data; avoid extra API calls in checkers
+- Always include character name in the OS-level notification title
+- Always call `emit_snapshot` after a create or clear — but only when the DB actually changed (gate on `cleared: bool` or the `if !has_active` create branch)
+- Log emit errors with `eprintln!`; never fail the check on emit failure
+- Use `db::has_active_notification` for deduplication
