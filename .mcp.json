@@ -1,11 +1,10 @@
 {
   "mcpServers": {
     "skillmon-sqlite": {
-      "command": "npx",
+      "command": "bash",
       "args": [
-        "-y",
-        "mcp-sqlite",
-        "${MCP_SQLITE_DB_PATH:-~/.local/share/com.skillmon/database.sqlite}"
+        "-c",
+        "npx -y mcp-sqlite \"${MCP_SQLITE_DB_PATH:-$HOME/.local/share/com.skillmon/database.sqlite}\""
       ]
     },
     "shadcn": {
