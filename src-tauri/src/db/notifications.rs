@@ -162,7 +162,6 @@ pub async fn dismiss_notification(pool: &Pool, notification_id: i64) -> Result<(
     Ok(())
 }
 
-#[allow(dead_code)]
 pub async fn has_active_notification(
     pool: &Pool,
     character_id: i64,
@@ -179,16 +178,26 @@ pub async fn has_active_notification(
     Ok(count > 0)
 }
 
+pub async fn cleanup_old_dismissed_notifications(pool: &Pool) -> Result<u64> {
+    let result = sqlx::query(
+        "DELETE FROM notifications WHERE status = 'dismissed' AND created_at < datetime('now', '-14 days')",
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(result.rows_affected())
+}
+
 pub async fn clear_notification(
     pool: &Pool,
     character_id: i64,
     notification_type: &str,
-) -> Result<()> {
-    sqlx::query("UPDATE notifications SET status = 'dismissed' WHERE character_id = ? AND notification_type = ? AND status = 'active'")
+) -> Result<bool> {
+    let result = sqlx::query("UPDATE notifications SET status = 'dismissed' WHERE character_id = ? AND notification_type = ? AND status = 'active'")
         .bind(character_id)
         .bind(notification_type)
         .execute(pool)
         .await?;
 
-    Ok(())
+    Ok(result.rows_affected() > 0)
 }

@@ -310,19 +310,25 @@ impl RefreshSupervisor {
                 }
 
                 // Process notifications for each fetched resource type
-                let data_types = ["queue", "skills", "attributes", "clones", "location"];
+                let data_types = [
+                    notifications::DataType::SkillQueue,
+                    notifications::DataType::Skills,
+                    notifications::DataType::Attributes,
+                    notifications::DataType::Clones,
+                    notifications::DataType::Location,
+                ];
                 let ctx = notifications::NotificationContext {
                     app: &app_handle,
                     pool: &pool,
                     rate_limits: &rate_limits,
                 };
-                for data_type in &data_types {
+                for data_type in data_types {
                     if let Err(e) = notification_processor
                         .process_data_updated(&ctx, data_type, character_id)
                         .await
                     {
                         eprintln!(
-                            "refresh: notification error for {} ({}): {}",
+                            "refresh: notification error for {} ({:?}): {}",
                             character_id, data_type, e
                         );
                     }

@@ -1,9 +1,10 @@
 use chrono::NaiveDateTime;
 use serde::Serialize;
-use tauri::State;
+use tauri::{AppHandle, State};
 use typeshare::typeshare;
 
 use crate::db;
+use crate::notifications;
 use crate::ts_types::i64_ts;
 
 #[typeshare]
@@ -64,29 +65,28 @@ impl From<db::NotificationSetting> for NotificationSettingResponse {
 }
 
 #[tauri::command]
-pub async fn get_notifications(
+pub async fn request_notifications_snapshot(
+    app: AppHandle,
     pool: State<'_, db::Pool>,
-    character_id: Option<i64>,
-    status: Option<String>,
-) -> Result<Vec<NotificationResponse>, String> {
-    let notifications = db::get_notifications(&pool, character_id, status.as_deref())
+) -> Result<(), String> {
+    notifications::emit_snapshot(&app, &pool)
         .await
-        .map_err(|e| format!("Failed to get notifications: {}", e))?;
-
-    Ok(notifications
-        .into_iter()
-        .map(NotificationResponse::from)
-        .collect())
+        .map_err(|e| format!("Failed to emit notifications snapshot: {}", e))
 }
 
 #[tauri::command]
 pub async fn dismiss_notification(
+    app: AppHandle,
     pool: State<'_, db::Pool>,
     notification_id: i64,
 ) -> Result<(), String> {
     db::dismiss_notification(&pool, notification_id)
         .await
         .map_err(|e| format!("Failed to dismiss notification: {}", e))?;
+
+    if let Err(e) = notifications::emit_snapshot(&app, &pool).await {
+        eprintln!("Failed to emit notifications snapshot after dismiss: {}", e);
+    }
 
     Ok(())
 }

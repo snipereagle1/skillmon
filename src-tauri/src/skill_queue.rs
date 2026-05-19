@@ -470,7 +470,7 @@ pub async fn build_character_skill_queue(
     let _ = app.emit(
         crate::notifications::EVENT_DATA_UPDATED,
         crate::notifications::DataUpdatedPayload {
-            data_type: "skill_queue".to_string(),
+            data_type: crate::notifications::DataType::SkillQueue,
             character_id,
         },
     );
