@@ -998,6 +998,14 @@ pub async fn compute_overview_row(
     character_id: i64,
 ) -> Option<events::OverviewRow> {
     let queue_payload = enrich_queue_from_db(pool, character_id).await?;
+    overview_row_from_queue(pool, character_id, &queue_payload).await
+}
+
+pub async fn overview_row_from_queue(
+    pool: &db::Pool,
+    character_id: i64,
+    queue_payload: &events::QueuePayload,
+) -> Option<events::OverviewRow> {
     if queue_payload.is_paused || queue_payload.queue.is_empty() {
         return None;
     }
@@ -1046,7 +1054,7 @@ pub async fn compute_overview_row(
 
     Some(events::OverviewRow {
         character_id: character_id as i32,
-        character_name: queue_payload.character_name,
+        character_name: queue_payload.character_name.clone(),
         account_name,
         queue_time_remaining_seconds,
         current_skill_name: current.skill_name.clone(),
