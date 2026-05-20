@@ -20,6 +20,7 @@ pub struct CharacterSnapshot {
     pub clones: Vec<events::CloneInfo>,
     pub location: Option<events::LocationPayload>,
     pub remaps: Vec<db::remaps::Remap>,
+    pub overview: Option<events::OverviewRow>,
 }
 
 #[tauri::command]
@@ -43,6 +44,11 @@ pub async fn get_esi_snapshot(pool: State<'_, db::Pool>) -> Result<Vec<Character
                 db::remaps::get_character_remaps(&pool, character_id),
             );
 
+            let overview = match &queue {
+                Some(q) => enrichment::overview_row_from_queue(&pool, character_id, q).await,
+                None => None,
+            };
+
             let remaps = remaps.unwrap_or_else(|e| {
                 eprintln!(
                     "esi_snapshot: remaps fetch error for {}: {}",
@@ -60,6 +66,7 @@ pub async fn get_esi_snapshot(pool: State<'_, db::Pool>) -> Result<Vec<Character
                 clones: clones_payload.clones,
                 location,
                 remaps,
+                overview,
             }
         }
     });

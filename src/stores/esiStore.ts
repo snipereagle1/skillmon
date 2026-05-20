@@ -30,7 +30,7 @@ interface EsiStoreState {
   setLocation(characterId: number, data: LocationPayload): void;
   setAttributes(characterId: number, data: AttributesPayload): void;
   setClones(characterId: number, data: CloneInfo[]): void;
-  setOverviewRow(characterId: number, row: OverviewRow): void;
+  setOverviewRow(characterId: number, row: OverviewRow | null): void;
   setError(resource: ResourceKey, characterId: number, error: string): void;
   clearCharacter(characterId: number): void;
 }
@@ -92,9 +92,15 @@ export const useEsiStore = create<EsiStoreState>((set) => ({
     })),
 
   setOverviewRow: (characterId, row) =>
-    set((s) => ({
-      overview: { ...s.overview, [characterId]: row },
-    })),
+    set((s) => {
+      const next = { ...s.overview };
+      if (row === null) {
+        delete next[characterId];
+      } else {
+        next[characterId] = row;
+      }
+      return { overview: next };
+    }),
 
   setError: (resource, characterId, error) =>
     set((s) => ({

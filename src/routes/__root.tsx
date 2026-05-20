@@ -82,6 +82,7 @@ function RootComponent() {
             if (snapshot.clones.length > 0)
               store.setClones(id, snapshot.clones);
             if (snapshot.location) store.setLocation(id, snapshot.location);
+            store.setOverviewRow(id, snapshot.overview ?? null);
           }
         } catch (err) {
           const store = useEsiStore.getState();

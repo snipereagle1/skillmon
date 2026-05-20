@@ -35,8 +35,10 @@ export async function listenCharacterChannels(
     listen<ClonesPayload>(`character:${characterId}:clones`, ({ payload }) =>
       useEsiStore.getState().setClones(characterId, payload.clones)
     ),
-    listen<OverviewRow>(`character:${characterId}:overview`, ({ payload }) =>
-      useEsiStore.getState().setOverviewRow(characterId, payload)
+    listen<OverviewRow | null>(
+      `character:${characterId}:overview`,
+      ({ payload }) =>
+        useEsiStore.getState().setOverviewRow(characterId, payload)
     ),
   ]);
   return () => unlisteners.forEach((fn) => fn());

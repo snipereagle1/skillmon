@@ -335,12 +335,12 @@ impl RefreshSupervisor {
                 }
 
                 // ── Overview ─────────────────────────────────────────────────
-                if let Some(row) = enrichment::compute_overview_row(&pool, character_id).await {
-                    if let Err(e) =
-                        app_handle.emit(&format!("character:{}:overview", character_id), &row)
-                    {
-                        eprintln!("refresh: emit error overview {}: {}", character_id, e);
-                    }
+                let overview_row = enrichment::compute_overview_row(&pool, character_id).await;
+                if let Err(e) = app_handle.emit(
+                    &format!("character:{}:overview", character_id),
+                    &overview_row,
+                ) {
+                    eprintln!("refresh: emit error overview {}: {}", character_id, e);
                 }
 
                 let endpoints = [
