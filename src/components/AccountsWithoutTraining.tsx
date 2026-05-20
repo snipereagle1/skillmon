@@ -29,7 +29,10 @@ export function AccountsWithoutTraining() {
   const accounts = accountsData?.accounts ?? [];
   const trainingCharacterIds = new Set(
     Object.entries(queues)
-      .filter(([, slice]) => (slice.data?.queue.length ?? 0) > 0)
+      .filter(
+        ([, slice]) =>
+          (slice.data?.queue.length ?? 0) > 0 && !slice.data?.isPaused
+      )
       .map(([id]) => Number(id))
   );
 
