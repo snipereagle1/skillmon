@@ -1,5 +1,5 @@
 import { Link, useNavigate, useParams } from '@tanstack/react-router';
-import { ChevronDown } from 'lucide-react';
+import { ChevronDown, FolderPlus, Pencil } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
@@ -16,7 +16,9 @@ import { cn } from '@/lib/utils';
 
 import { CreatePlanDialog } from './CreatePlanDialog';
 import { CreatePlanFromCharacterDialog } from './CreatePlanFromCharacterDialog';
+import { CreatePlanGroupDialog } from './CreatePlanGroupDialog';
 import { DeletePlanDialog } from './DeletePlanDialog';
+import { RenamePlanGroupDialog } from './RenamePlanGroupDialog';
 
 interface PlanRowProps {
   node: Extract<PlanTreeNode, { kind: 'plan' }>;
@@ -102,6 +104,7 @@ interface NodeRendererProps {
   onDelete?: (planId: number, planName: string) => void;
   onPlanClick?: (planId: number) => void;
   isDeleting: boolean;
+  onRenameGroup?: (groupId: number, currentName: string) => void;
 }
 
 function NodeRenderer({
@@ -111,6 +114,7 @@ function NodeRenderer({
   onDelete,
   onPlanClick,
   isDeleting,
+  onRenameGroup,
 }: NodeRendererProps) {
   if (node.kind === 'plan') {
     return (
@@ -127,10 +131,21 @@ function NodeRenderer({
   return (
     <div>
       <div
-        className="p-2 text-sm font-medium text-muted-foreground"
+        className="group flex items-center gap-1 p-2 text-sm font-medium text-muted-foreground"
         style={{ paddingLeft: depth * 12 }}
       >
-        {node.name}
+        <span className="flex-1 truncate">{node.name}</span>
+        {onRenameGroup && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="size-6 p-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
+            onClick={() => onRenameGroup(node.id, node.name)}
+            aria-label={`Rename folder ${node.name}`}
+          >
+            <Pencil className="size-3.5" />
+          </Button>
+        )}
       </div>
       <div>
         {node.children.map((child) => (
@@ -142,6 +157,7 @@ function NodeRenderer({
             onDelete={onDelete}
             onPlanClick={onPlanClick}
             isDeleting={isDeleting}
+            onRenameGroup={onRenameGroup}
           />
         ))}
       </div>
@@ -175,6 +191,12 @@ export function PlanTree({
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [createFromCharacterDialogOpen, setCreateFromCharacterDialogOpen] =
     useState(false);
+  const [createGroupDialogOpen, setCreateGroupDialogOpen] = useState(false);
+  const [renameGroupDialogOpen, setRenameGroupDialogOpen] = useState(false);
+  const [groupToRename, setGroupToRename] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [planToDelete, setPlanToDelete] = useState<{
     id: number;
@@ -189,6 +211,11 @@ export function PlanTree({
   const handleDeleteClick = (planId: number, planName: string) => {
     setPlanToDelete({ id: planId, name: planName });
     setDeleteDialogOpen(true);
+  };
+
+  const handleRenameGroup = (groupId: number, currentName: string) => {
+    setGroupToRename({ id: groupId, name: currentName });
+    setRenameGroupDialogOpen(true);
   };
 
   const handleDeleteConfirm = async () => {
@@ -253,6 +280,12 @@ export function PlanTree({
                 >
                   Create Plan from Character
                 </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => setCreateGroupDialogOpen(true)}
+                >
+                  <FolderPlus className="size-4 mr-2" />
+                  Create Folder
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -276,6 +309,7 @@ export function PlanTree({
                 onDelete={showActions ? handleDeleteClick : undefined}
                 onPlanClick={onPlanClick}
                 isDeleting={deletePlanMutation.isPending}
+                onRenameGroup={showActions ? handleRenameGroup : undefined}
               />
             ))}
           </div>
@@ -309,6 +343,19 @@ export function PlanTree({
         planName={planToDelete?.name}
         onConfirm={handleDeleteConfirm}
         isDeleting={deletePlanMutation.isPending}
+      />
+      <CreatePlanGroupDialog
+        open={createGroupDialogOpen}
+        onOpenChange={setCreateGroupDialogOpen}
+      />
+      <RenamePlanGroupDialog
+        open={renameGroupDialogOpen}
+        onOpenChange={(open) => {
+          setRenameGroupDialogOpen(open);
+          if (!open) setGroupToRename(null);
+        }}
+        groupId={groupToRename?.id ?? null}
+        currentName={groupToRename?.name ?? ''}
       />
     </>
   );

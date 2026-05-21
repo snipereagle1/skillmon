@@ -398,6 +398,8 @@ pub fn run() {
             commands::skill_plans::optimize_plan_attributes,
             commands::skill_plans::optimize_plan_reordering,
             commands::plan_groups::list_plan_groups,
+            commands::plan_groups::create_plan_group,
+            commands::plan_groups::rename_plan_group,
             commands::remaps::save_remap,
             commands::remaps::get_plan_remaps,
             commands::remaps::get_character_remaps,
