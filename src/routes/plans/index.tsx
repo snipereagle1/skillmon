@@ -1,12 +1,12 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { PlanList } from '@/components/SkillPlans/PlanList';
+import { PlanTree } from '@/components/SkillPlans/PlanTree';
 
 function PlansIndexPage() {
   return (
     <>
       <div className="w-64 border-r border-border shrink-0 overflow-hidden flex flex-col h-full bg-card">
-        <PlanList />
+        <PlanTree />
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">
         <div className="flex items-center justify-center h-full">

@@ -1,14 +1,14 @@
 import { createFileRoute } from '@tanstack/react-router';
 
 import { PlanEditor } from '@/components/SkillPlans/PlanEditor';
-import { PlanList } from '@/components/SkillPlans/PlanList';
+import { PlanTree } from '@/components/SkillPlans/PlanTree';
 
 function PlanDetailPage() {
   const { planId } = Route.useParams();
   return (
     <div className="flex h-full min-h-0 bg-card">
       <div className="w-64 border-r border-border shrink-0 overflow-hidden flex flex-col bg-card">
-        <PlanList />
+        <PlanTree />
       </div>
       <div className="flex-1 min-w-0 overflow-hidden">
         <PlanEditor planId={Number(planId)} />

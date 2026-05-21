@@ -16,6 +16,7 @@ pub mod clones;
 pub mod enabled_features;
 pub mod locations;
 pub mod notifications;
+pub mod plan_groups;
 pub mod remaps;
 pub mod sde;
 pub mod skill_plans;

@@ -15,6 +15,8 @@ pub struct SkillPlan {
     pub auto_prerequisites: i64,
     pub created_at: i64,
     pub updated_at: i64,
+    pub group_id: Option<i64>,
+    pub sort_order: i64,
 }
 
 #[derive(Debug, Clone, Serialize, FromRow)]
@@ -53,7 +55,9 @@ pub async fn create_skill_plan(
 
 pub async fn get_all_skill_plans(pool: &Pool) -> Result<Vec<SkillPlan>> {
     let plans = sqlx::query_as::<_, SkillPlan>(
-        "SELECT plan_id, name, description, auto_prerequisites, created_at, updated_at FROM skill_plans ORDER BY created_at DESC",
+        "SELECT plan_id, name, description, auto_prerequisites, created_at, updated_at, group_id, sort_order
+         FROM skill_plans
+         ORDER BY COALESCE(group_id, -1), sort_order, plan_id",
     )
     .fetch_all(pool)
     .await?;
@@ -63,7 +67,8 @@ pub async fn get_all_skill_plans(pool: &Pool) -> Result<Vec<SkillPlan>> {
 
 pub async fn get_skill_plan(pool: &Pool, plan_id: i64) -> Result<Option<SkillPlan>> {
     let plan = sqlx::query_as::<_, SkillPlan>(
-        "SELECT plan_id, name, description, auto_prerequisites, created_at, updated_at FROM skill_plans WHERE plan_id = ?",
+        "SELECT plan_id, name, description, auto_prerequisites, created_at, updated_at, group_id, sort_order
+         FROM skill_plans WHERE plan_id = ?",
     )
     .bind(plan_id)
     .fetch_optional(pool)

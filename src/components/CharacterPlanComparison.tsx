@@ -2,9 +2,9 @@ import { useMemo, useState } from 'react';
 import { match, P } from 'ts-pattern';
 
 import { SkillLevelPips } from '@/components/SkillLevelPips';
+import { PlanTree } from '@/components/SkillPlans/PlanTree';
 import type { PlanComparisonEntry } from '@/generated/types';
 import { usePlanComparison } from '@/hooks/tauri/usePlanComparison';
-import { useSkillPlans } from '@/hooks/tauri/useSkillPlans';
 import { cn, formatSkillpoints, toRoman } from '@/lib/utils';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
@@ -94,7 +94,6 @@ export function CharacterPlanComparison({
   selectedPlanId,
   onPlanChange,
 }: CharacterPlanComparisonProps) {
-  const { data: plans, isLoading: isLoadingPlans } = useSkillPlans();
   const { data: comparison, isLoading: isLoadingComparison } =
     usePlanComparison(selectedPlanId, characterId);
   const [showUntrainedOnly, setShowUntrainedOnly] = useState(false);
@@ -146,56 +145,11 @@ export function CharacterPlanComparison({
         <div className="p-4 border-b border-border">
           <h2 className="h-nav">Skill Plans</h2>
         </div>
-        <div className="flex-1 overflow-y-auto">
-          {match({ isLoadingPlans, plans })
-            .with({ isLoadingPlans: true }, () => (
-              <div className="flex items-center justify-center h-full p-4">
-                <p className="text-sm text-muted-foreground">
-                  Loading plans...
-                </p>
-              </div>
-            ))
-            .with({ plans: P.union(undefined, []) }, () => (
-              <div className="flex items-center justify-center h-full p-4">
-                <p className="text-sm text-muted-foreground text-center">
-                  No plans available. Create a plan in the Plans tab.
-                </p>
-              </div>
-            ))
-            .with({ plans: P.select(P.not(undefined)) }, (plans) => (
-              <div className="p-2 space-y-1">
-                {plans.map((plan) => (
-                  <div
-                    key={plan.plan_id}
-                    onClick={() => onPlanChange(plan.plan_id)}
-                    className={cn(
-                      'p-3 rounded-md cursor-pointer transition-colors',
-                      selectedPlanId === plan.plan_id
-                        ? 'bg-muted text-foreground'
-                        : 'hover:bg-muted'
-                    )}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <h3 className="h-nav truncate">{plan.name}</h3>
-                      {plan.description && (
-                        <p
-                          className={cn(
-                            'text-xs mt-1 line-clamp-2',
-                            selectedPlanId === plan.plan_id
-                              ? 'text-foreground/80'
-                              : 'text-muted-foreground'
-                          )}
-                        >
-                          {plan.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))
-            .exhaustive()}
-        </div>
+        <PlanTree
+          selectedPlanId={selectedPlanId}
+          onPlanClick={onPlanChange}
+          showActions={false}
+        />
       </div>
       <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
         {match({ selectedPlanId, isLoadingComparison, comparison })

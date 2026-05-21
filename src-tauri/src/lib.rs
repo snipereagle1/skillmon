@@ -397,6 +397,7 @@ pub fn run() {
             commands::skill_plans::simulate_skill_plan,
             commands::skill_plans::optimize_plan_attributes,
             commands::skill_plans::optimize_plan_reordering,
+            commands::plan_groups::list_plan_groups,
             commands::remaps::save_remap,
             commands::remaps::get_plan_remaps,
             commands::remaps::get_character_remaps,

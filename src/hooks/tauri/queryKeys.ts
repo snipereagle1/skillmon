@@ -2,6 +2,7 @@ export const queryKeys = {
   accountsAndCharacters: () => ['accountsAndCharacters'] as const,
 
   skillPlans: () => ['skillPlans'] as const,
+  planGroups: () => ['planGroups'] as const,
   planFromCharacterPreview: (
     characterId: number | null,
     includedGroupIds: number[]
