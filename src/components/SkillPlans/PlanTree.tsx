@@ -8,7 +8,7 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo } from 'react';
 import { toast } from 'sonner';
 
 import {
@@ -23,7 +23,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { NodeKind } from '@/generated/types';
 import {
   useExpandedPlanGroups,
   usePersistExpandedPlanGroups,
@@ -31,7 +30,16 @@ import {
 import { useMoveNode, usePlanGroups } from '@/hooks/tauri/usePlanGroups';
 import { useDeleteSkillPlan, useSkillPlans } from '@/hooks/tauri/useSkillPlans';
 import { assemblePlanTree, type PlanTreeNode } from '@/lib/planTree';
+import {
+  groupNodeId,
+  isDropAllowed,
+  type NodeIndex,
+  parseNodeId,
+  planNodeId,
+  resolveDropTarget,
+} from '@/lib/planTreeDnd';
 import { cn } from '@/lib/utils';
+import { usePlanTreeDialogStore } from '@/stores/planTreeDialogStore';
 
 import { CreatePlanDialog } from './CreatePlanDialog';
 import { CreatePlanFromCharacterDialog } from './CreatePlanFromCharacterDialog';
@@ -44,21 +52,6 @@ type PlanItem = TreeNode & {
   _planDescription?: string;
 };
 
-function planNodeId(id: number) {
-  return `plan:${id}`;
-}
-function groupNodeId(id: number) {
-  return `group:${id}`;
-}
-function parseNodeId(raw: string): { kind: NodeKind; id: number } | null {
-  const [kind, idStr] = raw.split(':');
-  const id = Number(idStr);
-  if (!Number.isFinite(id)) return null;
-  if (kind === NodeKind.Plan) return { kind: NodeKind.Plan, id };
-  if (kind === NodeKind.Group) return { kind: NodeKind.Group, id };
-  return null;
-}
-
 function useExpandedGroupTreeState() {
   const { data: persistedExpanded } = useExpandedPlanGroups();
   const persistExpanded = usePersistExpandedPlanGroups();
@@ -70,8 +63,11 @@ function useExpandedGroupTreeState() {
     (next: Set<string>) => {
       const ids: number[] = [];
       for (const key of next) {
-        const parsed = parseNodeId(key);
-        if (parsed?.kind === NodeKind.Group) ids.push(parsed.id);
+        const [kind, idStr] = key.split(':');
+        if (kind === 'group') {
+          const id = Number(idStr);
+          if (Number.isFinite(id)) ids.push(id);
+        }
       }
       persistExpanded(ids);
     },
@@ -128,25 +124,23 @@ export function PlanTree({
   const { expanded, onExpandedChange } = useExpandedGroupTreeState();
   const deletePlanMutation = useDeleteSkillPlan();
   const moveNodeMutation = useMoveNode();
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [createFromCharacterDialogOpen, setCreateFromCharacterDialogOpen] =
-    useState(false);
-  const [createGroupDialogOpen, setCreateGroupDialogOpen] = useState(false);
-  const [renameGroupDialogOpen, setRenameGroupDialogOpen] = useState(false);
-  const [groupToRename, setGroupToRename] = useState<{
-    id: number;
-    name: string;
-  } | null>(null);
-  const [deleteGroupDialogOpen, setDeleteGroupDialogOpen] = useState(false);
-  const [groupToDelete, setGroupToDelete] = useState<{
-    id: number;
-    name: string;
-  } | null>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [planToDelete, setPlanToDelete] = useState<{
-    id: number;
-    name: string;
-  } | null>(null);
+
+  const dialog = usePlanTreeDialogStore((s) => s.dialog);
+  const openCreatePlan = usePlanTreeDialogStore((s) => s.openCreatePlan);
+  const openCreatePlanFromCharacter = usePlanTreeDialogStore(
+    (s) => s.openCreatePlanFromCharacter
+  );
+  const openCreatePlanGroup = usePlanTreeDialogStore(
+    (s) => s.openCreatePlanGroup
+  );
+  const openRenamePlanGroup = usePlanTreeDialogStore(
+    (s) => s.openRenamePlanGroup
+  );
+  const openDeletePlanGroup = usePlanTreeDialogStore(
+    (s) => s.openDeletePlanGroup
+  );
+  const openDeletePlan = usePlanTreeDialogStore((s) => s.openDeletePlan);
+  const closeDialog = usePlanTreeDialogStore((s) => s.close);
 
   const tree = useMemo(
     () => assemblePlanTree(groups ?? [], plans ?? []),
@@ -154,7 +148,7 @@ export function PlanTree({
   );
 
   // Resolve a node's parent/sibling-index/childCount from its composite id.
-  const nodeIndex = useMemo(() => {
+  const nodeIndex = useMemo<NodeIndex>(() => {
     const parentOf = new Map<string, number | null>();
     const indexOf = new Map<string, number>();
     const childCount = new Map<number | null, number>();
@@ -182,36 +176,15 @@ export function PlanTree({
     [onPlanClick, navigate]
   );
 
-  const handleDeleteClick = useCallback((planId: number, planName: string) => {
-    setPlanToDelete({ id: planId, name: planName });
-    setDeleteDialogOpen(true);
-  }, []);
-
-  const handleRenameGroup = useCallback(
-    (groupId: number, currentName: string) => {
-      setGroupToRename({ id: groupId, name: currentName });
-      setRenameGroupDialogOpen(true);
-    },
-    []
-  );
-
-  const handleDeleteGroup = useCallback(
-    (groupId: number, currentName: string) => {
-      setGroupToDelete({ id: groupId, name: currentName });
-      setDeleteGroupDialogOpen(true);
-    },
-    []
-  );
-
   const handleDeleteConfirm = async () => {
-    if (!planToDelete) return;
+    if (dialog.kind !== 'deletePlan') return;
+    const { planId } = dialog;
     try {
-      await deletePlanMutation.mutateAsync({ planId: planToDelete.id });
-      if (selectedPlanId === planToDelete.id) {
+      await deletePlanMutation.mutateAsync({ planId });
+      if (selectedPlanId === planId) {
         navigate({ to: '/plans' });
       }
-      setDeleteDialogOpen(false);
-      setPlanToDelete(null);
+      closeDialog();
     } catch (err) {
       console.error('Failed to delete plan:', err);
     }
@@ -219,75 +192,22 @@ export function PlanTree({
 
   const handleDrop = async (sourceId: string, target: DropTarget) => {
     const source = parseNodeId(sourceId);
-    if (!source) return;
-
-    const sourceParentGroupId = nodeIndex.parentOf.get(sourceId) ?? null;
-    const sourceIndex = nodeIndex.indexOf.get(sourceId) ?? 0;
-
-    let newParent: number | null;
-    let newSortOrder: number;
-
-    if (target.type === 'row') {
-      // Drop onto a folder row → nest as last child.
-      const parsed = parseNodeId(target.id);
-      if (!parsed || parsed.kind !== NodeKind.Group) return;
-      newParent = parsed.id;
-      const existing = nodeIndex.childCount.get(parsed.id) ?? 0;
-      newSortOrder =
-        sourceParentGroupId === parsed.id
-          ? Math.max(0, existing - 1)
-          : existing;
-    } else {
-      // Drop into a gap → sibling at that index inside target.parentId.
-      const targetParent = target.parentId
-        ? (parseNodeId(target.parentId)?.id ?? null)
-        : null;
-      newParent = targetParent;
-      let idx = target.index;
-      if (sourceParentGroupId === newParent && sourceIndex < idx) {
-        idx -= 1;
-      }
-      newSortOrder = idx;
-    }
-
-    if (sourceParentGroupId === newParent && sourceIndex === newSortOrder) {
-      return;
-    }
-
+    const resolved = resolveDropTarget(sourceId, target, nodeIndex);
+    if (!source || !resolved) return;
     try {
       await moveNodeMutation.mutateAsync({
         kind: source.kind,
         id: source.id,
-        new_parent_group_id: newParent ?? undefined,
-        new_sort_order: newSortOrder,
+        new_parent_group_id: resolved.newParentGroupId ?? undefined,
+        new_sort_order: resolved.newSortOrder,
       });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : String(err));
     }
   };
 
-  // Prevent dropping a folder into itself or any of its descendants.
-  const canDrop = (sourceId: string, target: DropTarget): boolean => {
-    const source = parseNodeId(sourceId);
-    if (!source || source.kind !== NodeKind.Group) return true;
-    const forbiddenParent = source.id;
-    const isDescendantOf = (groupId: number): boolean => {
-      if (groupId === forbiddenParent) return true;
-      const parent = nodeIndex.parentOf.get(groupNodeId(groupId));
-      if (parent == null) return false;
-      return isDescendantOf(parent);
-    };
-    if (target.type === 'row') {
-      const parsed = parseNodeId(target.id);
-      if (!parsed || parsed.kind !== NodeKind.Group) return true;
-      return !isDescendantOf(parsed.id);
-    }
-    const targetParent = target.parentId
-      ? (parseNodeId(target.parentId)?.id ?? null)
-      : null;
-    if (targetParent == null) return true;
-    return !isDescendantOf(targetParent);
-  };
+  const canDrop = (sourceId: string, target: DropTarget): boolean =>
+    isDropAllowed(sourceId, target, nodeIndex);
 
   const treeData: PlanItem[] = useMemo(() => {
     const build = (node: PlanTreeNode): PlanItem => {
@@ -308,7 +228,7 @@ export function PlanTree({
                 className="size-6 p-0"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleRenameGroup(node.id, node.name);
+                  openRenamePlanGroup(node.id, node.name);
                 }}
                 aria-label={`Rename folder ${node.name}`}
               >
@@ -320,7 +240,7 @@ export function PlanTree({
                 className="size-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
                 onClick={(e) => {
                   e.stopPropagation();
-                  handleDeleteGroup(node.id, node.name);
+                  openDeletePlanGroup(node.id, node.name);
                 }}
                 aria-label={`Delete folder ${node.name}`}
               >
@@ -344,7 +264,7 @@ export function PlanTree({
             disabled={deletePlanMutation.isPending}
             onClick={(e) => {
               e.stopPropagation();
-              handleDeleteClick(node.id, node.name);
+              openDeletePlan(node.id, node.name);
             }}
             className="size-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
             aria-label={`Delete plan ${node.name}`}
@@ -361,9 +281,9 @@ export function PlanTree({
     showActions,
     deletePlanMutation.isPending,
     handlePlanClick,
-    handleDeleteClick,
-    handleRenameGroup,
-    handleDeleteGroup,
+    openRenamePlanGroup,
+    openDeletePlanGroup,
+    openDeletePlan,
   ]);
 
   if (plansLoading || groupsLoading) {
@@ -394,10 +314,7 @@ export function PlanTree({
       {showActions && (
         <div className="p-4 border-b border-border">
           <div className="flex w-full">
-            <Button
-              onClick={() => setCreateDialogOpen(true)}
-              className="flex-1 rounded-r-none"
-            >
+            <Button onClick={openCreatePlan} className="flex-1 rounded-r-none">
               Create Plan
             </Button>
             <DropdownMenu>
@@ -411,14 +328,10 @@ export function PlanTree({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  onClick={() => setCreateFromCharacterDialogOpen(true)}
-                >
+                <DropdownMenuItem onClick={openCreatePlanFromCharacter}>
                   Create Plan from Character
                 </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setCreateGroupDialogOpen(true)}
-                >
+                <DropdownMenuItem onClick={openCreatePlanGroup}>
                   <FolderPlus className="size-4 mr-2" />
                   Create Folder
                 </DropdownMenuItem>
@@ -461,10 +374,12 @@ export function PlanTree({
         )}
       </div>
       <CreatePlanDialog
-        open={createDialogOpen}
-        onOpenChange={setCreateDialogOpen}
+        open={dialog.kind === 'createPlan'}
+        onOpenChange={(open) => {
+          if (!open) closeDialog();
+        }}
         onSuccess={(planId) => {
-          setCreateDialogOpen(false);
+          closeDialog();
           navigate({
             to: '/plans/$planId',
             params: { planId: String(planId) },
@@ -472,10 +387,12 @@ export function PlanTree({
         }}
       />
       <CreatePlanFromCharacterDialog
-        open={createFromCharacterDialogOpen}
-        onOpenChange={setCreateFromCharacterDialogOpen}
+        open={dialog.kind === 'createPlanFromCharacter'}
+        onOpenChange={(open) => {
+          if (!open) closeDialog();
+        }}
         onSuccess={(planId) => {
-          setCreateFromCharacterDialogOpen(false);
+          closeDialog();
           navigate({
             to: '/plans/$planId',
             params: { planId: String(planId) },
@@ -483,33 +400,37 @@ export function PlanTree({
         }}
       />
       <DeletePlanDialog
-        open={deleteDialogOpen}
-        onOpenChange={setDeleteDialogOpen}
-        planName={planToDelete?.name}
+        open={dialog.kind === 'deletePlan'}
+        onOpenChange={(open) => {
+          if (!open) closeDialog();
+        }}
+        planName={dialog.kind === 'deletePlan' ? dialog.name : undefined}
         onConfirm={handleDeleteConfirm}
         isDeleting={deletePlanMutation.isPending}
       />
       <CreatePlanGroupDialog
-        open={createGroupDialogOpen}
-        onOpenChange={setCreateGroupDialogOpen}
+        open={dialog.kind === 'createPlanGroup'}
+        onOpenChange={(open) => {
+          if (!open) closeDialog();
+        }}
       />
       <DeletePlanGroupDialog
-        open={deleteGroupDialogOpen}
+        open={dialog.kind === 'deletePlanGroup'}
         onOpenChange={(open) => {
-          setDeleteGroupDialogOpen(open);
-          if (!open) setGroupToDelete(null);
+          if (!open) closeDialog();
         }}
-        groupId={groupToDelete?.id ?? null}
-        groupName={groupToDelete?.name ?? ''}
+        groupId={dialog.kind === 'deletePlanGroup' ? dialog.groupId : null}
+        groupName={dialog.kind === 'deletePlanGroup' ? dialog.name : ''}
       />
       <RenamePlanGroupDialog
-        open={renameGroupDialogOpen}
+        open={dialog.kind === 'renamePlanGroup'}
         onOpenChange={(open) => {
-          setRenameGroupDialogOpen(open);
-          if (!open) setGroupToRename(null);
+          if (!open) closeDialog();
         }}
-        groupId={groupToRename?.id ?? null}
-        currentName={groupToRename?.name ?? ''}
+        groupId={dialog.kind === 'renamePlanGroup' ? dialog.groupId : null}
+        currentName={
+          dialog.kind === 'renamePlanGroup' ? dialog.currentName : ''
+        }
       />
     </>
   );
