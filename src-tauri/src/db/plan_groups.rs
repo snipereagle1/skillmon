@@ -124,7 +124,7 @@ pub async fn rename(pool: &Pool, group_id: i64, name: &str) -> Result<()> {
     Ok(())
 }
 
-pub async fn delete(pool: &Pool, group_id: i64, cascade_plans: bool) -> Result<()> {
+pub async fn delete_group(pool: &Pool, group_id: i64, cascade_plans: bool) -> Result<()> {
     let mut tx = pool.begin().await?;
 
     let parent_row: Option<(Option<i64>,)> =
@@ -135,33 +135,38 @@ pub async fn delete(pool: &Pool, group_id: i64, cascade_plans: bool) -> Result<(
     let (deleted_parent,) = parent_row.ok_or_else(|| anyhow!("Folder {} not found", group_id))?;
 
     if cascade_plans {
-        // Collect every group in the subtree (including the root).
-        let subtree_ids: Vec<i64> = sqlx::query_scalar(
-            "WITH RECURSIVE subtree(group_id) AS (
-                 SELECT group_id FROM plan_groups WHERE group_id = ?
-                 UNION ALL
-                 SELECT pg.group_id FROM plan_groups pg
-                   JOIN subtree s ON pg.parent_group_id = s.group_id
-             )
-             SELECT group_id FROM subtree",
+        // Single recursive-CTE delete for plans, then for groups. The subtree is
+        // re-evaluated for the second statement, which is fine — the second one
+        // would otherwise need to see plan_groups rows that the first cannot touch.
+        sqlx::query(
+            "DELETE FROM skill_plans WHERE group_id IN (
+                 WITH RECURSIVE subtree(group_id) AS (
+                     SELECT group_id FROM plan_groups WHERE group_id = ?
+                     UNION ALL
+                     SELECT pg.group_id FROM plan_groups pg
+                       JOIN subtree s ON pg.parent_group_id = s.group_id
+                 )
+                 SELECT group_id FROM subtree
+             )",
         )
         .bind(group_id)
-        .fetch_all(&mut *tx)
+        .execute(&mut *tx)
         .await?;
 
-        for gid in &subtree_ids {
-            sqlx::query("DELETE FROM skill_plans WHERE group_id = ?")
-                .bind(gid)
-                .execute(&mut *tx)
-                .await?;
-        }
-        // Delete deepest first to avoid temporarily orphaning children if FKs are on.
-        for gid in subtree_ids.iter().rev() {
-            sqlx::query("DELETE FROM plan_groups WHERE group_id = ?")
-                .bind(gid)
-                .execute(&mut *tx)
-                .await?;
-        }
+        sqlx::query(
+            "DELETE FROM plan_groups WHERE group_id IN (
+                 WITH RECURSIVE subtree(group_id) AS (
+                     SELECT group_id FROM plan_groups WHERE group_id = ?
+                     UNION ALL
+                     SELECT pg.group_id FROM plan_groups pg
+                       JOIN subtree s ON pg.parent_group_id = s.group_id
+                 )
+                 SELECT group_id FROM subtree
+             )",
+        )
+        .bind(group_id)
+        .execute(&mut *tx)
+        .await?;
     } else {
         // Reparent direct children (groups + plans) to the deleted folder's parent.
         sqlx::query("UPDATE plan_groups SET parent_group_id = ? WHERE parent_group_id = ?")
@@ -611,25 +616,20 @@ mod tests {
             .collect()
     }
 
-    async fn plan_sort(pool: &Pool, plan_id: i64) -> (Option<i64>, i64) {
-        let row: (Option<i64>, i64) =
-            sqlx::query_as("SELECT group_id, sort_order FROM skill_plans WHERE plan_id = ?")
-                .bind(plan_id)
-                .fetch_one(pool)
-                .await
-                .unwrap();
-        row
+    async fn plan_sort(pool: &Pool, plan_id: i64) -> Option<(Option<i64>, i64)> {
+        sqlx::query_as("SELECT group_id, sort_order FROM skill_plans WHERE plan_id = ?")
+            .bind(plan_id)
+            .fetch_optional(pool)
+            .await
+            .unwrap()
     }
 
-    async fn group_row(pool: &Pool, group_id: i64) -> (Option<i64>, i64) {
-        let row: (Option<i64>, i64) = sqlx::query_as(
-            "SELECT parent_group_id, sort_order FROM plan_groups WHERE group_id = ?",
-        )
-        .bind(group_id)
-        .fetch_one(pool)
-        .await
-        .unwrap();
-        row
+    async fn group_row(pool: &Pool, group_id: i64) -> Option<(Option<i64>, i64)> {
+        sqlx::query_as("SELECT parent_group_id, sort_order FROM plan_groups WHERE group_id = ?")
+            .bind(group_id)
+            .fetch_optional(pool)
+            .await
+            .unwrap()
     }
 
     #[tokio::test]
@@ -676,7 +676,7 @@ mod tests {
         .await
         .unwrap();
 
-        let (parent, sort) = plan_sort(&db.pool, p).await;
+        let (parent, sort) = plan_sort(&db.pool, p).await.unwrap();
         assert_eq!(parent, Some(g));
         assert_eq!(sort, 0);
     }
@@ -706,9 +706,9 @@ mod tests {
         .await
         .unwrap();
 
-        let (parent, _) = group_row(&db.pool, child).await;
+        let (parent, _) = group_row(&db.pool, child).await.unwrap();
         assert_eq!(parent, Some(root_b));
-        let (plan_parent, _) = plan_sort(&db.pool, plan_in_child).await;
+        let (plan_parent, _) = plan_sort(&db.pool, plan_in_child).await.unwrap();
         assert_eq!(plan_parent, Some(child));
     }
 
@@ -781,28 +781,8 @@ mod tests {
         assert!(msg.contains("depth") || msg.contains("nesting"));
 
         // Tree must be unchanged.
-        let (parent_after, _) = group_row(&db.pool, child).await;
+        let (parent_after, _) = group_row(&db.pool, child).await.unwrap();
         assert_eq!(parent_after, Some(root_a));
-    }
-
-    async fn group_exists(pool: &Pool, group_id: i64) -> bool {
-        let row: Option<(i64,)> =
-            sqlx::query_as("SELECT group_id FROM plan_groups WHERE group_id = ?")
-                .bind(group_id)
-                .fetch_optional(pool)
-                .await
-                .unwrap();
-        row.is_some()
-    }
-
-    async fn plan_exists(pool: &Pool, plan_id: i64) -> bool {
-        let row: Option<(i64,)> =
-            sqlx::query_as("SELECT plan_id FROM skill_plans WHERE plan_id = ?")
-                .bind(plan_id)
-                .fetch_optional(pool)
-                .await
-                .unwrap();
-        row.is_some()
     }
 
     #[tokio::test]
@@ -814,12 +794,12 @@ mod tests {
             .await
             .unwrap();
 
-        delete(&db.pool, root, false).await.unwrap();
+        delete_group(&db.pool, root, false).await.unwrap();
 
-        assert!(!group_exists(&db.pool, root).await);
-        let (gp, _) = group_row(&db.pool, child_group).await;
+        assert!(group_row(&db.pool, root).await.is_none());
+        let (gp, _) = group_row(&db.pool, child_group).await.unwrap();
         assert_eq!(gp, None);
-        let (pp, _) = plan_sort(&db.pool, child_plan).await;
+        let (pp, _) = plan_sort(&db.pool, child_plan).await.unwrap();
         assert_eq!(pp, None);
     }
 
@@ -833,12 +813,12 @@ mod tests {
             .await
             .unwrap();
 
-        delete(&db.pool, mid, false).await.unwrap();
+        delete_group(&db.pool, mid, false).await.unwrap();
 
-        assert!(!group_exists(&db.pool, mid).await);
-        let (lp, _) = group_row(&db.pool, leaf).await;
+        assert!(group_row(&db.pool, mid).await.is_none());
+        let (lp, _) = group_row(&db.pool, leaf).await.unwrap();
         assert_eq!(lp, Some(root));
-        let (pp, _) = plan_sort(&db.pool, plan).await;
+        let (pp, _) = plan_sort(&db.pool, plan).await.unwrap();
         assert_eq!(pp, Some(root));
     }
 
@@ -858,15 +838,15 @@ mod tests {
             .await
             .unwrap();
 
-        delete(&db.pool, mid, true).await.unwrap();
+        delete_group(&db.pool, mid, true).await.unwrap();
 
-        assert!(!group_exists(&db.pool, mid).await);
-        assert!(!group_exists(&db.pool, leaf).await);
-        assert!(!plan_exists(&db.pool, plan_in_mid).await);
-        assert!(!plan_exists(&db.pool, plan_in_leaf).await);
+        assert!(group_row(&db.pool, mid).await.is_none());
+        assert!(group_row(&db.pool, leaf).await.is_none());
+        assert!(plan_sort(&db.pool, plan_in_mid).await.is_none());
+        assert!(plan_sort(&db.pool, plan_in_leaf).await.is_none());
         // Unrelated nodes untouched.
-        assert!(group_exists(&db.pool, root).await);
-        assert!(plan_exists(&db.pool, sibling_plan).await);
+        assert!(group_row(&db.pool, root).await.is_some());
+        assert!(plan_sort(&db.pool, sibling_plan).await.is_some());
     }
 
     #[tokio::test]
@@ -881,13 +861,13 @@ mod tests {
             .await
             .unwrap();
 
-        delete(&db.pool, target, false).await.unwrap();
+        delete_group(&db.pool, target, false).await.unwrap();
 
         // a, b, and the reparented plan now share the root in sort order.
         let groups = list(&db.pool).await.unwrap();
         let by_id: std::collections::HashMap<i64, &PlanGroup> =
             groups.iter().map(|g| (g.group_id, g)).collect();
-        let (_, plan_so) = plan_sort(&db.pool, plan).await;
+        let (_, plan_so) = plan_sort(&db.pool, plan).await.unwrap();
         let mut all: Vec<(i64, &'static str)> = vec![
             (by_id[&a].sort_order, "a"),
             (by_id[&b].sort_order, "b"),
@@ -904,7 +884,7 @@ mod tests {
     #[tokio::test]
     async fn delete_rejects_unknown_group() {
         let db = TestDb::new().await.unwrap();
-        let err = delete(&db.pool, 99_999, false).await.unwrap_err();
+        let err = delete_group(&db.pool, 99_999, false).await.unwrap_err();
         assert!(err.to_string().to_lowercase().contains("not found"));
     }
 
@@ -942,10 +922,10 @@ mod tests {
         .unwrap();
 
         // G1 densely renumbered: p1=0, p3=1
-        assert_eq!(plan_sort(&db.pool, p1).await, (Some(g1), 0));
-        assert_eq!(plan_sort(&db.pool, p3).await, (Some(g1), 1));
+        assert_eq!(plan_sort(&db.pool, p1).await, Some((Some(g1), 0)));
+        assert_eq!(plan_sort(&db.pool, p3).await, Some((Some(g1), 1)));
         // G2 has p2=0, q1=1
-        assert_eq!(plan_sort(&db.pool, p2).await, (Some(g2), 0));
-        assert_eq!(plan_sort(&db.pool, q1).await, (Some(g2), 1));
+        assert_eq!(plan_sort(&db.pool, p2).await, Some((Some(g2), 0)));
+        assert_eq!(plan_sort(&db.pool, q1).await, Some((Some(g2), 1)));
     }
 }

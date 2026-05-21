@@ -38,9 +38,9 @@ pub async fn delete_plan_group(
     group_id: i64,
     cascade_plans: bool,
 ) -> Result<(), String> {
-    db::plan_groups::delete(&pool, group_id, cascade_plans)
+    db::plan_groups::delete_group(&pool, group_id, cascade_plans)
         .await
-        .map_err(|e| format!("{}", e))
+        .map_err(|e| format!("Failed to delete folder: {}", e))
 }
 
 #[tauri::command]
