@@ -35,6 +35,8 @@ pub struct MoveNodePayload {
     pub new_sort_order: i64_ts,
 }
 
+/// Returns every plan group ordered by parent (roots first), then `sort_order`,
+/// then `group_id` for stable tiebreaks. The frontend assembles the tree.
 pub async fn list(pool: &Pool) -> Result<Vec<PlanGroup>> {
     let groups = sqlx::query_as::<_, PlanGroup>(
         "SELECT group_id, name, parent_group_id, sort_order
@@ -46,6 +48,10 @@ pub async fn list(pool: &Pool) -> Result<Vec<PlanGroup>> {
     Ok(groups)
 }
 
+/// Creates a folder under `parent_group_id` (NULL = root). Trims `name` and
+/// rejects empty input. Enforces `MAX_DEPTH` against the parent's depth so the
+/// tree never exceeds the configured nesting limit. Appends to the end of the
+/// parent's children by assigning the next free `sort_order`.
 pub async fn create(pool: &Pool, name: &str, parent_group_id: Option<i64>) -> Result<i64> {
     let name = name.trim();
     if name.is_empty() {
@@ -106,6 +112,8 @@ pub async fn create(pool: &Pool, name: &str, parent_group_id: Option<i64>) -> Re
     Ok(result.last_insert_rowid())
 }
 
+/// Renames an existing folder. Trims input and rejects empty names. Errors if
+/// `group_id` does not exist.
 pub async fn rename(pool: &Pool, group_id: i64, name: &str) -> Result<()> {
     let name = name.trim();
     if name.is_empty() {
@@ -124,6 +132,11 @@ pub async fn rename(pool: &Pool, group_id: i64, name: &str) -> Result<()> {
     Ok(())
 }
 
+/// Deletes a folder. With `cascade_plans = true`, removes the entire subtree —
+/// every descendant folder and every plan inside any of them. With
+/// `cascade_plans = false`, reparents the folder's direct children (both
+/// subfolders and plans) up to the deleted folder's parent before removing it,
+/// then renumbers the surviving siblings densely.
 pub async fn delete_group(pool: &Pool, group_id: i64, cascade_plans: bool) -> Result<()> {
     let mut tx = pool.begin().await?;
 
@@ -192,6 +205,18 @@ pub async fn delete_group(pool: &Pool, group_id: i64, cascade_plans: bool) -> Re
     Ok(())
 }
 
+/// Moves a plan or folder to `new_parent_group_id` (NULL = root) and places it
+/// at `new_sort_order` among its new siblings. Validates:
+/// - `new_sort_order >= 0`;
+/// - `new_parent_group_id` exists (when Some);
+/// - for folder moves, the destination is not the moved folder itself nor any
+///   of its descendants (cycle check);
+/// - for folder moves, the moved subtree's depth at the new location does not
+///   exceed `MAX_DEPTH`.
+///
+/// Renumbers both the new parent's children (placing the moved node at
+/// `new_sort_order`) and, if the parent changed, the old parent's children
+/// densely from zero.
 pub async fn move_node(pool: &Pool, payload: MoveNodePayload) -> Result<()> {
     let mut tx = pool.begin().await?;
 
@@ -295,22 +320,17 @@ pub async fn move_node(pool: &Pool, payload: MoveNodePayload) -> Result<()> {
         }
     }
 
-    // Re-parent the moved node with a temporary high sort_order so renumbering
-    // can place it cleanly. Use a value larger than any plausible sibling.
-    let parking_sort: i64 = 1_000_000_000;
+    // Re-parent only. The renumber pass below will overwrite sort_order for
+    // every sibling — including the moved node — at its final position.
     if kind_is_group {
-        sqlx::query(
-            "UPDATE plan_groups SET parent_group_id = ?, sort_order = ? WHERE group_id = ?",
-        )
-        .bind(new_parent)
-        .bind(parking_sort)
-        .bind(id)
-        .execute(&mut *tx)
-        .await?;
-    } else {
-        sqlx::query("UPDATE skill_plans SET group_id = ?, sort_order = ? WHERE plan_id = ?")
+        sqlx::query("UPDATE plan_groups SET parent_group_id = ? WHERE group_id = ?")
             .bind(new_parent)
-            .bind(parking_sort)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+    } else {
+        sqlx::query("UPDATE skill_plans SET group_id = ? WHERE plan_id = ?")
+            .bind(new_parent)
             .bind(id)
             .execute(&mut *tx)
             .await?;
@@ -380,16 +400,15 @@ async fn renumber_with_insertion(
         siblings.push((pid, false, sort));
     }
 
+    // Stable order: by current sort_order, then by kind, then by id. The kind
+    // tiebreak keeps deterministic placement when a folder and plan share a
+    // sort_order (e.g. immediately after a parent change).
+    siblings.sort_by_key(|(id, is_group, sort)| (*sort, *is_group, *id));
+
     if let Some((moved_id, moved_is_group, target)) = place_moved {
-        // Remove moved from the list so we can re-insert at the requested index.
         siblings.retain(|(id, is_group, _)| !(*id == moved_id && *is_group == moved_is_group));
-        // Stable order: by current sort_order then by id (group vs plan id are disjoint enough
-        // for deterministic ordering within each kind; we add `is_group` as a final tiebreak).
-        siblings.sort_by(|a, b| a.2.cmp(&b.2).then(a.1.cmp(&b.1)).then(a.0.cmp(&b.0)));
         let idx = target.clamp(0, siblings.len() as i64) as usize;
         siblings.insert(idx, (moved_id, moved_is_group, target));
-    } else {
-        siblings.sort_by(|a, b| a.2.cmp(&b.2).then(a.1.cmp(&b.1)).then(a.0.cmp(&b.0)));
     }
 
     for (i, (id, is_group, _)) in siblings.iter().enumerate() {

@@ -18,7 +18,7 @@ pub async fn create_plan_group(
 ) -> Result<i64, String> {
     db::plan_groups::create(&pool, &name, parent_group_id)
         .await
-        .map_err(|e| format!("{}", e))
+        .map_err(|e| format!("Failed to create folder: {}", e))
 }
 
 #[tauri::command]
@@ -29,7 +29,7 @@ pub async fn rename_plan_group(
 ) -> Result<(), String> {
     db::plan_groups::rename(&pool, group_id, &name)
         .await
-        .map_err(|e| format!("{}", e))
+        .map_err(|e| format!("Failed to rename folder: {}", e))
 }
 
 #[tauri::command]
@@ -47,5 +47,5 @@ pub async fn delete_plan_group(
 pub async fn move_node(pool: State<'_, db::Pool>, payload: MoveNodePayload) -> Result<(), String> {
     db::plan_groups::move_node(&pool, payload)
         .await
-        .map_err(|e| format!("{}", e))
+        .map_err(|e| format!("Failed to move folder: {}", e))
 }
