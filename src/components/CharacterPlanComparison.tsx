@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { match, P } from 'ts-pattern';
 
+import { PlanTree } from '@/components/PlanTree';
 import { SkillLevelPips } from '@/components/SkillLevelPips';
-import { PlanTree } from '@/components/SkillPlans/PlanTree';
 import type { PlanComparisonEntry } from '@/generated/types';
 import { usePlanComparison } from '@/hooks/tauri/usePlanComparison';
 import { cn, formatSkillpoints, toRoman } from '@/lib/utils';

@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router';
 
-import { PlanTree } from '@/components/SkillPlans/PlanTree';
+import { PlanTree } from '@/components/PlanTree';
 
 function PlansIndexPage() {
   return (

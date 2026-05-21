@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router';
 
+import { PlanTree } from '@/components/PlanTree';
 import { PlanEditor } from '@/components/SkillPlans/PlanEditor';
-import { PlanTree } from '@/components/SkillPlans/PlanTree';
 
 function PlanDetailPage() {
   const { planId } = Route.useParams();

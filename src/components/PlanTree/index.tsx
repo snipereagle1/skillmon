@@ -28,7 +28,7 @@ import {
   usePersistExpandedPlanGroups,
 } from '@/hooks/tauri/useExpandedPlanGroups';
 import { useMoveNode, usePlanGroups } from '@/hooks/tauri/usePlanGroups';
-import { useDeleteSkillPlan, useSkillPlans } from '@/hooks/tauri/useSkillPlans';
+import { useSkillPlans } from '@/hooks/tauri/useSkillPlans';
 import { assemblePlanTree, type PlanTreeNode } from '@/lib/planTree';
 import {
   groupNodeId,
@@ -41,12 +41,7 @@ import {
 import { cn } from '@/lib/utils';
 import { usePlanTreeDialogStore } from '@/stores/planTreeDialogStore';
 
-import { CreatePlanDialog } from './CreatePlanDialog';
-import { CreatePlanFromCharacterDialog } from './CreatePlanFromCharacterDialog';
-import { CreatePlanGroupDialog } from './CreatePlanGroupDialog';
-import { DeletePlanDialog } from './DeletePlanDialog';
-import { DeletePlanGroupDialog } from './DeletePlanGroupDialog';
-import { RenamePlanGroupDialog } from './RenamePlanGroupDialog';
+import { PlanTreeDialogs } from './PlanTreeDialogs';
 
 type PlanItem = TreeNode & {
   _planDescription?: string;
@@ -122,10 +117,8 @@ export function PlanTree({
   } = useSkillPlans();
   const { data: groups, isLoading: groupsLoading } = usePlanGroups();
   const { expanded, onExpandedChange } = useExpandedGroupTreeState();
-  const deletePlanMutation = useDeleteSkillPlan();
   const moveNodeMutation = useMoveNode();
 
-  const dialog = usePlanTreeDialogStore((s) => s.dialog);
   const openCreatePlan = usePlanTreeDialogStore((s) => s.openCreatePlan);
   const openCreatePlanFromCharacter = usePlanTreeDialogStore(
     (s) => s.openCreatePlanFromCharacter
@@ -140,7 +133,6 @@ export function PlanTree({
     (s) => s.openDeletePlanGroup
   );
   const openDeletePlan = usePlanTreeDialogStore((s) => s.openDeletePlan);
-  const closeDialog = usePlanTreeDialogStore((s) => s.close);
 
   const tree = useMemo(
     () => assemblePlanTree(groups ?? [], plans ?? []),
@@ -175,20 +167,6 @@ export function PlanTree({
     },
     [onPlanClick, navigate]
   );
-
-  const handleDeleteConfirm = async () => {
-    if (dialog.kind !== 'deletePlan') return;
-    const { planId } = dialog;
-    try {
-      await deletePlanMutation.mutateAsync({ planId });
-      if (selectedPlanId === planId) {
-        navigate({ to: '/plans' });
-      }
-      closeDialog();
-    } catch (err) {
-      console.error('Failed to delete plan:', err);
-    }
-  };
 
   const handleDrop = async (sourceId: string, target: DropTarget) => {
     const source = parseNodeId(sourceId);
@@ -261,7 +239,6 @@ export function PlanTree({
           <Button
             variant="ghost"
             size="sm"
-            disabled={deletePlanMutation.isPending}
             onClick={(e) => {
               e.stopPropagation();
               openDeletePlan(node.id, node.name);
@@ -279,7 +256,6 @@ export function PlanTree({
   }, [
     tree,
     showActions,
-    deletePlanMutation.isPending,
     handlePlanClick,
     openRenamePlanGroup,
     openDeletePlanGroup,
@@ -373,65 +349,7 @@ export function PlanTree({
           />
         )}
       </div>
-      <CreatePlanDialog
-        open={dialog.kind === 'createPlan'}
-        onOpenChange={(open) => {
-          if (!open) closeDialog();
-        }}
-        onSuccess={(planId) => {
-          closeDialog();
-          navigate({
-            to: '/plans/$planId',
-            params: { planId: String(planId) },
-          });
-        }}
-      />
-      <CreatePlanFromCharacterDialog
-        open={dialog.kind === 'createPlanFromCharacter'}
-        onOpenChange={(open) => {
-          if (!open) closeDialog();
-        }}
-        onSuccess={(planId) => {
-          closeDialog();
-          navigate({
-            to: '/plans/$planId',
-            params: { planId: String(planId) },
-          });
-        }}
-      />
-      <DeletePlanDialog
-        open={dialog.kind === 'deletePlan'}
-        onOpenChange={(open) => {
-          if (!open) closeDialog();
-        }}
-        planName={dialog.kind === 'deletePlan' ? dialog.name : undefined}
-        onConfirm={handleDeleteConfirm}
-        isDeleting={deletePlanMutation.isPending}
-      />
-      <CreatePlanGroupDialog
-        open={dialog.kind === 'createPlanGroup'}
-        onOpenChange={(open) => {
-          if (!open) closeDialog();
-        }}
-      />
-      <DeletePlanGroupDialog
-        open={dialog.kind === 'deletePlanGroup'}
-        onOpenChange={(open) => {
-          if (!open) closeDialog();
-        }}
-        groupId={dialog.kind === 'deletePlanGroup' ? dialog.groupId : null}
-        groupName={dialog.kind === 'deletePlanGroup' ? dialog.name : ''}
-      />
-      <RenamePlanGroupDialog
-        open={dialog.kind === 'renamePlanGroup'}
-        onOpenChange={(open) => {
-          if (!open) closeDialog();
-        }}
-        groupId={dialog.kind === 'renamePlanGroup' ? dialog.groupId : null}
-        currentName={
-          dialog.kind === 'renamePlanGroup' ? dialog.currentName : ''
-        }
-      />
+      <PlanTreeDialogs />
     </>
   );
 }
