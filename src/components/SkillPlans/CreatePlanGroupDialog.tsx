@@ -135,7 +135,6 @@ export function CreatePlanGroupDialog({
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder="Enter folder name"
-                autoFocus
                 required
               />
             </div>

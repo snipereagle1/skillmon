@@ -54,15 +54,16 @@ function ComparisonEntryRow({
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <SkillLevelPips queuedLevel={entry.planned_level} />
           <div className="flex flex-col flex-1 min-w-0">
-            <span
+            <button
+              type="button"
               className={cn(
-                'text-foreground font-medium truncate cursor-pointer hover:underline',
+                'text-foreground font-medium truncate text-left cursor-pointer hover:underline focus-visible:underline focus-visible:outline-none',
                 isPrerequisite && 'text-muted-foreground'
               )}
               onClick={() => openSkillDetail(entry.skill_type_id, characterId)}
             >
               {entry.skill_name} {levelRoman}
-            </span>
+            </button>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span>
                 Planned: Level {entry.planned_level} (
@@ -162,7 +163,7 @@ export function CharacterPlanComparison({
           ))
           .with({ isLoadingComparison: true }, () => (
             <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">Loading comparison...</p>
+              <p className="text-muted-foreground">Loading comparison…</p>
             </div>
           ))
           .with({ comparison: P.nullish }, () => (
@@ -224,7 +225,7 @@ export function CharacterPlanComparison({
                       {formatSkillpoints(stats.totalMissingSP)}
                     </span>
                   </div>
-                  <div className="flex items-center space-x-2 shrink-0">
+                  <div className="flex items-center gap-x-2 shrink-0">
                     <Label
                       htmlFor="untrained-only"
                       className="text-xs text-muted-foreground"
@@ -241,7 +242,7 @@ export function CharacterPlanComparison({
               </div>
               <div className="flex-1 overflow-y-auto">
                 {sortedEntries.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-32 space-y-2">
+                  <div className="flex flex-col items-center justify-center h-32 gap-y-2">
                     <p className="text-muted-foreground">
                       {showUntrainedOnly
                         ? 'No untrained skills in this plan'

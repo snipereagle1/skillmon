@@ -344,14 +344,11 @@ function NodeRow({
           aria-label={isOpen ? 'Collapse' : 'Expand'}
         >
           <ChevronRight
-            className={cn(
-              'h-4 w-4 transition-transform',
-              isOpen && 'rotate-90'
-            )}
+            className={cn('size-4 transition-transform', isOpen && 'rotate-90')}
           />
         </button>
       ) : (
-        <span className="h-4 w-4 shrink-0 ml-1 mr-1" />
+        <span className="size-4 shrink-0 ml-1 mr-1" />
       )}
       <button
         type="button"
@@ -362,7 +359,7 @@ function NodeRow({
         }}
         className="flex-1 flex items-center gap-2 py-2 pr-2 text-left min-w-0"
       >
-        {Icon && <Icon className="h-4 w-4 shrink-0" />}
+        {Icon && <Icon className="size-4 shrink-0" />}
         {renderItem ? (
           renderItem({
             item: node,

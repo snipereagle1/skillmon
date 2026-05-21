@@ -27,6 +27,7 @@ interface RenameFormProps {
 }
 
 function RenameForm({ groupId, currentName, onClose }: RenameFormProps) {
+  // Editable form state seeded from prop; parent uses key={groupId} to remount on change.
   const [name, setName] = useState(currentName);
   const renameMutation = useRenamePlanGroup();
 
@@ -55,7 +56,6 @@ function RenameForm({ groupId, currentName, onClose }: RenameFormProps) {
             id="rename-folder"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            autoFocus
             required
           />
         </div>
