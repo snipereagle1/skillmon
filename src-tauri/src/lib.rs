@@ -408,6 +408,8 @@ pub fn run() {
             commands::remaps::delete_remap,
             commands::settings::get_app_settings,
             commands::settings::set_boolean_app_setting,
+            commands::settings::get_expanded_plan_groups,
+            commands::settings::set_expanded_plan_groups,
             commands::settings::get_enabled_features,
             commands::settings::set_feature_enabled,
             commands::settings::get_optional_features,

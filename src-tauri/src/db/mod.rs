@@ -28,7 +28,10 @@ pub use accounts::{
     reorder_accounts, reorder_characters_in_account, reorder_unassigned_characters,
     update_account_name,
 };
-pub use app_settings::{get_boolean_app_setting, set_boolean_app_setting};
+pub use app_settings::{
+    get_boolean_app_setting, get_expanded_plan_groups, set_boolean_app_setting,
+    set_expanded_plan_groups,
+};
 pub use character_attributes::{
     get_character_attributes, set_character_attributes, CharacterAttributes,
 };

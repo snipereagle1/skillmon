@@ -48,6 +48,10 @@ export interface DndTreeViewProps {
   canDrop?: (sourceId: string, target: DropTarget) => boolean;
   renderItem?: (params: RenderItemParams) => React.ReactNode;
   defaultExpanded?: 'all' | string[];
+  /** Controlled expanded set. When provided together with `onExpandedChange`,
+   * internal expand state is bypassed. */
+  expanded?: Set<string>;
+  onExpandedChange?: (next: Set<string>) => void;
   defaultLeafIcon?: React.ComponentType<{ className?: string }>;
   defaultNodeIcon?: React.ComponentType<{ className?: string }>;
   indentPx?: number;
@@ -128,19 +132,27 @@ export function DndTreeView({
   canDrop,
   renderItem,
   defaultExpanded = 'all',
+  expanded: controlledExpanded,
+  onExpandedChange,
   defaultLeafIcon,
   defaultNodeIcon,
   indentPx = 12,
   className,
 }: DndTreeViewProps) {
-  const [expanded, setExpanded] = useState<Set<string>>(() => {
-    if (defaultExpanded === 'all') {
-      const all = new Set<string>();
-      collectAllIds(data, all);
-      return all;
+  const isControlled =
+    controlledExpanded !== undefined && onExpandedChange !== undefined;
+  const [uncontrolledExpanded, setUncontrolledExpanded] = useState<Set<string>>(
+    () => {
+      if (isControlled) return new Set();
+      if (defaultExpanded === 'all') {
+        const all = new Set<string>();
+        collectAllIds(data, all);
+        return all;
+      }
+      return new Set(defaultExpanded);
     }
-    return new Set(defaultExpanded);
-  });
+  );
+  const expanded = isControlled ? controlledExpanded : uncontrolledExpanded;
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
@@ -152,14 +164,24 @@ export function DndTreeView({
     return out;
   }, [data, expanded]);
 
-  const toggleExpand = useCallback((id: string) => {
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  }, []);
+  const toggleExpand = useCallback(
+    (id: string) => {
+      if (isControlled) {
+        const next = new Set(controlledExpanded);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        onExpandedChange(next);
+        return;
+      }
+      setUncontrolledExpanded((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      });
+    },
+    [isControlled, controlledExpanded, onExpandedChange]
+  );
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;

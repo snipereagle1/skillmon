@@ -24,6 +24,10 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { NodeKind } from '@/generated/types';
+import {
+  useExpandedPlanGroups,
+  usePersistExpandedPlanGroups,
+} from '@/hooks/tauri/useExpandedPlanGroups';
 import { useMoveNode, usePlanGroups } from '@/hooks/tauri/usePlanGroups';
 import { useDeleteSkillPlan, useSkillPlans } from '@/hooks/tauri/useSkillPlans';
 import { assemblePlanTree, type PlanTreeNode } from '@/lib/planTree';
@@ -53,6 +57,27 @@ function parseNodeId(raw: string): { kind: NodeKind; id: number } | null {
   if (kind === NodeKind.Plan) return { kind: NodeKind.Plan, id };
   if (kind === NodeKind.Group) return { kind: NodeKind.Group, id };
   return null;
+}
+
+function useExpandedGroupTreeState() {
+  const { data: persistedExpanded } = useExpandedPlanGroups();
+  const persistExpanded = usePersistExpandedPlanGroups();
+  const expanded = useMemo<Set<string>>(
+    () => new Set((persistedExpanded ?? []).map(groupNodeId)),
+    [persistedExpanded]
+  );
+  const onExpandedChange = useCallback(
+    (next: Set<string>) => {
+      const ids: number[] = [];
+      for (const key of next) {
+        const parsed = parseNodeId(key);
+        if (parsed?.kind === NodeKind.Group) ids.push(parsed.id);
+      }
+      persistExpanded(ids);
+    },
+    [persistExpanded]
+  );
+  return { expanded, onExpandedChange };
 }
 
 interface PlanRowBodyProps {
@@ -100,6 +125,7 @@ export function PlanTree({
     error: plansError,
   } = useSkillPlans();
   const { data: groups, isLoading: groupsLoading } = usePlanGroups();
+  const { expanded, onExpandedChange } = useExpandedGroupTreeState();
   const deletePlanMutation = useDeleteSkillPlan();
   const moveNodeMutation = useMoveNode();
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
@@ -414,6 +440,8 @@ export function PlanTree({
             selectedId={
               selectedPlanId != null ? planNodeId(selectedPlanId) : null
             }
+            expanded={expanded}
+            onExpandedChange={onExpandedChange}
             onDrop={handleDrop}
             canDrop={canDrop}
             renderItem={({ item, isLeaf, isSelected }) => {

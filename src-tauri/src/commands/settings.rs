@@ -53,6 +53,23 @@ pub async fn get_app_settings(pool: State<'_, db::Pool>) -> Result<AppSettings, 
 }
 
 #[tauri::command]
+pub async fn get_expanded_plan_groups(pool: State<'_, db::Pool>) -> Result<Vec<i64_ts>, String> {
+    db::get_expanded_plan_groups(&pool)
+        .await
+        .map_err(|e| format!("Failed to get expanded plan groups: {}", e))
+}
+
+#[tauri::command]
+pub async fn set_expanded_plan_groups(
+    pool: State<'_, db::Pool>,
+    group_ids: Vec<i64_ts>,
+) -> Result<(), String> {
+    db::set_expanded_plan_groups(&pool, &group_ids)
+        .await
+        .map_err(|e| format!("Failed to set expanded plan groups: {}", e))
+}
+
+#[tauri::command]
 pub async fn set_boolean_app_setting(
     pool: State<'_, db::Pool>,
     key: BooleanAppSettingKey,
