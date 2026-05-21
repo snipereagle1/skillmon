@@ -1,18 +1,20 @@
+import { useNavigate, useParams } from '@tanstack/react-router';
 import {
-  closestCenter,
-  DndContext,
-  type DragEndEvent,
-  PointerSensor,
-  useDraggable,
-  useDroppable,
-  useSensor,
-  useSensors,
-} from '@dnd-kit/core';
-import { Link, useNavigate, useParams } from '@tanstack/react-router';
-import { ChevronDown, FolderPlus, Pencil } from 'lucide-react';
-import { useMemo, useState } from 'react';
+  ChevronDown,
+  FileText,
+  Folder,
+  FolderOpen,
+  FolderPlus,
+  Pencil,
+} from 'lucide-react';
+import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import {
+  DndTreeView,
+  type DropTarget,
+  type TreeNode,
+} from '@/components/DndTreeView';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -32,220 +34,45 @@ import { CreatePlanGroupDialog } from './CreatePlanGroupDialog';
 import { DeletePlanDialog } from './DeletePlanDialog';
 import { RenamePlanGroupDialog } from './RenamePlanGroupDialog';
 
-type FlatRow = {
-  node: PlanTreeNode;
-  depth: number;
-  parentGroupId: number | null;
-  siblingIndex: number;
+type PlanItem = TreeNode & {
+  _planDescription?: string;
 };
 
-function flatten(
-  nodes: PlanTreeNode[],
-  depth: number,
-  parentGroupId: number | null,
-  out: FlatRow[]
-) {
-  nodes.forEach((node, siblingIndex) => {
-    out.push({ node, depth, parentGroupId, siblingIndex });
-    if (node.kind === 'group') {
-      flatten(node.children, depth + 1, node.id, out);
-    }
-  });
+function planNodeId(id: number) {
+  return `plan:${id}`;
+}
+function groupNodeId(id: number) {
+  return `group:${id}`;
+}
+function parseNodeId(raw: string): { kind: NodeKind; id: number } | null {
+  const [kind, idStr] = raw.split(':');
+  const id = Number(idStr);
+  if (!Number.isFinite(id)) return null;
+  if (kind === NodeKind.Plan) return { kind: NodeKind.Plan, id };
+  if (kind === NodeKind.Group) return { kind: NodeKind.Group, id };
+  return null;
 }
 
-function dragId(kind: NodeKind, id: number) {
-  return `drag:${kind}:${id}`;
+interface PlanRowBodyProps {
+  name: string;
+  description?: string;
+  isSelected: boolean;
 }
-function gapId(parentGroupId: number | null, index: number) {
-  return `gap:${parentGroupId ?? 'root'}:${index}`;
-}
-function rowDropId(kind: NodeKind, id: number) {
-  return `row:${kind}:${id}`;
-}
-
-interface DragData {
-  kind: NodeKind;
-  id: number;
-  parentGroupId: number | null;
-  siblingIndex: number;
-}
-interface GapDropData {
-  type: 'gap';
-  parentGroupId: number | null;
-  index: number;
-}
-interface RowDropData {
-  type: 'row';
-  kind: NodeKind;
-  id: number;
-}
-
-interface PlanRowProps {
-  node: Extract<PlanTreeNode, { kind: 'plan' }>;
-  selectedPlanId: number | null;
-  onDelete?: (planId: number, planName: string) => void;
-  onPlanClick?: (planId: number) => void;
-  isDeleting: boolean;
-  depth: number;
-  dragData: DragData;
-}
-
-function PlanRow({
-  node,
-  selectedPlanId,
-  onDelete,
-  onPlanClick,
-  isDeleting,
-  depth,
-  dragData,
-}: PlanRowProps) {
-  const isSelected = selectedPlanId === node.id;
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: dragId(NodeKind.Plan, node.id),
-    data: dragData,
-  });
-  const body = (
+function PlanRowBody({ name, description, isSelected }: PlanRowBodyProps) {
+  return (
     <div className="flex-1 min-w-0">
-      <h3 className="h-card truncate">{node.name}</h3>
-      {node.description && (
+      <h3 className="h-card truncate">{name}</h3>
+      {description && (
         <p
           className={cn(
             'text-sm mt-1 line-clamp-2',
             isSelected ? 'text-foreground/80' : 'text-muted-foreground'
           )}
         >
-          {node.description}
+          {description}
         </p>
       )}
     </div>
-  );
-
-  return (
-    <div
-      ref={setNodeRef}
-      className={cn(
-        'relative flex items-center rounded-md transition-colors',
-        isSelected ? 'bg-muted text-foreground' : 'hover:bg-muted',
-        isDragging && 'opacity-50'
-      )}
-      style={{ paddingLeft: depth * 12 }}
-      {...attributes}
-      {...listeners}
-    >
-      {onPlanClick ? (
-        <button
-          type="button"
-          onClick={() => onPlanClick(node.id)}
-          className="flex-1 block p-3 min-w-0 text-left"
-        >
-          {body}
-        </button>
-      ) : (
-        <Link
-          to="/plans/$planId"
-          params={{ planId: String(node.id) }}
-          className="flex-1 block p-3 min-w-0"
-        >
-          {body}
-        </Link>
-      )}
-      {onDelete && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => onDelete(node.id, node.name)}
-          disabled={isDeleting}
-          className={cn(
-            'absolute right-2 top-3 shrink-0 size-6 p-0 hover:bg-destructive hover:text-destructive-foreground',
-            isSelected && 'text-foreground/60'
-          )}
-        >
-          ×
-        </Button>
-      )}
-    </div>
-  );
-}
-
-interface GroupRowProps {
-  node: Extract<PlanTreeNode, { kind: 'group' }>;
-  depth: number;
-  onRenameGroup?: (groupId: number, currentName: string) => void;
-  dragData: DragData;
-}
-
-function GroupRow({ node, depth, onRenameGroup, dragData }: GroupRowProps) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
-    id: dragId(NodeKind.Group, node.id),
-    data: dragData,
-  });
-  const { setNodeRef: setDropRef, isOver } = useDroppable({
-    id: rowDropId(NodeKind.Group, node.id),
-    data: {
-      type: 'row',
-      kind: NodeKind.Group,
-      id: node.id,
-    } satisfies RowDropData,
-  });
-
-  return (
-    <div
-      ref={(el) => {
-        setNodeRef(el);
-        setDropRef(el);
-      }}
-      className={cn(
-        'group flex items-center gap-1 p-2 text-sm font-medium text-muted-foreground rounded-md',
-        isOver && 'ring-2 ring-primary bg-primary/10',
-        isDragging && 'opacity-50'
-      )}
-      style={{ paddingLeft: depth * 12 }}
-      {...attributes}
-      {...listeners}
-    >
-      <span className="flex-1 truncate">{node.name}</span>
-      {onRenameGroup && (
-        <Button
-          variant="ghost"
-          size="sm"
-          className="size-6 p-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
-          onClick={(e) => {
-            e.stopPropagation();
-            onRenameGroup(node.id, node.name);
-          }}
-          aria-label={`Rename folder ${node.name}`}
-        >
-          <Pencil className="size-3.5" />
-        </Button>
-      )}
-    </div>
-  );
-}
-
-interface GapProps {
-  parentGroupId: number | null;
-  index: number;
-  depth: number;
-}
-
-function Gap({ parentGroupId, index, depth }: GapProps) {
-  const { setNodeRef, isOver } = useDroppable({
-    id: gapId(parentGroupId, index),
-    data: {
-      type: 'gap',
-      parentGroupId,
-      index,
-    } satisfies GapDropData,
-  });
-  return (
-    <div
-      ref={setNodeRef}
-      style={{ paddingLeft: depth * 12 }}
-      className={cn(
-        'h-1 rounded-full transition-colors',
-        isOver && 'h-2 bg-primary'
-      )}
-    />
   );
 }
 
@@ -288,46 +115,52 @@ export function PlanTree({
     name: string;
   } | null>(null);
 
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } })
-  );
-
   const tree = useMemo(
     () => assemblePlanTree(groups ?? [], plans ?? []),
     [groups, plans]
   );
 
-  const flat = useMemo(() => {
-    const out: FlatRow[] = [];
-    flatten(tree, 0, null, out);
-    return out;
+  // Resolve a node's parent/sibling-index/childCount from its composite id.
+  const nodeIndex = useMemo(() => {
+    const parentOf = new Map<string, number | null>();
+    const indexOf = new Map<string, number>();
+    const childCount = new Map<number | null, number>();
+    const walk = (nodes: PlanTreeNode[], parentId: number | null) => {
+      childCount.set(parentId, nodes.length);
+      nodes.forEach((n, i) => {
+        const key = n.kind === 'plan' ? planNodeId(n.id) : groupNodeId(n.id);
+        parentOf.set(key, parentId);
+        indexOf.set(key, i);
+        if (n.kind === 'group') walk(n.children, n.id);
+      });
+    };
+    walk(tree, null);
+    return { parentOf, indexOf, childCount };
   }, [tree]);
 
-  // Count direct children of a folder (groups + plans), for "drop on folder = append".
-  const childCounts = useMemo(() => {
-    const counts = new Map<number, number>();
-    for (const g of groups ?? []) {
-      if (g.parent_group_id != null) {
-        counts.set(g.parent_group_id, (counts.get(g.parent_group_id) ?? 0) + 1);
+  const handlePlanClick = useCallback(
+    (planId: number) => {
+      if (onPlanClick) {
+        onPlanClick(planId);
+      } else {
+        navigate({ to: '/plans/$planId', params: { planId: String(planId) } });
       }
-    }
-    for (const p of plans ?? []) {
-      if (p.group_id != null) {
-        counts.set(p.group_id, (counts.get(p.group_id) ?? 0) + 1);
-      }
-    }
-    return counts;
-  }, [groups, plans]);
+    },
+    [onPlanClick, navigate]
+  );
 
-  const handleDeleteClick = (planId: number, planName: string) => {
+  const handleDeleteClick = useCallback((planId: number, planName: string) => {
     setPlanToDelete({ id: planId, name: planName });
     setDeleteDialogOpen(true);
-  };
+  }, []);
 
-  const handleRenameGroup = (groupId: number, currentName: string) => {
-    setGroupToRename({ id: groupId, name: currentName });
-    setRenameGroupDialogOpen(true);
-  };
+  const handleRenameGroup = useCallback(
+    (groupId: number, currentName: string) => {
+      setGroupToRename({ id: groupId, name: currentName });
+      setRenameGroupDialogOpen(true);
+    },
+    []
+  );
 
   const handleDeleteConfirm = async () => {
     if (!planToDelete) return;
@@ -343,53 +176,47 @@ export function PlanTree({
     }
   };
 
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    if (!over) return;
+  const handleDrop = async (sourceId: string, target: DropTarget) => {
+    const source = parseNodeId(sourceId);
+    if (!source) return;
 
-    const drag = active.data.current as DragData | undefined;
-    const drop = over.data.current as GapDropData | RowDropData | undefined;
-    if (!drag || !drop) return;
+    const sourceParentGroupId = nodeIndex.parentOf.get(sourceId) ?? null;
+    const sourceIndex = nodeIndex.indexOf.get(sourceId) ?? 0;
 
     let newParent: number | null;
     let newSortOrder: number;
 
-    if (drop.type === 'row') {
+    if (target.type === 'row') {
       // Drop onto a folder row → nest as last child.
-      if (drop.kind !== NodeKind.Group) return;
-      newParent = drop.id;
-      // Append at end of new parent's children. If moving within same parent,
-      // the moved item is already counted; otherwise it isn't yet.
-      const existing = childCounts.get(drop.id) ?? 0;
+      const parsed = parseNodeId(target.id);
+      if (!parsed || parsed.kind !== NodeKind.Group) return;
+      newParent = parsed.id;
+      const existing = nodeIndex.childCount.get(parsed.id) ?? 0;
       newSortOrder =
-        drag.parentGroupId === drop.id ? Math.max(0, existing - 1) : existing;
+        sourceParentGroupId === parsed.id
+          ? Math.max(0, existing - 1)
+          : existing;
     } else {
-      // Drop into a gap → sibling at that index inside drop.parentGroupId.
-      newParent = drop.parentGroupId;
-      let target = drop.index;
-      // Within the same parent, removing the dragged row from above the gap
-      // shifts the target index down by one.
-      if (
-        drag.parentGroupId === drop.parentGroupId &&
-        drag.siblingIndex < target
-      ) {
-        target -= 1;
+      // Drop into a gap → sibling at that index inside target.parentId.
+      const targetParent = target.parentId
+        ? (parseNodeId(target.parentId)?.id ?? null)
+        : null;
+      newParent = targetParent;
+      let idx = target.index;
+      if (sourceParentGroupId === newParent && sourceIndex < idx) {
+        idx -= 1;
       }
-      newSortOrder = target;
+      newSortOrder = idx;
     }
 
-    // No-op: dropping where it already sits.
-    if (
-      drag.parentGroupId === newParent &&
-      drag.siblingIndex === newSortOrder
-    ) {
+    if (sourceParentGroupId === newParent && sourceIndex === newSortOrder) {
       return;
     }
 
     try {
       await moveNodeMutation.mutateAsync({
-        kind: drag.kind,
-        id: drag.id,
+        kind: source.kind,
+        id: source.id,
         new_parent_group_id: newParent ?? undefined,
         new_sort_order: newSortOrder,
       });
@@ -397,6 +224,91 @@ export function PlanTree({
       toast.error(err instanceof Error ? err.message : String(err));
     }
   };
+
+  // Prevent dropping a folder into itself or any of its descendants.
+  const canDrop = (sourceId: string, target: DropTarget): boolean => {
+    const source = parseNodeId(sourceId);
+    if (!source || source.kind !== NodeKind.Group) return true;
+    const forbiddenParent = source.id;
+    const isDescendantOf = (groupId: number): boolean => {
+      if (groupId === forbiddenParent) return true;
+      const parent = nodeIndex.parentOf.get(groupNodeId(groupId));
+      if (parent == null) return false;
+      return isDescendantOf(parent);
+    };
+    if (target.type === 'row') {
+      const parsed = parseNodeId(target.id);
+      if (!parsed || parsed.kind !== NodeKind.Group) return true;
+      return !isDescendantOf(parsed.id);
+    }
+    const targetParent = target.parentId
+      ? (parseNodeId(target.parentId)?.id ?? null)
+      : null;
+    if (targetParent == null) return true;
+    return !isDescendantOf(targetParent);
+  };
+
+  const treeData: PlanItem[] = useMemo(() => {
+    const build = (node: PlanTreeNode): PlanItem => {
+      if (node.kind === 'group') {
+        return {
+          id: groupNodeId(node.id),
+          name: node.name,
+          icon: Folder,
+          openIcon: FolderOpen,
+          draggable: true,
+          droppable: true,
+          children: node.children.map(build),
+          actions: showActions ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="size-6 p-0"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRenameGroup(node.id, node.name);
+              }}
+              aria-label={`Rename folder ${node.name}`}
+            >
+              <Pencil className="size-3.5" />
+            </Button>
+          ) : undefined,
+        } satisfies PlanItem;
+      }
+      return {
+        id: planNodeId(node.id),
+        name: node.name,
+        icon: FileText,
+        draggable: true,
+        droppable: false,
+        onClick: () => handlePlanClick(node.id),
+        actions: showActions ? (
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={deletePlanMutation.isPending}
+            onClick={(e) => {
+              e.stopPropagation();
+              handleDeleteClick(node.id, node.name);
+            }}
+            className="size-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+            aria-label={`Delete plan ${node.name}`}
+          >
+            ×
+          </Button>
+        ) : undefined,
+        _planDescription: node.description,
+      } satisfies PlanItem;
+    };
+    return tree.map(build);
+  }, [
+    tree,
+    showActions,
+    deletePlanMutation.isPending,
+    handlePlanClick,
+    handleDeleteClick,
+    handleRenameGroup,
+  ]);
 
   if (plansLoading || groupsLoading) {
     return (
@@ -419,80 +331,7 @@ export function PlanTree({
     );
   }
 
-  // Render the flat list with gaps between siblings of the same parent.
-  const renderedRows: React.ReactNode[] = [];
-  for (let i = 0; i < flat.length; i++) {
-    const row = flat[i];
-    // Insert a gap before this row whenever the previous visible row was a
-    // sibling (same parent) — and always before the first sibling of a parent.
-    const prev = flat[i - 1];
-    const isFirstSibling =
-      !prev ||
-      prev.parentGroupId !== row.parentGroupId ||
-      prev.depth !== row.depth;
-    if (isFirstSibling) {
-      renderedRows.push(
-        <Gap
-          key={`gap-${row.parentGroupId ?? 'root'}-${row.siblingIndex}-pre`}
-          parentGroupId={row.parentGroupId}
-          index={row.siblingIndex}
-          depth={row.depth}
-        />
-      );
-    }
-
-    if (row.node.kind === 'plan') {
-      renderedRows.push(
-        <PlanRow
-          key={`plan-${row.node.id}`}
-          node={row.node}
-          selectedPlanId={selectedPlanId}
-          onDelete={showActions ? handleDeleteClick : undefined}
-          onPlanClick={onPlanClick}
-          isDeleting={deletePlanMutation.isPending}
-          depth={row.depth}
-          dragData={{
-            kind: NodeKind.Plan,
-            id: row.node.id,
-            parentGroupId: row.parentGroupId,
-            siblingIndex: row.siblingIndex,
-          }}
-        />
-      );
-    } else {
-      renderedRows.push(
-        <GroupRow
-          key={`group-${row.node.id}`}
-          node={row.node}
-          depth={row.depth}
-          onRenameGroup={showActions ? handleRenameGroup : undefined}
-          dragData={{
-            kind: NodeKind.Group,
-            id: row.node.id,
-            parentGroupId: row.parentGroupId,
-            siblingIndex: row.siblingIndex,
-          }}
-        />
-      );
-    }
-
-    // Trailing gap after the last sibling of this parent.
-    const next = flat[i + 1];
-    const isLastSibling =
-      !next ||
-      next.parentGroupId !== row.parentGroupId ||
-      next.depth !== row.depth;
-    if (isLastSibling) {
-      renderedRows.push(
-        <Gap
-          key={`gap-${row.parentGroupId ?? 'root'}-${row.siblingIndex + 1}-post`}
-          parentGroupId={row.parentGroupId}
-          index={row.siblingIndex + 1}
-          depth={row.depth}
-        />
-      );
-    }
-  }
+  const isEmpty = treeData.length === 0;
 
   return (
     <>
@@ -533,20 +372,34 @@ export function PlanTree({
         </div>
       )}
       <div className="flex-1 overflow-y-auto">
-        {flat.length === 0 ? (
+        {isEmpty ? (
           <div className="flex items-center justify-center h-full p-4">
             <p className="text-sm text-muted-foreground text-center">
               No plans yet. Create your first plan to get started.
             </p>
           </div>
         ) : (
-          <DndContext
-            sensors={sensors}
-            collisionDetection={closestCenter}
-            onDragEnd={handleDragEnd}
-          >
-            <div className="p-2">{renderedRows}</div>
-          </DndContext>
+          <DndTreeView
+            data={treeData}
+            selectedId={
+              selectedPlanId != null ? planNodeId(selectedPlanId) : null
+            }
+            onDrop={handleDrop}
+            canDrop={canDrop}
+            renderItem={({ item, isLeaf, isSelected }) => {
+              const meta = item as PlanItem;
+              if (isLeaf) {
+                return (
+                  <PlanRowBody
+                    name={item.name}
+                    description={meta._planDescription}
+                    isSelected={isSelected}
+                  />
+                );
+              }
+              return <span className="truncate">{item.name}</span>;
+            }}
+          />
         )}
       </div>
       <CreatePlanDialog
