@@ -1,7 +1,7 @@
 use tauri::State;
 
 use crate::db;
-use crate::db::plan_groups::PlanGroup;
+use crate::db::plan_groups::{MoveNodePayload, PlanGroup};
 
 #[tauri::command]
 pub async fn list_plan_groups(pool: State<'_, db::Pool>) -> Result<Vec<PlanGroup>, String> {
@@ -28,6 +28,13 @@ pub async fn rename_plan_group(
     name: String,
 ) -> Result<(), String> {
     db::plan_groups::rename(&pool, group_id, &name)
+        .await
+        .map_err(|e| format!("{}", e))
+}
+
+#[tauri::command]
+pub async fn move_node(pool: State<'_, db::Pool>, payload: MoveNodePayload) -> Result<(), String> {
+    db::plan_groups::move_node(&pool, payload)
         .await
         .map_err(|e| format!("{}", e))
 }

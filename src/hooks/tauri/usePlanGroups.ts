@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invoke } from '@tauri-apps/api/core';
 
-import type { PlanGroup } from '@/generated/types';
+import type { MoveNodePayload, PlanGroup } from '@/generated/types';
 
 import { queryKeys } from './queryKeys';
 
@@ -36,6 +36,18 @@ export function useRenamePlanGroup() {
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.planGroups() });
+    },
+  });
+}
+
+export function useMoveNode() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: MoveNodePayload) =>
+      invoke<void>('move_node', { payload }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.planGroups() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.skillPlans() });
     },
   });
 }

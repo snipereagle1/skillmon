@@ -1,6 +1,6 @@
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
-use sqlx::FromRow;
+use sqlx::{FromRow, Sqlite, Transaction};
 use typeshare::typeshare;
 
 use super::Pool;
@@ -16,6 +16,23 @@ pub struct PlanGroup {
     pub name: String,
     pub parent_group_id: Option<i64_ts>,
     pub sort_order: i64_ts,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum NodeKind {
+    Plan,
+    Group,
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MoveNodePayload {
+    pub kind: NodeKind,
+    pub id: i64_ts,
+    pub new_parent_group_id: Option<i64_ts>,
+    pub new_sort_order: i64_ts,
 }
 
 pub async fn list(pool: &Pool) -> Result<Vec<PlanGroup>> {
@@ -107,6 +124,226 @@ pub async fn rename(pool: &Pool, group_id: i64, name: &str) -> Result<()> {
     Ok(())
 }
 
+pub async fn move_node(pool: &Pool, payload: MoveNodePayload) -> Result<()> {
+    let mut tx = pool.begin().await?;
+
+    let MoveNodePayload {
+        kind,
+        id,
+        new_parent_group_id: new_parent,
+        new_sort_order,
+    } = payload;
+    let kind_is_group = matches!(kind, NodeKind::Group);
+
+    if new_sort_order < 0 {
+        return Err(anyhow!("new_sort_order must be non-negative"));
+    }
+
+    // Verify new parent exists (if specified) and compute its depth.
+    let new_parent_depth: i64 = match new_parent {
+        None => -1,
+        Some(pid) => {
+            let depth: Option<i64> = sqlx::query_scalar(
+                "WITH RECURSIVE chain(group_id, parent_group_id, depth) AS (
+                     SELECT group_id, parent_group_id, 0
+                     FROM plan_groups WHERE group_id = ?
+                     UNION ALL
+                     SELECT pg.group_id, pg.parent_group_id, c.depth + 1
+                     FROM chain c JOIN plan_groups pg ON pg.group_id = c.parent_group_id
+                 )
+                 SELECT MAX(depth) FROM chain",
+            )
+            .bind(pid)
+            .fetch_one(&mut *tx)
+            .await?;
+            depth.ok_or_else(|| anyhow!("Parent folder {} not found", pid))?
+        }
+    };
+
+    let current_parent: Option<i64> = if kind_is_group {
+        let row: Option<(Option<i64>,)> =
+            sqlx::query_as("SELECT parent_group_id FROM plan_groups WHERE group_id = ?")
+                .bind(id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        let (parent,) = row.ok_or_else(|| anyhow!("Folder {} not found", id))?;
+        parent
+    } else {
+        let row: Option<(Option<i64>,)> =
+            sqlx::query_as("SELECT group_id FROM skill_plans WHERE plan_id = ?")
+                .bind(id)
+                .fetch_optional(&mut *tx)
+                .await?;
+        let (parent,) = row.ok_or_else(|| anyhow!("Plan {} not found", id))?;
+        parent
+    };
+
+    if kind_is_group {
+        if let Some(pid) = new_parent {
+            if pid == id {
+                return Err(anyhow!("Cannot move a folder into itself"));
+            }
+            // Cycle check: new parent must not be a descendant of the moved group.
+            let descendant: Option<i64> = sqlx::query_scalar(
+                "WITH RECURSIVE descendants(group_id) AS (
+                     SELECT group_id FROM plan_groups WHERE group_id = ?
+                     UNION ALL
+                     SELECT pg.group_id FROM plan_groups pg
+                       JOIN descendants d ON pg.parent_group_id = d.group_id
+                 )
+                 SELECT group_id FROM descendants WHERE group_id = ? LIMIT 1",
+            )
+            .bind(id)
+            .bind(pid)
+            .fetch_optional(&mut *tx)
+            .await?;
+            if descendant.is_some() {
+                return Err(anyhow!(
+                    "Cannot move folder: would create a cycle in the folder tree"
+                ));
+            }
+        }
+
+        // Depth check: subtree-depth of moved group + (new parent depth + 1) <= MAX_DEPTH.
+        let subtree_depth: i64 = sqlx::query_scalar(
+            "WITH RECURSIVE subtree(group_id, depth) AS (
+                 SELECT group_id, 0 FROM plan_groups WHERE group_id = ?
+                 UNION ALL
+                 SELECT pg.group_id, s.depth + 1 FROM plan_groups pg
+                   JOIN subtree s ON pg.parent_group_id = s.group_id
+             )
+             SELECT COALESCE(MAX(depth), 0) FROM subtree",
+        )
+        .bind(id)
+        .fetch_one(&mut *tx)
+        .await?;
+
+        let moved_depth = new_parent_depth + 1;
+        if moved_depth + subtree_depth > MAX_DEPTH {
+            return Err(anyhow!(
+                "Cannot move folder: would exceed maximum nesting depth of {} levels",
+                MAX_DEPTH + 1
+            ));
+        }
+    }
+
+    // Re-parent the moved node with a temporary high sort_order so renumbering
+    // can place it cleanly. Use a value larger than any plausible sibling.
+    let parking_sort: i64 = 1_000_000_000;
+    if kind_is_group {
+        sqlx::query(
+            "UPDATE plan_groups SET parent_group_id = ?, sort_order = ? WHERE group_id = ?",
+        )
+        .bind(new_parent)
+        .bind(parking_sort)
+        .bind(id)
+        .execute(&mut *tx)
+        .await?;
+    } else {
+        sqlx::query("UPDATE skill_plans SET group_id = ?, sort_order = ? WHERE plan_id = ?")
+            .bind(new_parent)
+            .bind(parking_sort)
+            .bind(id)
+            .execute(&mut *tx)
+            .await?;
+    }
+
+    // Renumber the new parent's children, placing the moved node at new_sort_order.
+    renumber_with_insertion(
+        &mut tx,
+        new_parent,
+        Some((id, kind_is_group, new_sort_order)),
+    )
+    .await?;
+
+    // If the old parent differs from the new parent, renumber it densely too.
+    if current_parent != new_parent {
+        renumber_with_insertion(&mut tx, current_parent, None).await?;
+    }
+
+    tx.commit().await?;
+    Ok(())
+}
+
+/// Renumber sibling sort_order densely across plan_groups + skill_plans sharing
+/// the same parent. If `place_moved` is set, the named node is positioned at the
+/// requested index and the rest fill in around it.
+async fn renumber_with_insertion(
+    tx: &mut Transaction<'_, Sqlite>,
+    parent: Option<i64>,
+    place_moved: Option<(i64, bool, i64)>,
+) -> Result<()> {
+    // (id, is_group, current_sort_order)
+    let mut siblings: Vec<(i64, bool, i64)> = Vec::new();
+
+    let group_rows: Vec<(i64, i64)> = match parent {
+        Some(pid) => {
+            sqlx::query_as("SELECT group_id, sort_order FROM plan_groups WHERE parent_group_id = ?")
+                .bind(pid)
+                .fetch_all(&mut **tx)
+                .await?
+        }
+        None => {
+            sqlx::query_as(
+                "SELECT group_id, sort_order FROM plan_groups WHERE parent_group_id IS NULL",
+            )
+            .fetch_all(&mut **tx)
+            .await?
+        }
+    };
+    for (gid, sort) in group_rows {
+        siblings.push((gid, true, sort));
+    }
+
+    let plan_rows: Vec<(i64, i64)> = match parent {
+        Some(pid) => {
+            sqlx::query_as("SELECT plan_id, sort_order FROM skill_plans WHERE group_id = ?")
+                .bind(pid)
+                .fetch_all(&mut **tx)
+                .await?
+        }
+        None => {
+            sqlx::query_as("SELECT plan_id, sort_order FROM skill_plans WHERE group_id IS NULL")
+                .fetch_all(&mut **tx)
+                .await?
+        }
+    };
+    for (pid, sort) in plan_rows {
+        siblings.push((pid, false, sort));
+    }
+
+    if let Some((moved_id, moved_is_group, target)) = place_moved {
+        // Remove moved from the list so we can re-insert at the requested index.
+        siblings.retain(|(id, is_group, _)| !(*id == moved_id && *is_group == moved_is_group));
+        // Stable order: by current sort_order then by id (group vs plan id are disjoint enough
+        // for deterministic ordering within each kind; we add `is_group` as a final tiebreak).
+        siblings.sort_by(|a, b| a.2.cmp(&b.2).then(a.1.cmp(&b.1)).then(a.0.cmp(&b.0)));
+        let idx = target.clamp(0, siblings.len() as i64) as usize;
+        siblings.insert(idx, (moved_id, moved_is_group, target));
+    } else {
+        siblings.sort_by(|a, b| a.2.cmp(&b.2).then(a.1.cmp(&b.1)).then(a.0.cmp(&b.0)));
+    }
+
+    for (i, (id, is_group, _)) in siblings.iter().enumerate() {
+        let new_sort = i as i64;
+        if *is_group {
+            sqlx::query("UPDATE plan_groups SET sort_order = ? WHERE group_id = ?")
+                .bind(new_sort)
+                .bind(id)
+                .execute(&mut **tx)
+                .await?;
+        } else {
+            sqlx::query("UPDATE skill_plans SET sort_order = ? WHERE plan_id = ?")
+                .bind(new_sort)
+                .bind(id)
+                .execute(&mut **tx)
+                .await?;
+        }
+    }
+
+    Ok(())
+}
+
 #[cfg(test)]
 pub async fn create_for_test(
     pool: &Pool,
@@ -121,6 +358,28 @@ pub async fn create_for_test(
             .bind(sort_order)
             .execute(pool)
             .await?;
+    Ok(result.last_insert_rowid())
+}
+
+#[cfg(test)]
+pub async fn create_plan_for_test(
+    pool: &Pool,
+    name: &str,
+    group_id: Option<i64>,
+    sort_order: i64,
+) -> Result<i64> {
+    let now = chrono::Utc::now().timestamp();
+    let result = sqlx::query(
+        "INSERT INTO skill_plans (name, description, auto_prerequisites, created_at, updated_at, group_id, sort_order) \
+         VALUES (?, NULL, 0, ?, ?, ?, ?)",
+    )
+    .bind(name)
+    .bind(now)
+    .bind(now)
+    .bind(group_id)
+    .bind(sort_order)
+    .execute(pool)
+    .await?;
     Ok(result.last_insert_rowid())
 }
 
@@ -275,5 +534,232 @@ mod tests {
         let db = TestDb::new().await.unwrap();
         let err = rename(&db.pool, 99_999, "Whatever").await.unwrap_err();
         assert!(err.to_string().to_lowercase().contains("not found"));
+    }
+
+    async fn group_sort_orders(
+        pool: &Pool,
+        parent: Option<i64>,
+    ) -> std::collections::HashMap<i64, i64> {
+        let groups = list(pool).await.unwrap();
+        groups
+            .iter()
+            .filter(|g| g.parent_group_id == parent)
+            .map(|g| (g.group_id, g.sort_order))
+            .collect()
+    }
+
+    async fn plan_sort(pool: &Pool, plan_id: i64) -> (Option<i64>, i64) {
+        let row: (Option<i64>, i64) =
+            sqlx::query_as("SELECT group_id, sort_order FROM skill_plans WHERE plan_id = ?")
+                .bind(plan_id)
+                .fetch_one(pool)
+                .await
+                .unwrap();
+        row
+    }
+
+    async fn group_row(pool: &Pool, group_id: i64) -> (Option<i64>, i64) {
+        let row: (Option<i64>, i64) = sqlx::query_as(
+            "SELECT parent_group_id, sort_order FROM plan_groups WHERE group_id = ?",
+        )
+        .bind(group_id)
+        .fetch_one(pool)
+        .await
+        .unwrap();
+        row
+    }
+
+    #[tokio::test]
+    async fn move_node_reorders_siblings_within_parent() {
+        let db = TestDb::new().await.unwrap();
+        let a = create_for_test(&db.pool, "A", None, 0).await.unwrap();
+        let b = create_for_test(&db.pool, "B", None, 1).await.unwrap();
+        let c = create_for_test(&db.pool, "C", None, 2).await.unwrap();
+
+        // Move A to position 2 (end).
+        move_node(
+            &db.pool,
+            MoveNodePayload {
+                kind: NodeKind::Group,
+                id: a,
+                new_parent_group_id: None,
+                new_sort_order: 2,
+            },
+        )
+        .await
+        .unwrap();
+
+        let orders = group_sort_orders(&db.pool, None).await;
+        assert_eq!(orders[&b], 0);
+        assert_eq!(orders[&c], 1);
+        assert_eq!(orders[&a], 2);
+    }
+
+    #[tokio::test]
+    async fn move_node_reparents_plan_to_new_group() {
+        let db = TestDb::new().await.unwrap();
+        let g = create(&db.pool, "Group", None).await.unwrap();
+        let p = create_plan_for_test(&db.pool, "P", None, 0).await.unwrap();
+
+        move_node(
+            &db.pool,
+            MoveNodePayload {
+                kind: NodeKind::Plan,
+                id: p,
+                new_parent_group_id: Some(g),
+                new_sort_order: 0,
+            },
+        )
+        .await
+        .unwrap();
+
+        let (parent, sort) = plan_sort(&db.pool, p).await;
+        assert_eq!(parent, Some(g));
+        assert_eq!(sort, 0);
+    }
+
+    #[tokio::test]
+    async fn move_node_reparents_group_with_descendants() {
+        let db = TestDb::new().await.unwrap();
+        // root_a (depth 0) > child (depth 1) > leaf (depth 2)
+        let root_a = create(&db.pool, "RootA", None).await.unwrap();
+        let child = create(&db.pool, "Child", Some(root_a)).await.unwrap();
+        let _leaf = create(&db.pool, "Leaf", Some(child)).await.unwrap();
+        let root_b = create(&db.pool, "RootB", None).await.unwrap();
+        let plan_in_child = create_plan_for_test(&db.pool, "P", Some(child), 0)
+            .await
+            .unwrap();
+
+        // Move child under root_b — leaf and plan must still be inside child.
+        move_node(
+            &db.pool,
+            MoveNodePayload {
+                kind: NodeKind::Group,
+                id: child,
+                new_parent_group_id: Some(root_b),
+                new_sort_order: 0,
+            },
+        )
+        .await
+        .unwrap();
+
+        let (parent, _) = group_row(&db.pool, child).await;
+        assert_eq!(parent, Some(root_b));
+        let (plan_parent, _) = plan_sort(&db.pool, plan_in_child).await;
+        assert_eq!(plan_parent, Some(child));
+    }
+
+    #[tokio::test]
+    async fn move_node_rejects_self_reference() {
+        let db = TestDb::new().await.unwrap();
+        let g = create(&db.pool, "G", None).await.unwrap();
+        let err = move_node(
+            &db.pool,
+            MoveNodePayload {
+                kind: NodeKind::Group,
+                id: g,
+                new_parent_group_id: Some(g),
+                new_sort_order: 0,
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            err.to_string().to_lowercase().contains("itself")
+                || err.to_string().to_lowercase().contains("cycle")
+        );
+    }
+
+    #[tokio::test]
+    async fn move_node_rejects_indirect_cycle() {
+        let db = TestDb::new().await.unwrap();
+        let a = create(&db.pool, "A", None).await.unwrap();
+        let b = create(&db.pool, "B", Some(a)).await.unwrap();
+        // Try to move A under B → would create A → B → A cycle.
+        let err = move_node(
+            &db.pool,
+            MoveNodePayload {
+                kind: NodeKind::Group,
+                id: a,
+                new_parent_group_id: Some(b),
+                new_sort_order: 0,
+            },
+        )
+        .await
+        .unwrap_err();
+        assert!(err.to_string().to_lowercase().contains("cycle"));
+    }
+
+    #[tokio::test]
+    async fn move_node_rejects_depth_violation_for_subtree() {
+        let db = TestDb::new().await.unwrap();
+        // Build:
+        //   root_a (0) > child (1) > leaf (2)   ← subtree of depth 2 rooted at child
+        //   root_b (0) > inner (1)              ← inner sits at depth 1
+        let root_a = create(&db.pool, "RootA", None).await.unwrap();
+        let child = create(&db.pool, "Child", Some(root_a)).await.unwrap();
+        let _leaf = create(&db.pool, "Leaf", Some(child)).await.unwrap();
+        let root_b = create(&db.pool, "RootB", None).await.unwrap();
+        let inner = create(&db.pool, "Inner", Some(root_b)).await.unwrap();
+
+        // Moving child (subtree depth 1) under inner (depth 1) → leaf would land at depth 3.
+        let err = move_node(
+            &db.pool,
+            MoveNodePayload {
+                kind: NodeKind::Group,
+                id: child,
+                new_parent_group_id: Some(inner),
+                new_sort_order: 0,
+            },
+        )
+        .await
+        .unwrap_err();
+        let msg = err.to_string().to_lowercase();
+        assert!(msg.contains("depth") || msg.contains("nesting"));
+
+        // Tree must be unchanged.
+        let (parent_after, _) = group_row(&db.pool, child).await;
+        assert_eq!(parent_after, Some(root_a));
+    }
+
+    #[tokio::test]
+    async fn move_node_renumbers_old_and_new_parent_densely() {
+        let db = TestDb::new().await.unwrap();
+        let g1 = create(&db.pool, "G1", None).await.unwrap();
+        let g2 = create(&db.pool, "G2", None).await.unwrap();
+        // G1 children: p1, p2, p3
+        let p1 = create_plan_for_test(&db.pool, "P1", Some(g1), 0)
+            .await
+            .unwrap();
+        let p2 = create_plan_for_test(&db.pool, "P2", Some(g1), 1)
+            .await
+            .unwrap();
+        let p3 = create_plan_for_test(&db.pool, "P3", Some(g1), 2)
+            .await
+            .unwrap();
+        // G2 children: q1
+        let q1 = create_plan_for_test(&db.pool, "Q1", Some(g2), 0)
+            .await
+            .unwrap();
+
+        // Move p2 to G2 at index 0.
+        move_node(
+            &db.pool,
+            MoveNodePayload {
+                kind: NodeKind::Plan,
+                id: p2,
+                new_parent_group_id: Some(g2),
+                new_sort_order: 0,
+            },
+        )
+        .await
+        .unwrap();
+
+        // G1 densely renumbered: p1=0, p3=1
+        assert_eq!(plan_sort(&db.pool, p1).await, (Some(g1), 0));
+        assert_eq!(plan_sort(&db.pool, p3).await, (Some(g1), 1));
+        // G2 has p2=0, q1=1
+        assert_eq!(plan_sort(&db.pool, p2).await, (Some(g2), 0));
+        assert_eq!(plan_sort(&db.pool, q1).await, (Some(g2), 1));
     }
 }
