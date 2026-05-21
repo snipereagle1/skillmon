@@ -33,6 +33,17 @@ pub async fn rename_plan_group(
 }
 
 #[tauri::command]
+pub async fn delete_plan_group(
+    pool: State<'_, db::Pool>,
+    group_id: i64,
+    cascade_plans: bool,
+) -> Result<(), String> {
+    db::plan_groups::delete(&pool, group_id, cascade_plans)
+        .await
+        .map_err(|e| format!("{}", e))
+}
+
+#[tauri::command]
 pub async fn move_node(pool: State<'_, db::Pool>, payload: MoveNodePayload) -> Result<(), String> {
     db::plan_groups::move_node(&pool, payload)
         .await

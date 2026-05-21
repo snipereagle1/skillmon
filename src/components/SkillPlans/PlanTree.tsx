@@ -6,6 +6,7 @@ import {
   FolderOpen,
   FolderPlus,
   Pencil,
+  Trash2,
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
@@ -32,6 +33,7 @@ import { CreatePlanDialog } from './CreatePlanDialog';
 import { CreatePlanFromCharacterDialog } from './CreatePlanFromCharacterDialog';
 import { CreatePlanGroupDialog } from './CreatePlanGroupDialog';
 import { DeletePlanDialog } from './DeletePlanDialog';
+import { DeletePlanGroupDialog } from './DeletePlanGroupDialog';
 import { RenamePlanGroupDialog } from './RenamePlanGroupDialog';
 
 type PlanItem = TreeNode & {
@@ -109,6 +111,11 @@ export function PlanTree({
     id: number;
     name: string;
   } | null>(null);
+  const [deleteGroupDialogOpen, setDeleteGroupDialogOpen] = useState(false);
+  const [groupToDelete, setGroupToDelete] = useState<{
+    id: number;
+    name: string;
+  } | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [planToDelete, setPlanToDelete] = useState<{
     id: number;
@@ -158,6 +165,14 @@ export function PlanTree({
     (groupId: number, currentName: string) => {
       setGroupToRename({ id: groupId, name: currentName });
       setRenameGroupDialogOpen(true);
+    },
+    []
+  );
+
+  const handleDeleteGroup = useCallback(
+    (groupId: number, currentName: string) => {
+      setGroupToDelete({ id: groupId, name: currentName });
+      setDeleteGroupDialogOpen(true);
     },
     []
   );
@@ -260,18 +275,32 @@ export function PlanTree({
           droppable: true,
           children: node.children.map(build),
           actions: showActions ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="size-6 p-0"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleRenameGroup(node.id, node.name);
-              }}
-              aria-label={`Rename folder ${node.name}`}
-            >
-              <Pencil className="size-3.5" />
-            </Button>
+            <>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="size-6 p-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleRenameGroup(node.id, node.name);
+                }}
+                aria-label={`Rename folder ${node.name}`}
+              >
+                <Pencil className="size-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="size-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteGroup(node.id, node.name);
+                }}
+                aria-label={`Delete folder ${node.name}`}
+              >
+                <Trash2 className="size-3.5" />
+              </Button>
+            </>
           ) : undefined,
         } satisfies PlanItem;
       }
@@ -308,6 +337,7 @@ export function PlanTree({
     handlePlanClick,
     handleDeleteClick,
     handleRenameGroup,
+    handleDeleteGroup,
   ]);
 
   if (plansLoading || groupsLoading) {
@@ -434,6 +464,15 @@ export function PlanTree({
       <CreatePlanGroupDialog
         open={createGroupDialogOpen}
         onOpenChange={setCreateGroupDialogOpen}
+      />
+      <DeletePlanGroupDialog
+        open={deleteGroupDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteGroupDialogOpen(open);
+          if (!open) setGroupToDelete(null);
+        }}
+        groupId={groupToDelete?.id ?? null}
+        groupName={groupToDelete?.name ?? ''}
       />
       <RenamePlanGroupDialog
         open={renameGroupDialogOpen}

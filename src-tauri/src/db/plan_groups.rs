@@ -124,6 +124,69 @@ pub async fn rename(pool: &Pool, group_id: i64, name: &str) -> Result<()> {
     Ok(())
 }
 
+pub async fn delete(pool: &Pool, group_id: i64, cascade_plans: bool) -> Result<()> {
+    let mut tx = pool.begin().await?;
+
+    let parent_row: Option<(Option<i64>,)> =
+        sqlx::query_as("SELECT parent_group_id FROM plan_groups WHERE group_id = ?")
+            .bind(group_id)
+            .fetch_optional(&mut *tx)
+            .await?;
+    let (deleted_parent,) = parent_row.ok_or_else(|| anyhow!("Folder {} not found", group_id))?;
+
+    if cascade_plans {
+        // Collect every group in the subtree (including the root).
+        let subtree_ids: Vec<i64> = sqlx::query_scalar(
+            "WITH RECURSIVE subtree(group_id) AS (
+                 SELECT group_id FROM plan_groups WHERE group_id = ?
+                 UNION ALL
+                 SELECT pg.group_id FROM plan_groups pg
+                   JOIN subtree s ON pg.parent_group_id = s.group_id
+             )
+             SELECT group_id FROM subtree",
+        )
+        .bind(group_id)
+        .fetch_all(&mut *tx)
+        .await?;
+
+        for gid in &subtree_ids {
+            sqlx::query("DELETE FROM skill_plans WHERE group_id = ?")
+                .bind(gid)
+                .execute(&mut *tx)
+                .await?;
+        }
+        // Delete deepest first to avoid temporarily orphaning children if FKs are on.
+        for gid in subtree_ids.iter().rev() {
+            sqlx::query("DELETE FROM plan_groups WHERE group_id = ?")
+                .bind(gid)
+                .execute(&mut *tx)
+                .await?;
+        }
+    } else {
+        // Reparent direct children (groups + plans) to the deleted folder's parent.
+        sqlx::query("UPDATE plan_groups SET parent_group_id = ? WHERE parent_group_id = ?")
+            .bind(deleted_parent)
+            .bind(group_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("UPDATE skill_plans SET group_id = ? WHERE group_id = ?")
+            .bind(deleted_parent)
+            .bind(group_id)
+            .execute(&mut *tx)
+            .await?;
+        sqlx::query("DELETE FROM plan_groups WHERE group_id = ?")
+            .bind(group_id)
+            .execute(&mut *tx)
+            .await?;
+    }
+
+    // Renumber the parent the deleted folder lived in (NULL = root).
+    renumber_with_insertion(&mut tx, deleted_parent, None).await?;
+
+    tx.commit().await?;
+    Ok(())
+}
+
 pub async fn move_node(pool: &Pool, payload: MoveNodePayload) -> Result<()> {
     let mut tx = pool.begin().await?;
 
@@ -720,6 +783,129 @@ mod tests {
         // Tree must be unchanged.
         let (parent_after, _) = group_row(&db.pool, child).await;
         assert_eq!(parent_after, Some(root_a));
+    }
+
+    async fn group_exists(pool: &Pool, group_id: i64) -> bool {
+        let row: Option<(i64,)> =
+            sqlx::query_as("SELECT group_id FROM plan_groups WHERE group_id = ?")
+                .bind(group_id)
+                .fetch_optional(pool)
+                .await
+                .unwrap();
+        row.is_some()
+    }
+
+    async fn plan_exists(pool: &Pool, plan_id: i64) -> bool {
+        let row: Option<(i64,)> =
+            sqlx::query_as("SELECT plan_id FROM skill_plans WHERE plan_id = ?")
+                .bind(plan_id)
+                .fetch_optional(pool)
+                .await
+                .unwrap();
+        row.is_some()
+    }
+
+    #[tokio::test]
+    async fn delete_root_folder_reparents_children_to_null() {
+        let db = TestDb::new().await.unwrap();
+        let root = create(&db.pool, "Root", None).await.unwrap();
+        let child_group = create(&db.pool, "ChildGroup", Some(root)).await.unwrap();
+        let child_plan = create_plan_for_test(&db.pool, "P", Some(root), 0)
+            .await
+            .unwrap();
+
+        delete(&db.pool, root, false).await.unwrap();
+
+        assert!(!group_exists(&db.pool, root).await);
+        let (gp, _) = group_row(&db.pool, child_group).await;
+        assert_eq!(gp, None);
+        let (pp, _) = plan_sort(&db.pool, child_plan).await;
+        assert_eq!(pp, None);
+    }
+
+    #[tokio::test]
+    async fn delete_non_root_folder_reparents_children_to_grandparent() {
+        let db = TestDb::new().await.unwrap();
+        let root = create(&db.pool, "Root", None).await.unwrap();
+        let mid = create(&db.pool, "Mid", Some(root)).await.unwrap();
+        let leaf = create(&db.pool, "Leaf", Some(mid)).await.unwrap();
+        let plan = create_plan_for_test(&db.pool, "P", Some(mid), 0)
+            .await
+            .unwrap();
+
+        delete(&db.pool, mid, false).await.unwrap();
+
+        assert!(!group_exists(&db.pool, mid).await);
+        let (lp, _) = group_row(&db.pool, leaf).await;
+        assert_eq!(lp, Some(root));
+        let (pp, _) = plan_sort(&db.pool, plan).await;
+        assert_eq!(pp, Some(root));
+    }
+
+    #[tokio::test]
+    async fn delete_cascade_removes_entire_subtree() {
+        let db = TestDb::new().await.unwrap();
+        let root = create(&db.pool, "Root", None).await.unwrap();
+        let mid = create(&db.pool, "Mid", Some(root)).await.unwrap();
+        let leaf = create(&db.pool, "Leaf", Some(mid)).await.unwrap();
+        let plan_in_mid = create_plan_for_test(&db.pool, "P1", Some(mid), 0)
+            .await
+            .unwrap();
+        let plan_in_leaf = create_plan_for_test(&db.pool, "P2", Some(leaf), 0)
+            .await
+            .unwrap();
+        let sibling_plan = create_plan_for_test(&db.pool, "Outside", None, 0)
+            .await
+            .unwrap();
+
+        delete(&db.pool, mid, true).await.unwrap();
+
+        assert!(!group_exists(&db.pool, mid).await);
+        assert!(!group_exists(&db.pool, leaf).await);
+        assert!(!plan_exists(&db.pool, plan_in_mid).await);
+        assert!(!plan_exists(&db.pool, plan_in_leaf).await);
+        // Unrelated nodes untouched.
+        assert!(group_exists(&db.pool, root).await);
+        assert!(plan_exists(&db.pool, sibling_plan).await);
+    }
+
+    #[tokio::test]
+    async fn delete_renumbers_old_parent_densely() {
+        let db = TestDb::new().await.unwrap();
+        // Root siblings: a (0), target (1), b (2).
+        let a = create_for_test(&db.pool, "A", None, 0).await.unwrap();
+        let target = create_for_test(&db.pool, "T", None, 1).await.unwrap();
+        let b = create_for_test(&db.pool, "B", None, 2).await.unwrap();
+        // Plan parented to target so reparenting kicks in.
+        let plan = create_plan_for_test(&db.pool, "P", Some(target), 0)
+            .await
+            .unwrap();
+
+        delete(&db.pool, target, false).await.unwrap();
+
+        // a, b, and the reparented plan now share the root in sort order.
+        let groups = list(&db.pool).await.unwrap();
+        let by_id: std::collections::HashMap<i64, &PlanGroup> =
+            groups.iter().map(|g| (g.group_id, g)).collect();
+        let (_, plan_so) = plan_sort(&db.pool, plan).await;
+        let mut all: Vec<(i64, &'static str)> = vec![
+            (by_id[&a].sort_order, "a"),
+            (by_id[&b].sort_order, "b"),
+            (plan_so, "plan"),
+        ];
+        all.sort();
+        // Dense and unique: 0, 1, 2.
+        assert_eq!(
+            all.iter().map(|(s, _)| *s).collect::<Vec<_>>(),
+            vec![0, 1, 2]
+        );
+    }
+
+    #[tokio::test]
+    async fn delete_rejects_unknown_group() {
+        let db = TestDb::new().await.unwrap();
+        let err = delete(&db.pool, 99_999, false).await.unwrap_err();
+        assert!(err.to_string().to_lowercase().contains("not found"));
     }
 
     #[tokio::test]

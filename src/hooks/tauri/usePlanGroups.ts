@@ -40,6 +40,21 @@ export function useRenamePlanGroup() {
   });
 }
 
+export function useDeletePlanGroup() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (vars: { groupId: number; cascadePlans: boolean }) =>
+      invoke<void>('delete_plan_group', {
+        groupId: vars.groupId,
+        cascadePlans: vars.cascadePlans,
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.planGroups() });
+      queryClient.invalidateQueries({ queryKey: queryKeys.skillPlans() });
+    },
+  });
+}
+
 export function useMoveNode() {
   const queryClient = useQueryClient();
   return useMutation({

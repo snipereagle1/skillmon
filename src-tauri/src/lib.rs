@@ -400,6 +400,7 @@ pub fn run() {
             commands::plan_groups::list_plan_groups,
             commands::plan_groups::create_plan_group,
             commands::plan_groups::rename_plan_group,
+            commands::plan_groups::delete_plan_group,
             commands::plan_groups::move_node,
             commands::remaps::save_remap,
             commands::remaps::get_plan_remaps,
