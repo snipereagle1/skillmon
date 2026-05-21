@@ -14,6 +14,8 @@ React 19 + TypeScript frontend for skillmon. Always load `docs/context/eve.md` f
 
 **Notifications store** — the Zustand store (`notificationsStore`) holding the full notification list (active + dismissed) for all characters. Populated by a single `notifications:changed` Tauri event whose payload is the complete snapshot. Hydrated at startup by a backend-emitted snapshot; re-emitted after every create, clear, or dismiss. Read via selectors (`useActiveNotifications`, `useNotificationsForCharacter`, `useUnreadCount`). Never fetched via React Query — see `docs/adr/0001-notifications-via-zustand.md`.
 
+**Plan group** — a presentational folder containing skill plans and/or other plan groups. Rendered as a tree on `/plans` and `/characters/$characterId/plans` via shadcn-tree-view. Folders and plans mix freely at any level; root-level ungrouped plans sit alongside top-level folders. Expanded-group state persists in `app_settings`. Backend owns the tree shape; see backend `CONTEXT.md`.
+
 **Tauri command** — a Rust function exposed to the frontend via `invoke()`. Typed wrappers live in `src/hooks/tauri/`.
 
 **Route** — a TanStack Router file-based route under `src/routes/`. The route tree is auto-generated; never edit `routeTree.gen.ts`.
