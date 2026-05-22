@@ -17,6 +17,7 @@ import {
   type TreeNode,
 } from '@/components/DndTreeView';
 import { Button } from '@/components/ui/button';
+import { ContextMenuItem } from '@/components/ui/context-menu';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -172,32 +173,21 @@ export function PlanTree({
           draggable: true,
           droppable: true,
           children: node.children.map(build),
-          actions: showActions ? (
+          contextMenuContent: showActions ? (
             <>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="size-6 p-0"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openRenamePlanGroup(node.id, node.name);
-                }}
-                aria-label={`Rename folder ${node.name}`}
+              <ContextMenuItem
+                onSelect={() => openRenamePlanGroup(node.id, node.name)}
               >
                 <Pencil className="size-3.5" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="sm"
-                className="size-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  openDeletePlanGroup(node.id, node.name);
-                }}
-                aria-label={`Delete folder ${node.name}`}
+                Rename
+              </ContextMenuItem>
+              <ContextMenuItem
+                variant="destructive"
+                onSelect={() => openDeletePlanGroup(node.id, node.name)}
               >
                 <Trash2 className="size-3.5" />
-              </Button>
+                Delete
+              </ContextMenuItem>
             </>
           ) : undefined,
         } satisfies PlanItem;
@@ -209,19 +199,14 @@ export function PlanTree({
         draggable: true,
         droppable: false,
         onClick: () => handlePlanClick(node.id),
-        actions: showActions ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={(e) => {
-              e.stopPropagation();
-              openDeletePlan(node.id, node.name);
-            }}
-            className="size-6 p-0 hover:bg-destructive hover:text-destructive-foreground"
-            aria-label={`Delete plan ${node.name}`}
+        contextMenuContent: showActions ? (
+          <ContextMenuItem
+            variant="destructive"
+            onSelect={() => openDeletePlan(node.id, node.name)}
           >
-            ×
-          </Button>
+            <Trash2 className="size-3.5" />
+            Delete
+          </ContextMenuItem>
         ) : undefined,
       } satisfies PlanItem;
     };
