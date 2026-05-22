@@ -52,3 +52,27 @@ pub async fn set_expanded_plan_groups(pool: &Pool, group_ids: &[i64]) -> Result<
     let json = serde_json::to_string(group_ids)?;
     set_app_setting(pool, EXPANDED_PLAN_GROUPS_KEY, &json).await
 }
+
+const EXCLUDED_COMPARISON_CHARACTERS_KEY: &str = "excluded_comparison_characters";
+
+/// Returns persisted character ids excluded from the plan comparison tab,
+/// filtered to ids that still exist in `characters` so stale ids drop silently.
+/// Empty Vec = nothing excluded (default for new users).
+pub async fn get_excluded_comparison_characters(pool: &Pool) -> Result<Vec<i64>> {
+    let Some(raw) = get_app_setting(pool, EXCLUDED_COMPARISON_CHARACTERS_KEY).await? else {
+        return Ok(Vec::new());
+    };
+    let existing = sqlx::query_scalar::<_, i64>(
+        "SELECT character_id FROM characters \
+         WHERE character_id IN (SELECT CAST(value AS INTEGER) FROM json_each(?))",
+    )
+    .bind(&raw)
+    .fetch_all(pool)
+    .await?;
+    Ok(existing)
+}
+
+pub async fn set_excluded_comparison_characters(pool: &Pool, character_ids: &[i64]) -> Result<()> {
+    let json = serde_json::to_string(character_ids)?;
+    set_app_setting(pool, EXCLUDED_COMPARISON_CHARACTERS_KEY, &json).await
+}

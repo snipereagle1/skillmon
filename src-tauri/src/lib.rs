@@ -410,6 +410,8 @@ pub fn run() {
             commands::settings::set_boolean_app_setting,
             commands::settings::get_expanded_plan_groups,
             commands::settings::set_expanded_plan_groups,
+            commands::settings::get_excluded_comparison_characters,
+            commands::settings::set_excluded_comparison_characters,
             commands::settings::get_enabled_features,
             commands::settings::set_feature_enabled,
             commands::settings::get_optional_features,

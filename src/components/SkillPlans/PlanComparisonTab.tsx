@@ -1,6 +1,6 @@
 import { useNavigate } from '@tanstack/react-router';
 import { Filter } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import { match } from 'ts-pattern';
 
 import { Badge } from '@/components/ui/badge';
@@ -23,6 +23,10 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import {
+  useExcludedComparisonCharacters,
+  usePersistExcludedComparisonCharacters,
+} from '@/hooks/tauri/useExcludedComparisonCharacters';
 import { usePlanComparisonAll } from '@/hooks/tauri/usePlanComparisonAll';
 import { formatDuration, formatNumber } from '@/lib/utils';
 
@@ -33,8 +37,11 @@ interface PlanComparisonTabProps {
 export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
   const { data, isLoading, error } = usePlanComparisonAll(planId);
   const navigate = useNavigate();
-  const [excludedCharacterIds, setExcludedCharacterIds] = useState<Set<number>>(
-    new Set()
+  const { data: persistedExcluded } = useExcludedComparisonCharacters();
+  const persistExcluded = usePersistExcludedComparisonCharacters();
+  const excludedCharacterIds = useMemo<Set<number>>(
+    () => new Set(persistedExcluded ?? []),
+    [persistedExcluded]
   );
 
   const filteredComparisons = useMemo(() => {
@@ -50,26 +57,22 @@ export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
   }, [data?.comparisons, excludedCharacterIds]);
 
   const toggleCharacter = (characterId: number) => {
-    setExcludedCharacterIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(characterId)) {
-        next.delete(characterId);
-      } else {
-        next.add(characterId);
-      }
-      return next;
-    });
+    const next = new Set(excludedCharacterIds);
+    if (next.has(characterId)) {
+      next.delete(characterId);
+    } else {
+      next.add(characterId);
+    }
+    persistExcluded(Array.from(next));
   };
 
   const selectAll = () => {
-    setExcludedCharacterIds(new Set());
+    persistExcluded([]);
   };
 
   const selectNone = () => {
     if (!data) return;
-    setExcludedCharacterIds(
-      new Set(data.comparisons.map((c) => c.character_id))
-    );
+    persistExcluded(data.comparisons.map((c) => c.character_id));
   };
 
   if (isLoading) {

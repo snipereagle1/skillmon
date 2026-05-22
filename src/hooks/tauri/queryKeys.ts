@@ -77,6 +77,8 @@ export const queryKeys = {
 
   appSettings: () => ['app-settings'] as const,
   expandedPlanGroups: () => ['expanded-plan-groups'] as const,
+  excludedComparisonCharacters: () =>
+    ['excluded-comparison-characters'] as const,
   baseScopeStrings: () => ['base-scope-strings'] as const,
   enabledFeatures: () => ['enabled-features'] as const,
   optionalFeatures: () => ['optional-features'] as const,

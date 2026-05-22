@@ -29,8 +29,8 @@ pub use accounts::{
     update_account_name,
 };
 pub use app_settings::{
-    get_boolean_app_setting, get_expanded_plan_groups, set_boolean_app_setting,
-    set_expanded_plan_groups,
+    get_boolean_app_setting, get_excluded_comparison_characters, get_expanded_plan_groups,
+    set_boolean_app_setting, set_excluded_comparison_characters, set_expanded_plan_groups,
 };
 pub use character_attributes::{
     get_character_attributes, set_character_attributes, CharacterAttributes,
