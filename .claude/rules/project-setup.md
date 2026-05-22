@@ -22,10 +22,11 @@ pnpm tauri:build      # Production build (runs typegen first)
 pnpm typegen          # Regenerate TypeScript bindings — run after any Rust struct change
 pnpm typecheck        # tsc --noEmit
 pnpm test             # vitest (TZ=UTC)
+pnpm test:rust        # cargo test (in src-tauri/)
 pnpm lint             # eslint
 pnpm lint:rust        # cargo clippy -D warnings
 pnpm format           # prettier + cargo fmt
-pnpm verify           # typegen + lint + format check + typecheck
+pnpm verify           # typegen + (turbo) lint + lint:rust + typecheck + format checks + test + test:rust
 ```
 
 Do not run a full build solely to regenerate frontend bindings — use `pnpm typegen`.

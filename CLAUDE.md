@@ -6,7 +6,7 @@ EVE Online skill monitoring/planning desktop app. Tauri v2 (Rust backend) + Reac
 
 - **Frontend**: React 19, TypeScript, TanStack Router, TanStack Query, Tailwind v4, shadcn/ui, Zustand
 - **Backend**: Rust (Tauri v2), SQLite via sqlx, EVE ESI API
-- **Build**: pnpm, Vite, Cargo
+- **Build**: pnpm, Turborepo, Vite, Cargo
 
 ## Commands
 
@@ -16,10 +16,11 @@ pnpm tauri:build     # prod build (runs typegen first)
 pnpm typegen         # typeshare: generate types.ts from Rust structs → src/generated/
 pnpm typecheck       # tsc --noEmit
 pnpm test            # vitest (TZ=UTC)
+pnpm test:rust       # cargo test (in src-tauri/)
 pnpm lint            # eslint
 pnpm lint:rust       # cargo clippy -D warnings
 pnpm format          # prettier + cargo fmt
-pnpm verify          # typegen + lint:full + format:check:all + typecheck
+pnpm verify          # typegen + (turbo) lint + lint:rust + typecheck + format checks + test + test:rust
 ```
 
 ## Critical Rules
