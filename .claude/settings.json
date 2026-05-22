@@ -12,7 +12,9 @@
       "Read(.claude/design/*)",
       "Bash(pnpm view *)",
       "Bash(pnpm typecheck)",
-      "Bash(pnpm info *)"
+      "Bash(pnpm info *)",
+      "Bash(gh issue view*)",
+      "Bash(gh sub-issue list*)"
     ],
     "deny": [
       "mcp__skillmon-sqlite__create_record",

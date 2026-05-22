@@ -16,6 +16,7 @@ pub mod clones;
 pub mod enabled_features;
 pub mod locations;
 pub mod notifications;
+pub mod plan_groups;
 pub mod remaps;
 pub mod sde;
 pub mod skill_plans;
@@ -27,7 +28,10 @@ pub use accounts::{
     reorder_accounts, reorder_characters_in_account, reorder_unassigned_characters,
     update_account_name,
 };
-pub use app_settings::{get_boolean_app_setting, set_boolean_app_setting};
+pub use app_settings::{
+    get_boolean_app_setting, get_excluded_comparison_characters, get_expanded_plan_groups,
+    set_boolean_app_setting, set_excluded_comparison_characters, set_expanded_plan_groups,
+};
 pub use character_attributes::{
     get_character_attributes, set_character_attributes, CharacterAttributes,
 };

@@ -1,10 +1,11 @@
+import { Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import { match, P } from 'ts-pattern';
 
+import { PlanTree } from '@/components/PlanTree';
 import { SkillLevelPips } from '@/components/SkillLevelPips';
 import type { PlanComparisonEntry } from '@/generated/types';
 import { usePlanComparison } from '@/hooks/tauri/usePlanComparison';
-import { useSkillPlans } from '@/hooks/tauri/useSkillPlans';
 import { cn, formatSkillpoints, toRoman } from '@/lib/utils';
 import { useSkillDetailStore } from '@/stores/skillDetailStore';
 
@@ -54,15 +55,16 @@ function ComparisonEntryRow({
         <div className="flex items-center gap-3 flex-1 min-w-0">
           <SkillLevelPips queuedLevel={entry.planned_level} />
           <div className="flex flex-col flex-1 min-w-0">
-            <span
+            <button
+              type="button"
               className={cn(
-                'text-foreground font-medium truncate cursor-pointer hover:underline',
+                'text-foreground font-medium truncate text-left cursor-pointer hover:underline focus-visible:underline focus-visible:outline-none',
                 isPrerequisite && 'text-muted-foreground'
               )}
               onClick={() => openSkillDetail(entry.skill_type_id, characterId)}
             >
               {entry.skill_name} {levelRoman}
-            </span>
+            </button>
             <div className="flex items-center gap-3 text-xs text-muted-foreground">
               <span>
                 Planned: Level {entry.planned_level} (
@@ -94,10 +96,9 @@ export function CharacterPlanComparison({
   selectedPlanId,
   onPlanChange,
 }: CharacterPlanComparisonProps) {
-  const { data: plans, isLoading: isLoadingPlans } = useSkillPlans();
   const { data: comparison, isLoading: isLoadingComparison } =
     usePlanComparison(selectedPlanId, characterId);
-  const [showUntrainedOnly, setShowUntrainedOnly] = useState(false);
+  const [showUntrainedOnly, setShowUntrainedOnly] = useState(true);
 
   const { sortedEntries, stats } = useMemo(() => {
     if (!comparison || !characterId) {
@@ -143,59 +144,11 @@ export function CharacterPlanComparison({
   return (
     <div className="flex h-full min-h-0 bg-card">
       <div className="w-64 border-r border-border shrink-0 overflow-hidden flex flex-col">
-        <div className="p-4 border-b border-border">
-          <h2 className="h-nav">Skill Plans</h2>
-        </div>
-        <div className="flex-1 overflow-y-auto">
-          {match({ isLoadingPlans, plans })
-            .with({ isLoadingPlans: true }, () => (
-              <div className="flex items-center justify-center h-full p-4">
-                <p className="text-sm text-muted-foreground">
-                  Loading plans...
-                </p>
-              </div>
-            ))
-            .with({ plans: P.union(undefined, []) }, () => (
-              <div className="flex items-center justify-center h-full p-4">
-                <p className="text-sm text-muted-foreground text-center">
-                  No plans available. Create a plan in the Plans tab.
-                </p>
-              </div>
-            ))
-            .with({ plans: P.select(P.not(undefined)) }, (plans) => (
-              <div className="p-2 space-y-1">
-                {plans.map((plan) => (
-                  <div
-                    key={plan.plan_id}
-                    onClick={() => onPlanChange(plan.plan_id)}
-                    className={cn(
-                      'p-3 rounded-md cursor-pointer transition-colors',
-                      selectedPlanId === plan.plan_id
-                        ? 'bg-muted text-foreground'
-                        : 'hover:bg-muted'
-                    )}
-                  >
-                    <div className="flex-1 min-w-0">
-                      <h3 className="h-nav truncate">{plan.name}</h3>
-                      {plan.description && (
-                        <p
-                          className={cn(
-                            'text-xs mt-1 line-clamp-2',
-                            selectedPlanId === plan.plan_id
-                              ? 'text-foreground/80'
-                              : 'text-muted-foreground'
-                          )}
-                        >
-                          {plan.description}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ))
-            .exhaustive()}
-        </div>
+        <PlanTree
+          selectedPlanId={selectedPlanId}
+          onPlanClick={onPlanChange}
+          showActions={false}
+        />
       </div>
       <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
         {match({ selectedPlanId, isLoadingComparison, comparison })
@@ -208,7 +161,7 @@ export function CharacterPlanComparison({
           ))
           .with({ isLoadingComparison: true }, () => (
             <div className="flex items-center justify-center h-full">
-              <p className="text-muted-foreground">Loading comparison...</p>
+              <p className="text-muted-foreground">Loading comparison…</p>
             </div>
           ))
           .with({ comparison: P.nullish }, () => (
@@ -221,7 +174,16 @@ export function CharacterPlanComparison({
               <div className="border-b border-border p-4 space-y-3 shrink-0">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <h2 className="h-card truncate">{comp.plan.name}</h2>
+                    <h2 className="h-card truncate">
+                      <Link
+                        to="/plans/$planId"
+                        params={{ planId: String(comp.plan.plan_id) }}
+                        search={{ tab: 'comparison' }}
+                        className="underline decoration-dotted decoration-(--brand) underline-offset-4 hover:decoration-solid focus-visible:decoration-solid focus-visible:outline-none"
+                      >
+                        {comp.plan.name}
+                      </Link>
+                    </h2>
                     {comp.plan.description && (
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
                         {comp.plan.description}
@@ -270,7 +232,7 @@ export function CharacterPlanComparison({
                       {formatSkillpoints(stats.totalMissingSP)}
                     </span>
                   </div>
-                  <div className="flex items-center space-x-2 shrink-0">
+                  <div className="flex items-center gap-x-2 shrink-0">
                     <Label
                       htmlFor="untrained-only"
                       className="text-xs text-muted-foreground"
@@ -287,7 +249,7 @@ export function CharacterPlanComparison({
               </div>
               <div className="flex-1 overflow-y-auto">
                 {sortedEntries.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-32 space-y-2">
+                  <div className="flex flex-col items-center justify-center h-32 gap-y-2">
                     <p className="text-muted-foreground">
                       {showUntrainedOnly
                         ? 'No untrained skills in this plan'

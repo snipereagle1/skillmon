@@ -40,6 +40,22 @@
         "src-tauri/src/**/*.rs",
         "rustfmt.toml"
       ]
+    },
+    "test": {
+      "inputs": [
+        "src/**/*.{ts,tsx,js,jsx}",
+        "vitest.config.ts",
+        "vite.config.ts",
+        "src/generated/**"
+      ]
+    },
+    "test:rust": {
+      "inputs": [
+        "src-tauri/src/**/*.rs",
+        "src-tauri/Cargo.toml",
+        "src-tauri/Cargo.lock",
+        "src-tauri/migrations/**"
+      ]
     }
   }
 }

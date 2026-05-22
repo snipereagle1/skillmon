@@ -57,7 +57,7 @@ export function DeletePlanDialog({
             onClick={handleConfirm}
             disabled={isDeleting}
           >
-            {isDeleting ? 'Deleting...' : 'Delete'}
+            {isDeleting ? 'Deleting…' : 'Delete'}
           </Button>
         </DialogFooter>
       </DialogContent>

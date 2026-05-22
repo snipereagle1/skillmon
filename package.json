@@ -15,9 +15,10 @@
     "typegen": "typeshare src-tauri/src --lang typescript --output-file src/generated/types.ts",
     "tauri:dev": "pnpm typegen && tauri dev",
     "tauri:build": "pnpm typegen && tauri build",
-    "test": "TZ=UTC vitest",
+    "test": "TZ=UTC vitest run",
     "test:watch": "TZ=UTC vitest --watch",
     "test:coverage": "TZ=UTC vitest --coverage",
+    "test:rust": "cd src-tauri && cargo test",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "lint:rust": "cd src-tauri && cargo clippy -- -D warnings",
@@ -28,7 +29,7 @@
     "format:check:rust": "cd src-tauri && cargo fmt -- --check",
     "lint:full": "pnpm lint && pnpm lint:rust",
     "format:check:all": "pnpm format:check && pnpm format:check:rust",
-    "verify": "pnpm typegen && turbo run lint lint:rust typecheck format:check format:check:rust",
+    "verify": "pnpm typegen && turbo run lint lint:rust typecheck format:check format:check:rust test test:rust",
     "prepare": "husky"
   },
   "lint-staged": {

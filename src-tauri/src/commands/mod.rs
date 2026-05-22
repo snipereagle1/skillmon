@@ -4,6 +4,7 @@ pub mod characters;
 pub mod clones;
 pub mod esi_snapshot;
 pub mod notifications;
+pub mod plan_groups;
 pub mod rate_limits;
 pub mod remaps;
 pub mod sde;

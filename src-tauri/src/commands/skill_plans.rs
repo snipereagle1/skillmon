@@ -205,6 +205,8 @@ pub struct SkillPlanResponse {
     pub auto_prerequisites: bool,
     pub created_at: i64_ts,
     pub updated_at: i64_ts,
+    pub group_id: Option<i64_ts>,
+    pub sort_order: i64_ts,
 }
 
 impl From<db::skill_plans::SkillPlan> for SkillPlanResponse {
@@ -216,6 +218,8 @@ impl From<db::skill_plans::SkillPlan> for SkillPlanResponse {
             auto_prerequisites: p.auto_prerequisites != 0,
             created_at: p.created_at,
             updated_at: p.updated_at,
+            group_id: p.group_id,
+            sort_order: p.sort_order,
         }
     }
 }

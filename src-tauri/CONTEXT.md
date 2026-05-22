@@ -22,6 +22,10 @@ Rust + Tauri v2 backend for skillmon. Always load `docs/context/eve.md` first fo
 
 **Cache** — ESI response cache in `src-tauri/src/cache/`. Stores ETags and expiration timestamps to avoid redundant API calls.
 
+**Plan group** — a presentational folder for organising skill plans. Self-referential tree (`parent_group_id` nullable, root = NULL), max 3 levels of nesting. Plans link to a group via nullable `skill_plans.group_id`; ungrouped plans live at root. Drag-and-drop reorder/reparent goes through the unified `move_node` command. See [`docs/adr/0003-plan-grouping-tree.md`](docs/adr/0003-plan-grouping-tree.md).
+
+**`move_node` command** — unified Tauri command for both reordering and reparenting plans or groups in the plan tree. Payload is a discriminated union `{ kind: "plan" | "group", id, new_parent_group_id, new_sort_order }`. Runs cycle + depth checks (groups only) and rewrites sibling `sort_order` in one transaction.
+
 **App settings** — app-wide key/value settings stored in the `app_settings` SQLite table (`key TEXT PRIMARY KEY, value TEXT`). DB operations in `src-tauri/src/db/app_settings.rs`; commands in `src-tauri/src/commands/settings.rs`. Distinct from per-character `notification_settings` and the `enabled_features` table.
 
 ## Architectural rules
