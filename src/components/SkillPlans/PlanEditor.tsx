@@ -5,6 +5,7 @@ import {
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { useQueryClient } from '@tanstack/react-query';
+import { useNavigate, useSearch } from '@tanstack/react-router';
 import { invoke } from '@tauri-apps/api/core';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { save } from '@tauri-apps/plugin-dialog';
@@ -59,6 +60,17 @@ interface PlanEditorProps {
 }
 
 export function PlanEditor({ planId }: PlanEditorProps) {
+  const search = useSearch({ from: '/plans/$planId' });
+  const navigate = useNavigate({ from: '/plans/$planId' });
+  const activeTab = search.tab ?? 'editor';
+  const handleTabChange = (value: string) => {
+    navigate({
+      search: {
+        tab: value === 'editor' ? undefined : (value as typeof search.tab),
+      },
+      replace: true,
+    });
+  };
   const { data, isLoading, error } = useSkillPlanWithEntries(planId);
   const { data: planRemaps } = usePlanRemaps(planId);
   const reorderMutation = useReorderPlanEntries();
@@ -611,7 +623,11 @@ export function PlanEditor({ planId }: PlanEditorProps) {
         </div>
       </div>
 
-      <Tabs defaultValue="editor" className="flex-1 flex flex-col min-h-0">
+      <Tabs
+        value={activeTab}
+        onValueChange={handleTabChange}
+        className="flex-1 flex flex-col min-h-0"
+      >
         <div className="px-4 py-2 border-b border-border bg-muted/20">
           <TabsList className="h-10">
             <TabsTrigger value="editor">Plan Editor</TabsTrigger>

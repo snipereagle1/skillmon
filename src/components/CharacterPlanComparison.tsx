@@ -1,3 +1,4 @@
+import { Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import { match, P } from 'ts-pattern';
 
@@ -97,7 +98,7 @@ export function CharacterPlanComparison({
 }: CharacterPlanComparisonProps) {
   const { data: comparison, isLoading: isLoadingComparison } =
     usePlanComparison(selectedPlanId, characterId);
-  const [showUntrainedOnly, setShowUntrainedOnly] = useState(false);
+  const [showUntrainedOnly, setShowUntrainedOnly] = useState(true);
 
   const { sortedEntries, stats } = useMemo(() => {
     if (!comparison || !characterId) {
@@ -143,9 +144,6 @@ export function CharacterPlanComparison({
   return (
     <div className="flex h-full min-h-0 bg-card">
       <div className="w-64 border-r border-border shrink-0 overflow-hidden flex flex-col">
-        <div className="p-4 border-b border-border">
-          <h2 className="h-nav">Skill Plans</h2>
-        </div>
         <PlanTree
           selectedPlanId={selectedPlanId}
           onPlanClick={onPlanChange}
@@ -176,7 +174,16 @@ export function CharacterPlanComparison({
               <div className="border-b border-border p-4 space-y-3 shrink-0">
                 <div className="flex items-start justify-between">
                   <div className="flex-1 min-w-0">
-                    <h2 className="h-card truncate">{comp.plan.name}</h2>
+                    <h2 className="h-card truncate">
+                      <Link
+                        to="/plans/$planId"
+                        params={{ planId: String(comp.plan.plan_id) }}
+                        search={{ tab: 'comparison' }}
+                        className="underline decoration-dotted decoration-(--brand) underline-offset-4 hover:decoration-solid focus-visible:decoration-solid focus-visible:outline-none"
+                      >
+                        {comp.plan.name}
+                      </Link>
+                    </h2>
                     {comp.plan.description && (
                       <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
                         {comp.plan.description}
