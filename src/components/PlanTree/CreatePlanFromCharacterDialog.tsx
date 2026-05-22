@@ -300,7 +300,7 @@ export function CreatePlanFromCharacterDialog({
               type="submit"
               disabled={!canCreate || createPlanMutation.isPending}
             >
-              {createPlanMutation.isPending ? 'Creating...' : 'Create Plan'}
+              {createPlanMutation.isPending ? 'Creating…' : 'Create Plan'}
             </Button>
           </DialogFooter>
         </form>

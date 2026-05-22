@@ -101,7 +101,7 @@ export function CreatePlanDialog({
               type="submit"
               disabled={!name.trim() || createPlanMutation.isPending}
             >
-              {createPlanMutation.isPending ? 'Creating...' : 'Create'}
+              {createPlanMutation.isPending ? 'Creating…' : 'Create'}
             </Button>
           </DialogFooter>
         </form>

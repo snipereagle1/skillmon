@@ -11,6 +11,11 @@ import {
 import { ChevronRight } from 'lucide-react';
 import React, { useCallback, useMemo, useState } from 'react';
 
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
 
 export interface TreeNode {
@@ -21,6 +26,7 @@ export interface TreeNode {
   selectedIcon?: React.ComponentType<{ className?: string }>;
   children?: TreeNode[];
   actions?: React.ReactNode;
+  contextMenuContent?: React.ReactNode;
   draggable?: boolean;
   droppable?: boolean;
   disabled?: boolean;
@@ -248,12 +254,17 @@ function Gap({ parentId, index, depth, indentPx }: GapProps) {
   return (
     <div
       ref={setNodeRef}
-      style={{ paddingLeft: depth * indentPx }}
-      className={cn(
-        'h-1 rounded-full transition-colors',
-        isOver && 'h-2 bg-primary'
-      )}
-    />
+      style={{ paddingLeft: depth * indentPx + 4, paddingRight: 4 }}
+      className="h-1.5 flex items-center"
+    >
+      <div
+        className={cn(
+          'h-0.5 w-full rounded-full',
+          'transition-[background-color,height] duration-150',
+          isOver && 'h-1 bg-primary'
+        )}
+      />
+    </div>
   );
 }
 
@@ -314,7 +325,7 @@ function NodeRow({
     return isLeaf ? defaultLeafIcon : defaultNodeIcon;
   })();
 
-  return (
+  const rowEl = (
     <div
       ref={setRef}
       {...attributes}
@@ -323,10 +334,11 @@ function NodeRow({
       aria-selected={isSelected}
       aria-expanded={hasChildren ? isOpen : undefined}
       className={cn(
-        'group relative flex items-center rounded-md text-sm transition-colors',
-        'hover:bg-accent/70',
-        isSelected && 'bg-accent/70 text-accent-foreground',
-        isOver && droppable && 'ring-2 ring-primary bg-primary/10',
+        'group relative flex items-center rounded-md text-sm',
+        'transition-[background-color,box-shadow,color] duration-150',
+        'hover:bg-accent/50',
+        isSelected && 'bg-accent text-accent-foreground',
+        isOver && droppable && 'ring-1 ring-inset ring-primary bg-primary/5',
         isDragging && 'opacity-50',
         node.disabled && 'opacity-50 cursor-not-allowed pointer-events-none',
         node.className
@@ -340,24 +352,38 @@ function NodeRow({
             e.stopPropagation();
             onToggleExpand(node.id);
           }}
-          className="shrink-0 p-1 text-muted-foreground hover:text-foreground"
+          className={cn(
+            'shrink-0 grid place-items-center size-7 rounded-md',
+            'text-muted-foreground hover:text-foreground hover:bg-accent/50',
+            'transition-colors duration-150',
+            'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+          )}
           aria-label={isOpen ? 'Collapse' : 'Expand'}
         >
           <ChevronRight
-            className={cn('size-4 transition-transform', isOpen && 'rotate-90')}
+            className={cn(
+              'size-4 transition-transform duration-200',
+              isOpen && 'rotate-90'
+            )}
           />
         </button>
       ) : (
-        <span className="size-4 shrink-0 ml-1 mr-1" />
+        <span className="size-7 shrink-0" />
       )}
       <button
         type="button"
         onClick={() => {
           if (node.disabled) return;
+          if (hasChildren) onToggleExpand(node.id);
           onSelectChange?.(node.id);
           node.onClick?.();
         }}
-        className="flex-1 flex items-center gap-2 py-2 pr-2 text-left min-w-0"
+        className={cn(
+          'flex-1 flex items-center gap-2 py-2 text-left min-w-0 rounded-md',
+          'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+          'active:scale-[0.98] transition-transform duration-100',
+          node.actions ? 'pr-16' : 'pr-2'
+        )}
       >
         {Icon && <Icon className="size-4 shrink-0" />}
         {renderItem ? (
@@ -373,10 +399,26 @@ function NodeRow({
         )}
       </button>
       {node.actions && (
-        <div className="absolute right-2 hidden group-hover:flex items-center gap-1">
+        <div
+          className={cn(
+            'absolute right-1.5 flex items-center gap-0.5',
+            'opacity-0 group-hover:opacity-100 group-focus-within:opacity-100',
+            'transition-opacity duration-150'
+          )}
+        >
           {node.actions}
         </div>
       )}
     </div>
   );
+
+  if (node.contextMenuContent) {
+    return (
+      <ContextMenu>
+        <ContextMenuTrigger asChild>{rowEl}</ContextMenuTrigger>
+        <ContextMenuContent>{node.contextMenuContent}</ContextMenuContent>
+      </ContextMenu>
+    );
+  }
+  return rowEl;
 }

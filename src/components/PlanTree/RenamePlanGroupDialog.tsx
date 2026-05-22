@@ -79,7 +79,7 @@ function RenameForm({ groupId, currentName, onClose }: RenameFormProps) {
             renameMutation.isPending
           }
         >
-          {renameMutation.isPending ? 'Saving...' : 'Rename'}
+          {renameMutation.isPending ? 'Saving…' : 'Rename'}
         </Button>
       </DialogFooter>
     </form>
