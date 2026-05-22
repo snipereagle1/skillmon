@@ -38,14 +38,11 @@ import {
   planNodeId,
   resolveDropTarget,
 } from '@/lib/planTreeDnd';
-import { cn } from '@/lib/utils';
 import { usePlanTreeDialogStore } from '@/stores/planTreeDialogStore';
 
 import { PlanTreeDialogs } from './PlanTreeDialogs';
 
-type PlanItem = TreeNode & {
-  _planDescription?: string;
-};
+type PlanItem = TreeNode;
 
 function useExpandedGroupTreeState() {
   const { data: persistedExpanded } = useExpandedPlanGroups();
@@ -69,29 +66,6 @@ function useExpandedGroupTreeState() {
     [persistExpanded]
   );
   return { expanded, onExpandedChange };
-}
-
-interface PlanRowBodyProps {
-  name: string;
-  description?: string;
-  isSelected: boolean;
-}
-function PlanRowBody({ name, description, isSelected }: PlanRowBodyProps) {
-  return (
-    <div className="flex-1 min-w-0">
-      <h3 className="h-card truncate">{name}</h3>
-      {description && (
-        <p
-          className={cn(
-            'text-sm mt-1 line-clamp-2',
-            isSelected ? 'text-foreground/80' : 'text-muted-foreground'
-          )}
-        >
-          {description}
-        </p>
-      )}
-    </div>
-  );
 }
 
 interface PlanTreeProps {
@@ -249,7 +223,6 @@ export function PlanTree({
             ×
           </Button>
         ) : undefined,
-        _planDescription: node.description,
       } satisfies PlanItem;
     };
     return tree.map(build);
@@ -333,19 +306,9 @@ export function PlanTree({
             onExpandedChange={onExpandedChange}
             onDrop={handleDrop}
             canDrop={canDrop}
-            renderItem={({ item, isLeaf, isSelected }) => {
-              const meta = item as PlanItem;
-              if (isLeaf) {
-                return (
-                  <PlanRowBody
-                    name={item.name}
-                    description={meta._planDescription}
-                    isSelected={isSelected}
-                  />
-                );
-              }
-              return <span className="truncate">{item.name}</span>;
-            }}
+            renderItem={({ item }) => (
+              <span className="truncate leading-none">{item.name}</span>
+            )}
           />
         )}
       </div>
