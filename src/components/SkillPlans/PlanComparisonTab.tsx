@@ -11,6 +11,7 @@ import {
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
+  DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
@@ -23,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { useAccountsAndCharacters } from '@/hooks/tauri/useAccountsAndCharacters';
 import {
   useExcludedComparisonCharacters,
   usePersistExcludedComparisonCharacters,
@@ -36,6 +38,7 @@ interface PlanComparisonTabProps {
 
 export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
   const { data, isLoading, error } = usePlanComparisonAll(planId);
+  const { data: accountsData } = useAccountsAndCharacters();
   const navigate = useNavigate();
   const { data: persistedExcluded } = useExcludedComparisonCharacters();
   const persistExcluded = usePersistExcludedComparisonCharacters();
@@ -43,6 +46,17 @@ export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
     () => new Set(persistedExcluded ?? []),
     [persistedExcluded]
   );
+
+  const characterAccountMap = useMemo(() => {
+    const map = new Map<number, string>();
+    if (!accountsData) return map;
+    for (const account of accountsData.accounts) {
+      for (const char of account.characters) {
+        map.set(char.character_id, account.name);
+      }
+    }
+    return map;
+  }, [accountsData]);
 
   const filteredComparisons = useMemo(() => {
     const comparisons = data?.comparisons ?? [];
@@ -74,6 +88,36 @@ export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
     if (!data) return;
     persistExcluded(data.comparisons.map((c) => c.character_id));
   };
+
+  const groupedComparisons = useMemo(() => {
+    if (!data) return [];
+    if (!accountsData) {
+      return [{ label: 'All Characters', characters: data.comparisons }];
+    }
+    const comparisonMap = new Map(
+      data.comparisons.map((c) => [c.character_id, c])
+    );
+    type Comparison = (typeof data.comparisons)[number];
+    const groups: { label: string; characters: Comparison[] }[] = [];
+
+    for (const account of accountsData.accounts) {
+      const chars = account.characters
+        .map((c) => comparisonMap.get(c.character_id))
+        .filter((c): c is Comparison => c !== undefined);
+      if (chars.length > 0) {
+        groups.push({ label: account.name, characters: chars });
+      }
+    }
+
+    const unassignedChars = accountsData.unassigned_characters
+      .map((c) => comparisonMap.get(c.character_id))
+      .filter((c): c is Comparison => c !== undefined);
+    if (unassignedChars.length > 0) {
+      groups.push({ label: 'Unassigned', characters: unassignedChars });
+    }
+
+    return groups;
+  }, [data, accountsData]);
 
   if (isLoading) {
     return (
@@ -130,18 +174,22 @@ export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
               Select None
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuGroup>
-              {data.comparisons.map((c) => (
-                <DropdownMenuCheckboxItem
-                  key={c.character_id}
-                  checked={!excludedCharacterIds.has(c.character_id)}
-                  onCheckedChange={() => toggleCharacter(c.character_id)}
-                  onSelect={(e) => e.preventDefault()}
-                >
-                  {c.character_name}
-                </DropdownMenuCheckboxItem>
-              ))}
-            </DropdownMenuGroup>
+            {groupedComparisons.map((group, i) => (
+              <DropdownMenuGroup key={group.label}>
+                {i > 0 && <DropdownMenuSeparator />}
+                <DropdownMenuLabel>{group.label}</DropdownMenuLabel>
+                {group.characters.map((c) => (
+                  <DropdownMenuCheckboxItem
+                    key={c.character_id}
+                    checked={!excludedCharacterIds.has(c.character_id)}
+                    onCheckedChange={() => toggleCharacter(c.character_id)}
+                    onSelect={(e) => e.preventDefault()}
+                  >
+                    {c.character_name}
+                  </DropdownMenuCheckboxItem>
+                ))}
+              </DropdownMenuGroup>
+            ))}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -153,6 +201,9 @@ export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
               <TableRow>
                 <TableHead className="bg-background border-b">
                   Character
+                </TableHead>
+                <TableHead className="bg-background border-b">
+                  Account
                 </TableHead>
                 <TableHead className="text-right bg-background border-b">
                   Completed SP
@@ -181,6 +232,9 @@ export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
                 >
                   <TableCell className="font-medium">
                     {c.character_name}
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">
+                    {characterAccountMap.get(c.character_id) ?? '—'}
                   </TableCell>
                   <TableCell className="text-right">
                     {formatNumber(c.completed_sp)}
@@ -215,7 +269,7 @@ export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
               {filteredComparisons.length === 0 && (
                 <TableRow>
                   <TableCell
-                    colSpan={5}
+                    colSpan={6}
                     className="text-center py-8 text-muted-foreground"
                   >
                     No characters selected or available.

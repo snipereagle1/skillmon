@@ -113,17 +113,20 @@ export function CharacterPlanComparison({
         },
       };
     }
-    const sorted = [...comparison.entries]
+    const allEntries = comparison.entries;
+    const sorted = [...allEntries]
       .filter((e) => !showUntrainedOnly || e.status !== 'complete')
       .sort((a, b) => a.sort_order - b.sort_order);
     return {
       sortedEntries: sorted,
       stats: {
-        total: sorted.length,
-        complete: sorted.filter((e) => e.status === 'complete').length,
-        in_progress: sorted.filter((e) => e.status === 'in_progress').length,
-        not_started: sorted.filter((e) => e.status === 'not_started').length,
-        totalMissingSP: sorted.reduce(
+        total: allEntries.length,
+        complete: allEntries.filter((e) => e.status === 'complete').length,
+        in_progress: allEntries.filter((e) => e.status === 'in_progress')
+          .length,
+        not_started: allEntries.filter((e) => e.status === 'not_started')
+          .length,
+        totalMissingSP: allEntries.reduce(
           (sum, e) => sum + e.missing_skillpoints,
           0
         ),
