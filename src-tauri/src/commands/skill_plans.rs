@@ -1744,17 +1744,25 @@ pub async fn compare_skill_plan_with_character(
         let skill_attr = skill_attributes.get(&entry.skill_type_id);
         let rank = skill_attr.and_then(|attr| attr.rank);
 
-        let skillpoints_for_planned_level = if let Some(rank_val) = rank {
-            utils::calculate_sp_for_level(rank_val, entry.planned_level as i32)
-        } else {
-            0
-        };
+        let (skillpoints_for_planned_level, current_skillpoints_for_level) = rank
+            .map(|rank_val| {
+                let sp_for_level =
+                    utils::calculate_sp_for_level(rank_val, entry.planned_level as i32)
+                        - utils::calculate_sp_for_level(rank_val, (entry.planned_level - 1) as i32);
+                let trained =
+                    trained_sp_for_level(entry.planned_level, current_skillpoints, rank_val);
+                (sp_for_level, trained)
+            })
+            .unwrap_or((0, 0));
 
-        let missing_skillpoints = if trained_level >= entry.planned_level {
-            0
-        } else {
-            (skillpoints_for_planned_level - current_skillpoints).max(0)
-        };
+        let missing_skillpoints = rank.map_or(0, |rank_val| {
+            missing_sp_for_level(
+                entry.planned_level,
+                trained_level,
+                current_skillpoints,
+                rank_val,
+            )
+        });
 
         let status = if trained_level >= entry.planned_level {
             "complete"
@@ -1775,7 +1783,7 @@ pub async fn compare_skill_plan_with_character(
             sort_order: entry.sort_order,
             rank,
             skillpoints_for_planned_level,
-            current_skillpoints,
+            current_skillpoints: current_skillpoints_for_level,
             missing_skillpoints,
             status: status.to_string(),
         });
@@ -1859,7 +1867,12 @@ pub async fn compare_skill_plan_with_all_characters(
                     completed_sp += sp_for_planned;
                 } else {
                     completed_sp += current_skillpoints;
-                    let missing = (sp_for_planned - current_skillpoints).max(0);
+                    let missing = missing_sp_for_level(
+                        entry.planned_level,
+                        trained_level,
+                        current_skillpoints,
+                        rank_val,
+                    );
                     missing_sp += missing;
 
                     if let Some(attr) = attributes.as_ref() {
@@ -1946,4 +1959,111 @@ pub async fn compare_skill_plan_with_all_characters(
         plan: SkillPlanResponse::from(plan),
         comparisons,
     })
+}
+
+fn trained_sp_for_level(planned_level: i64, current_skillpoints: i64, rank: i64) -> i64 {
+    let total = utils::calculate_sp_for_level(rank, planned_level as i32);
+    let previous = utils::calculate_sp_for_level(rank, (planned_level - 1) as i32);
+    (current_skillpoints - previous).clamp(0, total - previous)
+}
+
+fn missing_sp_for_level(
+    planned_level: i64,
+    trained_level: i64,
+    current_skillpoints: i64,
+    rank: i64,
+) -> i64 {
+    if trained_level >= planned_level {
+        return 0;
+    }
+    let sp_for_planned = utils::calculate_sp_for_level(rank, planned_level as i32);
+    let sp_for_previous = utils::calculate_sp_for_level(rank, (planned_level - 1) as i32);
+    let base = current_skillpoints.max(sp_for_previous);
+    (sp_for_planned - base).max(0)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn missing_sp_scoped_to_single_level() {
+        let rank = 1;
+        let sp_1 = utils::calculate_sp_for_level(rank, 1);
+        let sp_2 = utils::calculate_sp_for_level(rank, 2);
+        let sp_3 = utils::calculate_sp_for_level(rank, 3);
+
+        // Untrained character: each level only counts its own slice
+        let missing_1 = missing_sp_for_level(1, 0, 0, rank);
+        let missing_2 = missing_sp_for_level(2, 0, 0, rank);
+        let missing_3 = missing_sp_for_level(3, 0, 0, rank);
+
+        assert_eq!(missing_1, sp_1);
+        assert_eq!(missing_2, sp_2 - sp_1);
+        assert_eq!(missing_3, sp_3 - sp_2);
+
+        // Sum of per-level missing equals total SP for level 3
+        assert_eq!(missing_1 + missing_2 + missing_3, sp_3);
+    }
+
+    #[test]
+    fn missing_sp_zero_when_trained() {
+        let rank = 3;
+        assert_eq!(missing_sp_for_level(2, 2, 10000, rank), 0);
+        assert_eq!(missing_sp_for_level(2, 5, 100000, rank), 0);
+    }
+
+    #[test]
+    fn missing_sp_partial_progress_within_level() {
+        let rank = 1;
+        let sp_2 = utils::calculate_sp_for_level(rank, 2);
+        let sp_3 = utils::calculate_sp_for_level(rank, 3);
+        // Trained to level 2, halfway through level 3
+        let partial_sp = sp_2 + (sp_3 - sp_2) / 2;
+
+        let missing = missing_sp_for_level(3, 2, partial_sp, rank);
+        assert_eq!(missing, sp_3 - partial_sp);
+    }
+
+    #[test]
+    fn trained_sp_scoped_to_level() {
+        let rank = 1;
+        let sp_1 = utils::calculate_sp_for_level(rank, 1);
+        let sp_2 = utils::calculate_sp_for_level(rank, 2);
+        let sp_3 = utils::calculate_sp_for_level(rank, 3);
+
+        // Untrained: 0 trained SP in every level
+        assert_eq!(trained_sp_for_level(1, 0, rank), 0);
+        assert_eq!(trained_sp_for_level(2, 0, rank), 0);
+        assert_eq!(trained_sp_for_level(3, 0, rank), 0);
+
+        // Fully trained to level 2: level 1 and 2 are full, level 3 is 0
+        assert_eq!(trained_sp_for_level(1, sp_2, rank), sp_1);
+        assert_eq!(trained_sp_for_level(2, sp_2, rank), sp_2 - sp_1);
+        assert_eq!(trained_sp_for_level(3, sp_2, rank), 0);
+
+        // Partial progress into level 3
+        let partial = sp_2 + 100;
+        assert_eq!(trained_sp_for_level(1, partial, rank), sp_1);
+        assert_eq!(trained_sp_for_level(2, partial, rank), sp_2 - sp_1);
+        assert_eq!(trained_sp_for_level(3, partial, rank), 100);
+
+        // Fully trained to level 3: all levels capped at their slice
+        assert_eq!(trained_sp_for_level(1, sp_3, rank), sp_1);
+        assert_eq!(trained_sp_for_level(2, sp_3, rank), sp_2 - sp_1);
+        assert_eq!(trained_sp_for_level(3, sp_3, rank), sp_3 - sp_2);
+    }
+
+    #[test]
+    fn missing_sp_no_double_count_across_levels() {
+        let rank = 5;
+        let sp_5 = utils::calculate_sp_for_level(rank, 5);
+
+        // Simulate a plan with levels 1-5 for an untrained character
+        let total_missing: i64 = (1..=5)
+            .map(|level| missing_sp_for_level(level, 0, 0, rank))
+            .sum();
+
+        assert_eq!(total_missing, sp_5);
+    }
 }
