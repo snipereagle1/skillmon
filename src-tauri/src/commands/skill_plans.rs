@@ -1863,10 +1863,14 @@ pub async fn compare_skill_plan_with_all_characters(
                 let sp_for_planned =
                     utils::calculate_sp_for_level(rank_val, entry.planned_level as i32);
 
+                let sp_for_previous =
+                    utils::calculate_sp_for_level(rank_val, (entry.planned_level - 1) as i32);
+
                 if trained_level >= entry.planned_level {
-                    completed_sp += sp_for_planned;
+                    completed_sp += sp_for_planned - sp_for_previous;
                 } else {
-                    completed_sp += current_skillpoints;
+                    completed_sp +=
+                        trained_sp_for_level(entry.planned_level, current_skillpoints, rank_val);
                     let missing = missing_sp_for_level(
                         entry.planned_level,
                         trained_level,
@@ -2052,6 +2056,27 @@ mod tests {
         assert_eq!(trained_sp_for_level(1, sp_3, rank), sp_1);
         assert_eq!(trained_sp_for_level(2, sp_3, rank), sp_2 - sp_1);
         assert_eq!(trained_sp_for_level(3, sp_3, rank), sp_3 - sp_2);
+    }
+
+    #[test]
+    fn missing_sp_level_one_with_partial_progress() {
+        let rank = 1;
+        let sp_1 = utils::calculate_sp_for_level(rank, 1);
+        let partial = sp_1 / 2;
+
+        let missing = missing_sp_for_level(1, 0, partial, rank);
+        assert_eq!(missing, sp_1 - partial);
+    }
+
+    #[test]
+    fn trained_sp_high_rank_all_levels() {
+        let rank = 16;
+        let sp_4 = utils::calculate_sp_for_level(rank, 4);
+        let sp_5 = utils::calculate_sp_for_level(rank, 5);
+
+        assert_eq!(trained_sp_for_level(5, sp_5, rank), sp_5 - sp_4);
+        assert_eq!(trained_sp_for_level(5, sp_5 + 1000, rank), sp_5 - sp_4);
+        assert_eq!(trained_sp_for_level(5, sp_4, rank), 0);
     }
 
     #[test]

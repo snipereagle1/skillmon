@@ -90,16 +90,20 @@ export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
   };
 
   const groupedComparisons = useMemo(() => {
-    if (!data || !accountsData) return [];
+    if (!data) return [];
+    if (!accountsData) {
+      return [{ label: 'All Characters', characters: data.comparisons }];
+    }
     const comparisonMap = new Map(
       data.comparisons.map((c) => [c.character_id, c])
     );
-    const groups: { label: string; characters: typeof data.comparisons }[] = [];
+    type Comparison = (typeof data.comparisons)[number];
+    const groups: { label: string; characters: Comparison[] }[] = [];
 
     for (const account of accountsData.accounts) {
       const chars = account.characters
         .map((c) => comparisonMap.get(c.character_id))
-        .filter(Boolean) as typeof data.comparisons;
+        .filter((c): c is Comparison => c !== undefined);
       if (chars.length > 0) {
         groups.push({ label: account.name, characters: chars });
       }
@@ -107,7 +111,7 @@ export function PlanComparisonTab({ planId }: PlanComparisonTabProps) {
 
     const unassignedChars = accountsData.unassigned_characters
       .map((c) => comparisonMap.get(c.character_id))
-      .filter(Boolean) as typeof data.comparisons;
+      .filter((c): c is Comparison => c !== undefined);
     if (unassignedChars.length > 0) {
       groups.push({ label: 'Unassigned', characters: unassignedChars });
     }
