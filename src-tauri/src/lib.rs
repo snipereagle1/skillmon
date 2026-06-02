@@ -17,7 +17,6 @@ mod notifications;
 mod refresh;
 mod sde;
 mod skill_plans;
-mod skill_queue;
 mod tray;
 pub mod ts_types;
 mod utils;
