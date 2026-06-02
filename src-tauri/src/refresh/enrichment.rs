@@ -263,14 +263,20 @@ pub async fn enrich_queue(
             is_omega: true,
         });
 
-    let db_attrs = db::get_character_attributes(pool, character_id)
-        .await
-        .ok()
-        .flatten();
+    let db_attrs = match db::get_character_attributes(pool, character_id).await {
+        Ok(attrs) => attrs,
+        Err(e) => {
+            eprintln!("refresh: attributes {}: {}", character_id, e);
+            None
+        }
+    };
 
-    let character_skills = db::get_character_skills(pool, character_id)
-        .await
-        .unwrap_or_default();
+    let skills_result = db::get_character_skills(pool, character_id).await;
+    let skills_loaded = skills_result.is_ok();
+    if let Err(e) = &skills_result {
+        eprintln!("refresh: skills {}: {}", character_id, e);
+    }
+    let character_skills = skills_result.unwrap_or_default();
     let skill_sp_map: HashMap<i64, i64> = character_skills
         .iter()
         .map(|s| (s.skill_id, s.skillpoints_in_skill))
@@ -297,17 +303,24 @@ pub async fn enrich_queue(
 
     // Recompute Omega status every refresh. This is the only live path that
     // writes is_omega; without it a stale persisted value never self-corrects.
-    let is_omega = infer_is_omega(
-        db_attrs.as_ref(),
-        &character_skills,
-        &raw_queue,
-        &skill_attrs,
-    );
-    if is_omega != character.is_omega {
-        db::update_character_omega_status(pool, character_id, is_omega)
-            .await
-            .ok();
-    }
+    // Skip when the skills read failed — Signal 1 needs the real skill list, and
+    // inferring from an error-empty Vec would persist a misclassification.
+    let is_omega = if skills_loaded {
+        let inferred = infer_is_omega(
+            db_attrs.as_ref(),
+            &character_skills,
+            &raw_queue,
+            &skill_attrs,
+        );
+        if inferred != character.is_omega {
+            if let Err(e) = db::update_character_omega_status(pool, character_id, inferred).await {
+                eprintln!("refresh: update omega status {}: {}", character_id, e);
+            }
+        }
+        inferred
+    } else {
+        character.is_omega
+    };
 
     let is_paused =
         !raw_queue.is_empty() && raw_queue.iter().all(|item| item.finish_date.is_none());
@@ -1206,6 +1219,24 @@ mod tests {
         // Will(34) + Int(44)/2 = 56 SP/min over 120 min = 6720 SP gained.
         let queue = vec![training_item(88377, 6720)];
         let skills = vec![skill(88377, 5, 5), skill(3300, 5, 5)];
+        assert!(infer_is_omega(
+            Some(&a),
+            &skills,
+            &queue,
+            &doomsday_attr_map()
+        ));
+    }
+
+    // Boundary: rate just above the 0.55x threshold must stay Omega. Guards the
+    // lone magic constant — the slow-rate Alpha test sits well below (28/min),
+    // this pins the Omega side just above 30.8/min. (Avoids the exact-equality
+    // value 30.8, which is float-fuzzy against expected*0.55.)
+    #[test]
+    fn rate_just_above_threshold_stays_omega() {
+        let a = attrs(44, 38, 34, 34);
+        // 0.55 * 56 = 30.8 threshold. 31 SP/min over 120 min = 3720 SP gained.
+        let queue = vec![training_item(88377, 3720)];
+        let skills = vec![skill(88377, 5, 5)];
         assert!(infer_is_omega(
             Some(&a),
             &skills,
