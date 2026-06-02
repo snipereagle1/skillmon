@@ -59,6 +59,59 @@ fn attr_value_from_id(attrs: &db::CharacterAttributes, attr_id: i64) -> i64 {
     }
 }
 
+/// Infer Omega vs Alpha from ESI data, since ESI exposes no subscription field.
+/// Defaults to Omega; only returns false when a positive Alpha signal fires.
+/// See docs/context/eve.md (Alpha inference). Mirrors the two documented signals.
+fn infer_is_omega(
+    db_attrs: Option<&db::CharacterAttributes>,
+    character_skills: &[db::CharacterSkill],
+    raw_queue: &[esi::CharactersSkillqueueSkill],
+    skill_attrs: &HashMap<i64, utils::SkillAttributes>,
+) -> bool {
+    // Signal 1 — Lapsed status: a skill trained above the alpha cap reports
+    // active_skill_level < trained_skill_level. Reliable.
+    if character_skills
+        .iter()
+        .any(|s| s.active_skill_level < s.trained_skill_level)
+    {
+        return false;
+    }
+
+    // Signal 2 — Active training rate < 55% of the expected Omega rate. Only
+    // fires while a skill is actively training. Less reliable than signal 1.
+    let now = chrono::Utc::now();
+    let currently_training = raw_queue.iter().find(|item| {
+        matches!((item.start_date, item.finish_date), (Some(start), Some(finish)) if now >= start && now < finish)
+    });
+
+    if let (Some(item), Some(attrs)) = (currently_training, db_attrs) {
+        if let (Some(start), Some(finish), Some(start_sp), Some(end_sp)) = (
+            item.start_date,
+            item.finish_date,
+            item.training_start_sp,
+            item.level_end_sp,
+        ) {
+            let duration_mins = (finish - start).num_minutes() as f64;
+            if duration_mins > 0.0 {
+                if let Some(skill_attr) = skill_attrs.get(&item.skill_id) {
+                    if let (Some(p_id), Some(s_id)) =
+                        (skill_attr.primary_attribute, skill_attr.secondary_attribute)
+                    {
+                        let actual_rate = (end_sp - start_sp) as f64 / duration_mins;
+                        let expected_omega_rate = attr_value_from_id(attrs, p_id) as f64
+                            + attr_value_from_id(attrs, s_id) as f64 / 2.0;
+                        if expected_omega_rate > 0.0 && actual_rate < expected_omega_rate * 0.55 {
+                            return false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    true
+}
+
 fn compute_breakdown_from_db_attrs(
     attrs: &db::CharacterAttributes,
     implant_ids: &[i64],
@@ -210,15 +263,22 @@ pub async fn enrich_queue(
             is_omega: true,
         });
 
-    let db_attrs = db::get_character_attributes(pool, character_id)
-        .await
-        .ok()
-        .flatten();
+    let db_attrs = match db::get_character_attributes(pool, character_id).await {
+        Ok(attrs) => attrs,
+        Err(e) => {
+            eprintln!("refresh: attributes {}: {}", character_id, e);
+            None
+        }
+    };
 
-    let skill_sp_map: HashMap<i64, i64> = db::get_character_skills(pool, character_id)
-        .await
-        .unwrap_or_default()
-        .into_iter()
+    let skills_result = db::get_character_skills(pool, character_id).await;
+    let skills_loaded = skills_result.is_ok();
+    if let Err(e) = &skills_result {
+        eprintln!("refresh: skills {}: {}", character_id, e);
+    }
+    let character_skills = skills_result.unwrap_or_default();
+    let skill_sp_map: HashMap<i64, i64> = character_skills
+        .iter()
         .map(|s| (s.skill_id, s.skillpoints_in_skill))
         .collect();
 
@@ -240,6 +300,27 @@ pub async fn enrich_queue(
     let skill_attrs = utils::get_skill_attributes(pool, &unique_ids)
         .await
         .unwrap_or_default();
+
+    // Recompute Omega status every refresh. This is the only live path that
+    // writes is_omega; without it a stale persisted value never self-corrects.
+    // Skip when the skills read failed — Signal 1 needs the real skill list, and
+    // inferring from an error-empty Vec would persist a misclassification.
+    let is_omega = if skills_loaded {
+        let inferred = infer_is_omega(
+            db_attrs.as_ref(),
+            &character_skills,
+            &raw_queue,
+            &skill_attrs,
+        );
+        if inferred != character.is_omega {
+            if let Err(e) = db::update_character_omega_status(pool, character_id, inferred).await {
+                eprintln!("refresh: update omega status {}: {}", character_id, e);
+            }
+        }
+        inferred
+    } else {
+        character.is_omega
+    };
 
     let is_paused =
         !raw_queue.is_empty() && raw_queue.iter().all(|item| item.finish_date.is_none());
@@ -270,7 +351,7 @@ pub async fn enrich_queue(
                     ) {
                         let pv = attr_value_from_id(attrs, p_id);
                         let sv = attr_value_from_id(attrs, s_id);
-                        Some(utils::calculate_sp_per_minute(pv, sv, character.is_omega))
+                        Some(utils::calculate_sp_per_minute(pv, sv, is_omega))
                     } else {
                         None
                     };
@@ -315,7 +396,7 @@ pub async fn enrich_queue(
         character_name: character.character_name,
         unallocated_sp: character.unallocated_sp,
         is_paused,
-        is_omega: character.is_omega,
+        is_omega,
         attributes,
     }
 }
@@ -1064,4 +1145,138 @@ pub async fn overview_row_from_queue(
         has_implants,
         has_booster,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn attrs(
+        intelligence: i64,
+        memory: i64,
+        perception: i64,
+        willpower: i64,
+    ) -> db::CharacterAttributes {
+        db::CharacterAttributes {
+            character_id: 1,
+            charisma: 17,
+            intelligence,
+            memory,
+            perception,
+            willpower,
+            bonus_remaps: None,
+            accrued_remap_cooldown_date: None,
+            last_remap_date: None,
+        }
+    }
+
+    fn skill(skill_id: i64, active: i64, trained: i64) -> db::CharacterSkill {
+        db::CharacterSkill {
+            character_id: 1,
+            skill_id,
+            active_skill_level: active,
+            skillpoints_in_skill: 0,
+            trained_skill_level: trained,
+        }
+    }
+
+    // Advanced Doomsday Operation: primary willpower (168), secondary intelligence (165).
+    fn doomsday_attr_map() -> HashMap<i64, utils::SkillAttributes> {
+        let mut m = HashMap::new();
+        m.insert(
+            88377,
+            utils::SkillAttributes {
+                primary_attribute: Some(168),
+                secondary_attribute: Some(165),
+                rank: Some(14),
+            },
+        );
+        m
+    }
+
+    // A queue item actively training right now, gaining `sp_gained` over a 120-minute window.
+    fn training_item(skill_id: i64, sp_gained: i64) -> esi::CharactersSkillqueueSkill {
+        let now = chrono::Utc::now();
+        esi::CharactersSkillqueueSkill {
+            skill_id,
+            finished_level: 5,
+            queue_position: 0,
+            start_date: Some(now - chrono::Duration::minutes(60)),
+            finish_date: Some(now + chrono::Duration::minutes(60)),
+            training_start_sp: Some(0),
+            level_start_sp: Some(0),
+            level_end_sp: Some(sp_gained),
+            ..Default::default()
+        }
+    }
+
+    // Regression: the bug. An Omega — attributes full (Int44/Will34),
+    // no lapsed skills, training at the full Omega rate — must stay Omega.
+    // Pre-fix this path was dead and a stale is_omega=false halved every rate.
+    #[test]
+    fn omega_with_no_lapsed_skills_and_full_rate_stays_omega() {
+        let a = attrs(44, 38, 34, 34);
+        // Will(34) + Int(44)/2 = 56 SP/min over 120 min = 6720 SP gained.
+        let queue = vec![training_item(88377, 6720)];
+        let skills = vec![skill(88377, 5, 5), skill(3300, 5, 5)];
+        assert!(infer_is_omega(
+            Some(&a),
+            &skills,
+            &queue,
+            &doomsday_attr_map()
+        ));
+    }
+
+    // Boundary: rate just above the 0.55x threshold must stay Omega. Guards the
+    // lone magic constant — the slow-rate Alpha test sits well below (28/min),
+    // this pins the Omega side just above 30.8/min. (Avoids the exact-equality
+    // value 30.8, which is float-fuzzy against expected*0.55.)
+    #[test]
+    fn rate_just_above_threshold_stays_omega() {
+        let a = attrs(44, 38, 34, 34);
+        // 0.55 * 56 = 30.8 threshold. 31 SP/min over 120 min = 3720 SP gained.
+        let queue = vec![training_item(88377, 3720)];
+        let skills = vec![skill(88377, 5, 5)];
+        assert!(infer_is_omega(
+            Some(&a),
+            &skills,
+            &queue,
+            &doomsday_attr_map()
+        ));
+    }
+
+    #[test]
+    fn lapsed_skill_flags_alpha() {
+        let a = attrs(44, 38, 34, 34);
+        let queue = vec![training_item(88377, 6720)];
+        // One skill trained above the alpha cap: active < trained.
+        let skills = vec![skill(3300, 4, 5)];
+        assert!(!infer_is_omega(
+            Some(&a),
+            &skills,
+            &queue,
+            &doomsday_attr_map()
+        ));
+    }
+
+    #[test]
+    fn slow_active_rate_flags_alpha() {
+        let a = attrs(44, 38, 34, 34);
+        // 28 SP/min < 0.55 * 56 = 30.8 expected Omega rate.
+        let queue = vec![training_item(88377, 3360)];
+        let skills = vec![skill(88377, 5, 5)];
+        assert!(!infer_is_omega(
+            Some(&a),
+            &skills,
+            &queue,
+            &doomsday_attr_map()
+        ));
+    }
+
+    #[test]
+    fn no_training_and_no_lapsed_defaults_omega() {
+        let a = attrs(44, 38, 34, 34);
+        let skills = vec![skill(88377, 5, 5)];
+        assert!(infer_is_omega(Some(&a), &skills, &[], &doomsday_attr_map()));
+    }
 }
