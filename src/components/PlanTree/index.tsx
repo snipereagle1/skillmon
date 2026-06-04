@@ -137,7 +137,11 @@ export function PlanTree({
       if (onPlanClick) {
         onPlanClick(planId);
       } else {
-        navigate({ to: '/plans/$planId', params: { planId: String(planId) } });
+        navigate({
+          to: '/plans/$planId',
+          params: { planId: String(planId) },
+          search: (prev) => prev,
+        });
       }
     },
     [onPlanClick, navigate]
