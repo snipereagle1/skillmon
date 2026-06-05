@@ -4,6 +4,7 @@ import { invoke } from '@tauri-apps/api/core';
 import type {
   MergeIntoPlanResponse,
   PreviewPlanFromCharacterResponse,
+  ReplacePlanEntryInput,
   SkillmonPlan,
   SkillPlanResponse,
   SkillPlanWithEntriesResponse,
@@ -30,6 +31,12 @@ interface MergePlansIntoParams {
   [key: string]: unknown;
   targetPlanId: number;
   sourcePlanIds: number[];
+}
+
+interface ReplacePlanEntriesParams {
+  [key: string]: unknown;
+  planId: number;
+  entries: ReplacePlanEntryInput[];
 }
 
 interface UpdateSkillPlanParams {
@@ -271,6 +278,53 @@ export function useMergePlansInto() {
       });
       queryClient.invalidateQueries({
         queryKey: queryKeys.remaps.plan(targetId),
+      });
+    },
+  });
+}
+
+export function useReplacePlanEntries() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: ReplacePlanEntriesParams) => {
+      return await invoke<SkillPlanWithEntriesResponse>(
+        'replace_plan_entries',
+        params
+      );
+    },
+    onSuccess: (data, params) => {
+      const planId = params.planId;
+      // Seed the restored plan, then invalidate everything it derives from its
+      // entries — the same set merge_plans_into touches, since this is the
+      // undo of that action.
+      queryClient.setQueryData(queryKeys.skillPlanWithEntries(planId), data);
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillPlanWithEntries(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillPlanValidation(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillPlanSimulation(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillPlanOptimization(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonByPlan(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonAll(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.exportSkillPlanText(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.exportSkillPlanXml(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.remaps.plan(planId),
       });
     },
   });

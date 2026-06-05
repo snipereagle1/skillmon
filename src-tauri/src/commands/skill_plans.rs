@@ -1,7 +1,7 @@
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
 use tauri::State;
@@ -522,6 +522,45 @@ async fn merge_plans_into_inner(
     tx.commit().await?;
 
     Ok(appended.len())
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Deserialize)]
+pub struct ReplacePlanEntryInput {
+    pub skill_type_id: i64_ts,
+    pub planned_level: i64_ts,
+    pub entry_type: String,
+    pub notes: Option<String>,
+}
+
+/// Replace a plan's entries with an exact supplied snapshot (clear + insert),
+/// returning the refreshed plan. This is the undo primitive behind "Merge into
+/// this plan": the frontend captures the target's pre-merge entries and
+/// restores them here on undo. Existing rows are re-created, so `entry_id`s are
+/// not preserved.
+#[tauri::command]
+pub async fn replace_plan_entries(
+    pool: State<'_, db::Pool>,
+    plan_id: i64,
+    entries: Vec<ReplacePlanEntryInput>,
+) -> Result<SkillPlanWithEntriesResponse, String> {
+    let rows: Vec<db::skill_plans::ReplacePlanEntry> = entries
+        .into_iter()
+        .map(|e| db::skill_plans::ReplacePlanEntry {
+            skill_type_id: e.skill_type_id,
+            planned_level: e.planned_level,
+            entry_type: e.entry_type,
+            notes: e.notes,
+        })
+        .collect();
+
+    db::skill_plans::replace_plan_entries(&pool, plan_id, &rows)
+        .await
+        .map_err(|e| format!("Failed to replace plan entries: {}", e))?;
+
+    get_skill_plan_with_entries(pool, plan_id)
+        .await?
+        .ok_or_else(|| "Plan not found after replacing entries".to_string())
 }
 
 #[typeshare]
@@ -2632,5 +2671,97 @@ mod tests {
             .await
             .unwrap_err();
         assert!(err.to_string().contains("at least one"));
+    }
+
+    #[tokio::test]
+    async fn replace_plan_entries_restores_exact_snapshot() {
+        use crate::testdata::{fixtures, TestDb};
+
+        const SPACESHIP_COMMAND: i64 = 3327;
+        const GUNNERY: i64 = 3300;
+
+        let db = TestDb::new_with_sde().await.unwrap();
+
+        // Build a plan and capture its entries as the snapshot to restore.
+        let plan = fixtures::create_skill_plan(&db.pool, "Plan").await;
+        fixtures::add_plan_entry(&db.pool, plan, SPACESHIP_COMMAND, 1, "Planned").await;
+        fixtures::add_plan_entry(&db.pool, plan, SPACESHIP_COMMAND, 2, "Prerequisite").await;
+
+        let snapshot = db::skill_plans::get_plan_entries(&db.pool, plan)
+            .await
+            .unwrap();
+        let snapshot_signature: Vec<(i64, i64, i64, String, Option<String>)> = snapshot
+            .iter()
+            .map(|e| {
+                (
+                    e.skill_type_id,
+                    e.planned_level,
+                    e.sort_order,
+                    e.entry_type.clone(),
+                    e.notes.clone(),
+                )
+            })
+            .collect();
+
+        // Mutate the plan so its current state differs from the snapshot.
+        fixtures::add_plan_entry(&db.pool, plan, GUNNERY, 1, "Planned").await;
+        assert_eq!(
+            db::skill_plans::get_plan_entries(&db.pool, plan)
+                .await
+                .unwrap()
+                .len(),
+            3
+        );
+
+        // Restore the captured snapshot wholesale.
+        let rows: Vec<db::skill_plans::ReplacePlanEntry> = snapshot
+            .iter()
+            .map(|e| db::skill_plans::ReplacePlanEntry {
+                skill_type_id: e.skill_type_id,
+                planned_level: e.planned_level,
+                entry_type: e.entry_type.clone(),
+                notes: e.notes.clone(),
+            })
+            .collect();
+        db::skill_plans::replace_plan_entries(&db.pool, plan, &rows)
+            .await
+            .unwrap();
+
+        // Round-trip: every field but entry_id matches the original snapshot.
+        let restored = db::skill_plans::get_plan_entries(&db.pool, plan)
+            .await
+            .unwrap();
+        let restored_signature: Vec<(i64, i64, i64, String, Option<String>)> = restored
+            .iter()
+            .map(|e| {
+                (
+                    e.skill_type_id,
+                    e.planned_level,
+                    e.sort_order,
+                    e.entry_type.clone(),
+                    e.notes.clone(),
+                )
+            })
+            .collect();
+        assert_eq!(restored_signature, snapshot_signature);
+    }
+
+    #[tokio::test]
+    async fn replace_plan_entries_with_empty_snapshot_clears_plan() {
+        use crate::testdata::{fixtures, TestDb};
+
+        let db = TestDb::new_with_sde().await.unwrap();
+
+        let plan = fixtures::create_skill_plan(&db.pool, "Plan").await;
+        fixtures::add_plan_entry(&db.pool, plan, 3327, 1, "Planned").await;
+
+        db::skill_plans::replace_plan_entries(&db.pool, plan, &[])
+            .await
+            .unwrap();
+
+        assert!(db::skill_plans::get_plan_entries(&db.pool, plan)
+            .await
+            .unwrap()
+            .is_empty());
     }
 }

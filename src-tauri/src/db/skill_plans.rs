@@ -122,6 +122,59 @@ pub async fn get_plan_entries(pool: &Pool, plan_id: i64) -> Result<Vec<SkillPlan
     Ok(entries)
 }
 
+/// A single entry to write when replacing a plan's entries wholesale.
+/// `sort_order` is derived from the position in the supplied slice, so it is
+/// not carried here.
+pub struct ReplacePlanEntry {
+    pub skill_type_id: i64,
+    pub planned_level: i64,
+    pub entry_type: String,
+    pub notes: Option<String>,
+}
+
+/// Replace a plan's entries with an exact supplied snapshot: clear every
+/// existing row for the plan, then insert `entries` in order with a dense,
+/// sequential `sort_order` starting at 0. Runs in one transaction. An empty
+/// slice clears the plan. Existing rows are deleted and re-created, so their
+/// `entry_id`s are not preserved.
+pub async fn replace_plan_entries(
+    pool: &Pool,
+    plan_id: i64,
+    entries: &[ReplacePlanEntry],
+) -> Result<()> {
+    let mut tx = pool.begin().await?;
+
+    sqlx::query("DELETE FROM skill_plan_entries WHERE plan_id = ?")
+        .bind(plan_id)
+        .execute(&mut *tx)
+        .await?;
+
+    for (index, entry) in entries.iter().enumerate() {
+        sqlx::query(
+            "INSERT INTO skill_plan_entries (plan_id, skill_type_id, planned_level, sort_order, entry_type, notes)
+             VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(plan_id)
+        .bind(entry.skill_type_id)
+        .bind(entry.planned_level)
+        .bind(index as i64)
+        .bind(&entry.entry_type)
+        .bind(&entry.notes)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    sqlx::query("UPDATE skill_plans SET updated_at = ? WHERE plan_id = ?")
+        .bind(chrono::Utc::now().timestamp())
+        .bind(plan_id)
+        .execute(&mut *tx)
+        .await?;
+
+    tx.commit().await?;
+
+    Ok(())
+}
+
 pub async fn get_plan_nodes_in_order(pool: &Pool, plan_id: i64) -> Result<Vec<(i64, i64)>> {
     let nodes = sqlx::query_as::<_, (i64, i64)>(
         "SELECT skill_type_id, planned_level
