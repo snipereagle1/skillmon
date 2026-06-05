@@ -32,6 +32,8 @@ Game concepts used across the skillmon codebase. Load this before any frontend o
 
 **Skill plan** — a user-defined ordered list of skills to train, with target levels. skillmon validates prerequisites, simulates training time, and can optimise attribute remaps.
 
+**Plan merge** — creating a new skill plan from the union of several existing plans, combined in a user-chosen order. Each source plan's entries are appended in their stored order; a skill-level already present from an earlier source is skipped (first occurrence wins, keeping its entry type). Source plans are left unchanged.
+
 **Training time** — how long a skill level takes to complete. Determined by SP required, character attributes, and any implant bonuses.
 
 **Certificate** — a CCP-defined collection of skills at specified levels representing a competency. Not directly used in skillmon yet but present in SDE.
