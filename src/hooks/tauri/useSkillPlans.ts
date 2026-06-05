@@ -2,6 +2,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invoke } from '@tauri-apps/api/core';
 
 import type {
+  MergeIntoPlanResponse,
   PreviewPlanFromCharacterResponse,
   SkillmonPlan,
   SkillPlanResponse,
@@ -22,6 +23,12 @@ interface CreateMergedSkillPlanParams {
   [key: string]: unknown;
   name: string;
   description?: string;
+  sourcePlanIds: number[];
+}
+
+interface MergePlansIntoParams {
+  [key: string]: unknown;
+  targetPlanId: number;
   sourcePlanIds: number[];
 }
 
@@ -218,6 +225,53 @@ export function useCreateMergedSkillPlan() {
       });
 
       queryClient.invalidateQueries({ queryKey: queryKeys.skillPlans() });
+    },
+  });
+}
+
+export function useMergePlansInto() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: MergePlansIntoParams) => {
+      return await invoke<MergeIntoPlanResponse>('merge_plans_into', params);
+    },
+    onSuccess: (data, params) => {
+      const targetId = params.targetPlanId;
+      // Seed the freshly merged plan, then invalidate everything the target
+      // derives from its entries. The plans list itself is untouched (name,
+      // group, sort_order don't change), so it is not invalidated.
+      queryClient.setQueryData(
+        queryKeys.skillPlanWithEntries(targetId),
+        data.plan
+      );
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillPlanWithEntries(targetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillPlanValidation(targetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillPlanSimulation(targetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillPlanOptimization(targetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonByPlan(targetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonAll(targetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.exportSkillPlanText(targetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.exportSkillPlanXml(targetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.remaps.plan(targetId),
+      });
     },
   });
 }

@@ -369,6 +369,7 @@ pub fn run() {
             commands::notifications::upsert_notification_setting,
             commands::skill_plans::create_skill_plan,
             commands::skill_plans::create_merged_skill_plan,
+            commands::skill_plans::merge_plans_into,
             commands::skill_plans::create_plan_from_character,
             commands::skill_plans::preview_plan_from_character,
             commands::skill_plans::get_all_skill_plans,
