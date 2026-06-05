@@ -10,7 +10,14 @@ import { invoke } from '@tauri-apps/api/core';
 import { writeText } from '@tauri-apps/plugin-clipboard-manager';
 import { save } from '@tauri-apps/plugin-dialog';
 import { writeTextFile } from '@tauri-apps/plugin-fs';
-import { ChevronDown, Copy, Download, Redo2, Undo2 } from 'lucide-react';
+import {
+  ChevronDown,
+  Copy,
+  Download,
+  GitMerge,
+  Redo2,
+  Undo2,
+} from 'lucide-react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -47,6 +54,7 @@ import { useSortableList } from '@/hooks/useSortableList';
 import { useUndoRedo } from '@/hooks/useUndoRedo';
 import { formatNumber } from '@/lib/utils';
 
+import { MergeIntoPlanDialog } from '../PlanTree/MergeIntoPlanDialog';
 import { RemapRow } from '../Remaps/RemapRow';
 import { ImportPlanDialog } from './ImportPlanDialog';
 import { PlanComparisonTab } from './PlanComparisonTab';
@@ -92,6 +100,7 @@ export function PlanEditor({ planId }: PlanEditorProps) {
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [mergeDialogOpen, setMergeDialogOpen] = useState(false);
   const [isExportingText, setIsExportingText] = useState(false);
   const [isExportingXml, setIsExportingXml] = useState(false);
   const [isCopyingText, setIsCopyingText] = useState(false);
@@ -584,6 +593,15 @@ export function PlanEditor({ planId }: PlanEditorProps) {
           <Button
             variant="outline"
             size="sm"
+            onClick={() => setMergeDialogOpen(true)}
+          >
+            <GitMerge className="mr-2 h-4 w-4" />
+            Merge in
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
             onClick={handleCopyTextToClipboard}
             disabled={isCopyingText}
           >
@@ -750,6 +768,14 @@ export function PlanEditor({ planId }: PlanEditorProps) {
         onOpenChange={setImportDialogOpen}
         planId={planId}
       />
+      {data && (
+        <MergeIntoPlanDialog
+          open={mergeDialogOpen}
+          onOpenChange={setMergeDialogOpen}
+          targetPlanId={planId}
+          targetName={data.plan.name}
+        />
+      )}
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { create } from 'zustand';
 export type PlanTreeDialog =
   | { kind: 'none' }
   | { kind: 'createPlan' }
+  | { kind: 'createMergedPlan' }
   | { kind: 'createPlanFromCharacter' }
   | { kind: 'createPlanGroup' }
   | { kind: 'renamePlanGroup'; groupId: number; currentName: string }
@@ -12,6 +13,7 @@ export type PlanTreeDialog =
 interface PlanTreeDialogState {
   dialog: PlanTreeDialog;
   openCreatePlan: () => void;
+  openCreateMergedPlan: () => void;
   openCreatePlanFromCharacter: () => void;
   openCreatePlanGroup: () => void;
   openRenamePlanGroup: (groupId: number, currentName: string) => void;
@@ -23,6 +25,7 @@ interface PlanTreeDialogState {
 export const usePlanTreeDialogStore = create<PlanTreeDialogState>((set) => ({
   dialog: { kind: 'none' },
   openCreatePlan: () => set({ dialog: { kind: 'createPlan' } }),
+  openCreateMergedPlan: () => set({ dialog: { kind: 'createMergedPlan' } }),
   openCreatePlanFromCharacter: () =>
     set({ dialog: { kind: 'createPlanFromCharacter' } }),
   openCreatePlanGroup: () => set({ dialog: { kind: 'createPlanGroup' } }),

@@ -2,7 +2,9 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { invoke } from '@tauri-apps/api/core';
 
 import type {
+  MergeIntoPlanResponse,
   PreviewPlanFromCharacterResponse,
+  ReplacePlanEntryInput,
   SkillmonPlan,
   SkillPlanResponse,
   SkillPlanWithEntriesResponse,
@@ -16,6 +18,25 @@ interface CreateSkillPlanParams {
   name: string;
   description?: string;
   autoPrerequisites?: boolean;
+}
+
+interface CreateMergedSkillPlanParams {
+  [key: string]: unknown;
+  name: string;
+  description?: string;
+  sourcePlanIds: number[];
+}
+
+interface MergePlansIntoParams {
+  [key: string]: unknown;
+  targetPlanId: number;
+  sourcePlanIds: number[];
+}
+
+interface ReplacePlanEntriesParams {
+  [key: string]: unknown;
+  planId: number;
+  entries: ReplacePlanEntryInput[];
 }
 
 interface UpdateSkillPlanParams {
@@ -169,6 +190,141 @@ export function useCreateSkillPlan() {
       });
 
       queryClient.invalidateQueries({ queryKey: queryKeys.skillPlans() });
+    },
+  });
+}
+
+export function useCreateMergedSkillPlan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: CreateMergedSkillPlanParams) => {
+      return await invoke<number>('create_merged_skill_plan', params);
+    },
+    onSuccess: (data) => {
+      queryClient.removeQueries({ queryKey: queryKeys.skillPlan(data) });
+      queryClient.removeQueries({
+        queryKey: queryKeys.skillPlanWithEntries(data),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.skillPlanValidation(data),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.planComparisonByPlan(data),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.planComparisonAll(data),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.exportSkillPlanText(data),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.exportSkillPlanXml(data),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.remaps.plan(data),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.skillPlanSimulation(data),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.skillPlanOptimization(data),
+      });
+
+      queryClient.invalidateQueries({ queryKey: queryKeys.skillPlans() });
+    },
+  });
+}
+
+export function useMergePlansInto() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: MergePlansIntoParams) => {
+      return await invoke<MergeIntoPlanResponse>('merge_plans_into', params);
+    },
+    onSuccess: (data, params) => {
+      const targetId = params.targetPlanId;
+      // Seed the freshly merged plan from the authoritative response, then
+      // invalidate everything else the target derives from its entries. The
+      // seeded key is not invalidated — the response is the full, current plan,
+      // so a refetch would only discard it and round-trip for the same data.
+      // The plans list itself is untouched (name, group, sort_order don't
+      // change), so it is not invalidated either.
+      queryClient.setQueryData(
+        queryKeys.skillPlanWithEntries(targetId),
+        data.plan
+      );
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillPlanValidation(targetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillPlanSimulation(targetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillPlanOptimization(targetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonByPlan(targetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonAll(targetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.exportSkillPlanText(targetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.exportSkillPlanXml(targetId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.remaps.plan(targetId),
+      });
+    },
+  });
+}
+
+export function useReplacePlanEntries() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: ReplacePlanEntriesParams) => {
+      return await invoke<SkillPlanWithEntriesResponse>(
+        'replace_plan_entries',
+        params
+      );
+    },
+    onSuccess: (data, params) => {
+      const planId = params.planId;
+      // Seed the restored plan from the authoritative response, then invalidate
+      // everything else it derives from its entries — the same set
+      // merge_plans_into touches, since this is the undo of that action. The
+      // seeded key is not invalidated for the same reason as the merge: the
+      // response is already the full, current plan.
+      queryClient.setQueryData(queryKeys.skillPlanWithEntries(planId), data);
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillPlanValidation(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillPlanSimulation(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillPlanOptimization(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonByPlan(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonAll(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.exportSkillPlanText(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.exportSkillPlanXml(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.remaps.plan(planId),
+      });
     },
   });
 }

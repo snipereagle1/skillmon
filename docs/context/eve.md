@@ -32,6 +32,11 @@ Game concepts used across the skillmon codebase. Load this before any frontend o
 
 **Skill plan** — a user-defined ordered list of skills to train, with target levels. skillmon validates prerequisites, simulates training time, and can optimise attribute remaps.
 
+**Plan merge** — combining the entries of several skill plans into one, in a user-chosen order, deduplicating by skill-level. Source plans' entries are appended in their stored order; a skill-level already present from an earlier source is skipped (**first occurrence wins** — its entry type and notes are kept, no later duplicate upgrades it). Source plans are never modified. Source plans' remaps are dropped. Two modes:
+
+- **Merge to new plan (Mode 1)** — produces a brand-new plan from the union of two or more sources. No plan is the authority; merge order is just the order the user arranges the sources.
+- **Merge into this plan (Mode 2)** — grows one existing **target plan** in place by appending one or more incoming plans after its current last entry. The target is always the authoritative first source, so its existing entries, their order, entry types, and its own remaps are preserved unchanged. A skill-level already in the target (or earlier in the incoming order) is skipped; if every incoming skill-level is already present the merge is a valid no-op that adds nothing.
+
 **Training time** — how long a skill level takes to complete. Determined by SP required, character attributes, and any implant bonuses.
 
 **Certificate** — a CCP-defined collection of skills at specified levels representing a competency. Not directly used in skillmon yet but present in SDE.

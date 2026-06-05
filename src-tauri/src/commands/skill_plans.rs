@@ -1,7 +1,7 @@
 use quick_xml::events::{BytesDecl, BytesEnd, BytesStart, BytesText, Event};
 use quick_xml::reader::Reader;
 use quick_xml::writer::Writer;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::io::Cursor;
 use tauri::State;
@@ -21,12 +21,12 @@ pub async fn export_skill_plan_json(
     pool: State<'_, db::Pool>,
     plan_id: i64,
 ) -> Result<SkillmonPlan, String> {
-    let plan = db::skill_plans::get_skill_plan(&pool, plan_id)
+    let plan = db::skill_plans::get_skill_plan(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get plan: {}", e))?
         .ok_or_else(|| "Plan not found".to_string())?;
 
-    let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+    let entries = db::skill_plans::get_plan_entries(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get entries: {}", e))?;
 
@@ -290,6 +290,309 @@ pub async fn create_skill_plan(
         .map_err(|e| format!("Failed to create skill plan: {}", e))
 }
 
+#[tauri::command]
+pub async fn create_merged_skill_plan(
+    pool: State<'_, db::Pool>,
+    name: String,
+    description: Option<String>,
+    source_plan_ids: Vec<i64>,
+) -> Result<i64, String> {
+    create_merged_skill_plan_inner(&pool, &name, description.as_deref(), &source_plan_ids)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+async fn create_merged_skill_plan_inner(
+    pool: &db::Pool,
+    name: &str,
+    description: Option<&str>,
+    source_plan_ids: &[i64],
+) -> anyhow::Result<i64> {
+    let name = name.trim();
+    if name.is_empty() {
+        anyhow::bail!("Plan name is required");
+    }
+
+    let distinct: HashSet<i64> = source_plan_ids.iter().copied().collect();
+    if distinct.len() < 2 {
+        anyhow::bail!("Select at least two distinct source plans");
+    }
+
+    // Fetch each source's entries in stored order, preserving the caller's
+    // chosen source ordering. Verify each source exists first.
+    let mut sources: Vec<Vec<SkillmonPlanEntry>> = Vec::with_capacity(source_plan_ids.len());
+    for plan_id in source_plan_ids {
+        if db::skill_plans::get_skill_plan(pool, *plan_id)
+            .await?
+            .is_none()
+        {
+            anyhow::bail!("Source plan {} does not exist", plan_id);
+        }
+
+        let entries = db::skill_plans::get_plan_entries(pool, *plan_id).await?;
+
+        sources.push(
+            entries
+                .into_iter()
+                .map(|e| SkillmonPlanEntry {
+                    skill_type_id: e.skill_type_id,
+                    level: e.planned_level,
+                    entry_type: e.entry_type,
+                    notes: e.notes,
+                })
+                .collect(),
+        );
+    }
+
+    let merged = crate::skill_plans::merge::merge_plan_entries(&sources);
+
+    // Validate the merged ordering the same way the importer does. For valid
+    // sources this never fails, but it guards against a stray incomplete plan.
+    let mut dag = PlanDag::new();
+    let mut nodes = Vec::with_capacity(merged.len());
+    for entry in &merged {
+        let node = PlanNode {
+            skill_type_id: entry.skill_type_id,
+            level: entry.level,
+        };
+        dag.add_node(pool, node).await?;
+        nodes.push(node);
+    }
+    if !dag.validate(&nodes).is_valid {
+        anyhow::bail!("Merged plan has an invalid prerequisite ordering");
+    }
+
+    // Create the plan at root (group_id NULL, auto_prerequisites = true), then
+    // insert merged entries with dense sort_order in one transaction.
+    let plan_id = db::skill_plans::create_skill_plan(
+        pool,
+        name,
+        description.map(str::trim).filter(|s| !s.is_empty()),
+        true,
+    )
+    .await?;
+
+    let mut tx = pool.begin().await?;
+
+    for (index, entry) in merged.iter().enumerate() {
+        sqlx::query(
+            "INSERT INTO skill_plan_entries (plan_id, skill_type_id, planned_level, sort_order, entry_type, notes)
+             VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(plan_id)
+        .bind(entry.skill_type_id)
+        .bind(entry.level)
+        .bind(index as i64)
+        .bind(&entry.entry_type)
+        .bind(&entry.notes)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    tx.commit().await?;
+
+    Ok(plan_id)
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Serialize)]
+pub struct MergeIntoPlanResponse {
+    pub plan: SkillPlanWithEntriesResponse,
+    pub added_count: usize_ts,
+}
+
+#[tauri::command]
+pub async fn merge_plans_into(
+    pool: State<'_, db::Pool>,
+    target_plan_id: i64,
+    source_plan_ids: Vec<i64>,
+) -> Result<MergeIntoPlanResponse, String> {
+    let added_count = merge_plans_into_inner(&pool, target_plan_id, &source_plan_ids)
+        .await
+        .map_err(|e| e.to_string())?;
+
+    let plan = get_skill_plan_with_entries(pool, target_plan_id)
+        .await?
+        .ok_or_else(|| "Failed to retrieve target plan after merge".to_string())?;
+
+    Ok(MergeIntoPlanResponse { plan, added_count })
+}
+
+/// Merge `source_plan_ids` (ordered) into the target plan in place, appending
+/// any not-yet-present `(skill, level)` nodes after the target's current last
+/// entry. Returns the number of entries actually appended.
+///
+/// The target is treated as the authoritative first source, so its existing
+/// entries — order, entry types, notes — are left untouched. First occurrence
+/// wins, so a node already in the target (or earlier in the incoming order) is
+/// skipped. Remaps live in a separate table keyed by skill/level, not entry
+/// position, and this function only writes `skill_plan_entries`; the target's
+/// remaps therefore stay valid and the incoming plans' remaps are simply never
+/// copied.
+async fn merge_plans_into_inner(
+    pool: &db::Pool,
+    target_plan_id: i64,
+    source_plan_ids: &[i64],
+) -> anyhow::Result<usize> {
+    if source_plan_ids.is_empty() {
+        anyhow::bail!("Select at least one plan to merge in");
+    }
+    if source_plan_ids.contains(&target_plan_id) {
+        anyhow::bail!("Cannot merge a plan into itself");
+    }
+
+    let to_entries = |entries: Vec<db::skill_plans::SkillPlanEntry>| -> Vec<SkillmonPlanEntry> {
+        entries
+            .into_iter()
+            .map(|e| SkillmonPlanEntry {
+                skill_type_id: e.skill_type_id,
+                level: e.planned_level,
+                entry_type: e.entry_type,
+                notes: e.notes,
+            })
+            .collect()
+    };
+
+    // Read the target and sources, then append, all inside one transaction so a
+    // plan deleted between read and write can't leave orphaned rows or a stale
+    // sort_order offset.
+    let mut tx = pool.begin().await?;
+
+    if db::skill_plans::get_skill_plan(&mut *tx, target_plan_id)
+        .await?
+        .is_none()
+    {
+        anyhow::bail!("Target plan does not exist");
+    }
+
+    // Target is the authoritative first source; its prefix comes out unchanged.
+    let target_entries = db::skill_plans::get_plan_entries(&mut *tx, target_plan_id).await?;
+    let target_len = target_entries.len();
+
+    let mut sources: Vec<Vec<SkillmonPlanEntry>> = Vec::with_capacity(source_plan_ids.len() + 1);
+    sources.push(to_entries(target_entries));
+    for plan_id in source_plan_ids {
+        if db::skill_plans::get_skill_plan(&mut *tx, *plan_id)
+            .await?
+            .is_none()
+        {
+            anyhow::bail!("Source plan {} does not exist", plan_id);
+        }
+        let entries = db::skill_plans::get_plan_entries(&mut *tx, *plan_id).await?;
+        sources.push(to_entries(entries));
+    }
+
+    let merged = crate::skill_plans::merge::merge_plan_entries(&sources);
+
+    // Validate the combined ordering the same way the importer does. For valid
+    // sources this never fails, but it guards against a stray incomplete plan.
+    // The DAG reads only immutable SDE data, so using the pool on a separate
+    // connection while the write tx is open is safe under WAL.
+    let mut dag = PlanDag::new();
+    let mut nodes = Vec::with_capacity(merged.len());
+    for entry in &merged {
+        let node = PlanNode {
+            skill_type_id: entry.skill_type_id,
+            level: entry.level,
+        };
+        dag.add_node(pool, node).await?;
+        nodes.push(node);
+    }
+    if !dag.validate(&nodes).is_valid {
+        anyhow::bail!("Merged plan has an invalid prerequisite ordering");
+    }
+
+    // merged[..target_len] is exactly the target's existing entries (first
+    // source, seen first). Everything after is newly merged in. Append-only:
+    // never touch the existing rows, so their entry_ids stay stable.
+    let appended = &merged[target_len..];
+    if appended.is_empty() {
+        return Ok(0);
+    }
+
+    for (offset, entry) in appended.iter().enumerate() {
+        sqlx::query(
+            "INSERT INTO skill_plan_entries (plan_id, skill_type_id, planned_level, sort_order, entry_type, notes)
+             VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(target_plan_id)
+        .bind(entry.skill_type_id)
+        .bind(entry.level)
+        .bind((target_len + offset) as i64)
+        .bind(&entry.entry_type)
+        .bind(&entry.notes)
+        .execute(&mut *tx)
+        .await?;
+    }
+    sqlx::query("UPDATE skill_plans SET updated_at = ? WHERE plan_id = ?")
+        .bind(chrono::Utc::now().timestamp())
+        .bind(target_plan_id)
+        .execute(&mut *tx)
+        .await?;
+    tx.commit().await?;
+
+    Ok(appended.len())
+}
+
+#[typeshare]
+#[derive(Debug, Clone, Deserialize)]
+pub struct ReplacePlanEntryInput {
+    pub skill_type_id: i64_ts,
+    pub planned_level: i64_ts,
+    pub entry_type: String,
+    pub notes: Option<String>,
+}
+
+/// Replace a plan's entries with an exact supplied snapshot (clear + insert),
+/// returning the refreshed plan. This is the undo primitive behind "Merge into
+/// this plan": the frontend captures the target's pre-merge entries and
+/// restores them here on undo. Existing rows are re-created, so `entry_id`s are
+/// not preserved.
+///
+/// The supplied ordering is validated through the DAG the same way merge and
+/// import are, so this command (the one write path that takes fully
+/// caller-supplied entries) can never persist a prerequisite-broken plan.
+#[tauri::command]
+pub async fn replace_plan_entries(
+    pool: State<'_, db::Pool>,
+    plan_id: i64,
+    entries: Vec<ReplacePlanEntryInput>,
+) -> Result<SkillPlanWithEntriesResponse, String> {
+    let mut dag = PlanDag::new();
+    let mut nodes = Vec::with_capacity(entries.len());
+    for entry in &entries {
+        let node = PlanNode {
+            skill_type_id: entry.skill_type_id,
+            level: entry.planned_level,
+        };
+        dag.add_node(&pool, node)
+            .await
+            .map_err(|e| format!("Failed to build DAG: {}", e))?;
+        nodes.push(node);
+    }
+    if !dag.validate(&nodes).is_valid {
+        return Err("Replacement entries have an invalid prerequisite ordering".to_string());
+    }
+
+    let rows: Vec<db::skill_plans::ReplacePlanEntry> = entries
+        .into_iter()
+        .map(|e| db::skill_plans::ReplacePlanEntry {
+            skill_type_id: e.skill_type_id,
+            planned_level: e.planned_level,
+            entry_type: e.entry_type,
+            notes: e.notes,
+        })
+        .collect();
+
+    db::skill_plans::replace_plan_entries(&pool, plan_id, &rows)
+        .await
+        .map_err(|e| format!("Failed to replace plan entries: {}", e))?;
+
+    get_skill_plan_with_entries(pool, plan_id)
+        .await?
+        .ok_or_else(|| "Plan not found after replacing entries".to_string())
+}
+
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct PreviewPlanFromCharacterResponse {
@@ -397,7 +700,7 @@ pub async fn get_skill_plan(
     pool: State<'_, db::Pool>,
     plan_id: i64,
 ) -> Result<Option<SkillPlanResponse>, String> {
-    let plan = db::skill_plans::get_skill_plan(&pool, plan_id)
+    let plan = db::skill_plans::get_skill_plan(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get skill plan: {}", e))?;
 
@@ -409,7 +712,7 @@ pub async fn get_skill_plan_with_entries(
     pool: State<'_, db::Pool>,
     plan_id: i64,
 ) -> Result<Option<SkillPlanWithEntriesResponse>, String> {
-    let plan = db::skill_plans::get_skill_plan(&pool, plan_id)
+    let plan = db::skill_plans::get_skill_plan(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get skill plan: {}", e))?;
 
@@ -418,7 +721,7 @@ pub async fn get_skill_plan_with_entries(
         None => return Ok(None),
     };
 
-    let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+    let entries = db::skill_plans::get_plan_entries(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get plan entries: {}", e))?;
 
@@ -509,7 +812,7 @@ pub async fn add_plan_entry(
         .await
         .map_err(|e| format!("Failed to build DAG: {}", e))?;
 
-    let plan = db::skill_plans::get_skill_plan(&pool, plan_id)
+    let plan = db::skill_plans::get_skill_plan(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get plan: {}", e))?
         .ok_or_else(|| "Plan not found".to_string())?;
@@ -692,7 +995,7 @@ pub async fn remove_skill_level(pool: State<'_, db::Pool>, entry_id: i64) -> Res
 
     // 1. If it was "Planned", promote the highest lower level of this skill to "Planned"
     if entry_type == "Planned" {
-        let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+        let entries = db::skill_plans::get_plan_entries(&*pool, plan_id)
             .await
             .map_err(|e| format!("Failed to get entries: {}", e))?;
 
@@ -801,7 +1104,7 @@ pub async fn remove_skill_and_prerequisites(
     skill_type_id: i64,
 ) -> Result<SkillPlanWithEntriesResponse, String> {
     // 1. Get all current planned entries except the one being removed
-    let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+    let entries = db::skill_plans::get_plan_entries(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get entries: {}", e))?;
 
@@ -1002,7 +1305,7 @@ pub async fn validate_reorder(
     plan_id: i64,
     entry_ids: Vec<i64>,
 ) -> Result<ValidationResponse, String> {
-    let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+    let entries = db::skill_plans::get_plan_entries(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get entries: {}", e))?;
 
@@ -1446,7 +1749,7 @@ pub async fn export_skill_plan_text(
     pool: State<'_, db::Pool>,
     plan_id: i64,
 ) -> Result<String, String> {
-    let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+    let entries = db::skill_plans::get_plan_entries(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get plan entries: {}", e))?;
 
@@ -1475,7 +1778,7 @@ pub async fn simulate_skill_plan(
     profile: SimulationProfile,
     character_id: Option<i64>,
 ) -> Result<SimulationResult, String> {
-    let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+    let entries = db::skill_plans::get_plan_entries(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get plan entries: {}", e))?;
 
@@ -1504,7 +1807,7 @@ pub async fn optimize_plan_attributes(
     accelerator_bonus: i64,
     character_id: Option<i64>,
 ) -> Result<OptimizationResult, String> {
-    let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+    let entries = db::skill_plans::get_plan_entries(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get plan entries: {}", e))?;
 
@@ -1570,12 +1873,12 @@ pub async fn export_skill_plan_xml(
     pool: State<'_, db::Pool>,
     plan_id: i64,
 ) -> Result<String, String> {
-    let plan = db::skill_plans::get_skill_plan(&pool, plan_id)
+    let plan = db::skill_plans::get_skill_plan(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get skill plan: {}", e))?
         .ok_or_else(|| "Plan not found".to_string())?;
 
-    let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+    let entries = db::skill_plans::get_plan_entries(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get plan entries: {}", e))?;
 
@@ -1702,12 +2005,12 @@ pub async fn compare_skill_plan_with_character(
     plan_id: i64,
     character_id: i64,
 ) -> Result<PlanComparisonResponse, String> {
-    let plan = db::skill_plans::get_skill_plan(&pool, plan_id)
+    let plan = db::skill_plans::get_skill_plan(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get skill plan: {}", e))?
         .ok_or_else(|| "Plan not found".to_string())?;
 
-    let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+    let entries = db::skill_plans::get_plan_entries(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get plan entries: {}", e))?;
 
@@ -1801,12 +2104,12 @@ pub async fn compare_skill_plan_with_all_characters(
     pool: State<'_, db::Pool>,
     plan_id: i64,
 ) -> Result<MultiPlanComparisonResponse, String> {
-    let plan = db::skill_plans::get_skill_plan(&pool, plan_id)
+    let plan = db::skill_plans::get_skill_plan(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get skill plan: {}", e))?
         .ok_or_else(|| "Plan not found".to_string())?;
 
-    let entries = db::skill_plans::get_plan_entries(&pool, plan_id)
+    let entries = db::skill_plans::get_plan_entries(&*pool, plan_id)
         .await
         .map_err(|e| format!("Failed to get plan entries: {}", e))?;
 
@@ -2090,5 +2393,613 @@ mod tests {
             .sum();
 
         assert_eq!(total_missing, sp_5);
+    }
+
+    #[tokio::test]
+    async fn create_merged_skill_plan_unions_sources_and_leaves_them_untouched() {
+        use crate::testdata::{fixtures, TestDb};
+
+        // Real, prerequisite-free skills (FK to sde_types): 3327 Spaceship
+        // Command, 3300 Gunnery.
+        const SPACESHIP_COMMAND: i64 = 3327;
+        const GUNNERY: i64 = 3300;
+
+        let db = TestDb::new_with_sde().await.unwrap();
+
+        // Source A: Spaceship Command levels I, II.
+        let a = fixtures::create_skill_plan(&db.pool, "A").await;
+        fixtures::add_plan_entry(&db.pool, a, SPACESHIP_COMMAND, 1, "Planned").await;
+        fixtures::add_plan_entry(&db.pool, a, SPACESHIP_COMMAND, 2, "Planned").await;
+
+        // Source B: Spaceship Command II (overlap) + Gunnery I.
+        let b = fixtures::create_skill_plan(&db.pool, "B").await;
+        fixtures::add_plan_entry(&db.pool, b, SPACESHIP_COMMAND, 2, "Planned").await;
+        fixtures::add_plan_entry(&db.pool, b, GUNNERY, 1, "Planned").await;
+
+        let merged_id = create_merged_skill_plan_inner(&db.pool, "Merge: A + B", None, &[a, b])
+            .await
+            .unwrap();
+
+        // New plan is at root with auto_prerequisites enabled.
+        let plan = db::skill_plans::get_skill_plan(&db.pool, merged_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(plan.name, "Merge: A + B");
+        assert_eq!(plan.group_id, None);
+        assert_eq!(plan.auto_prerequisites, 1);
+
+        // Merged entries: overlap once, dense sequential sort_order.
+        let merged = db::skill_plans::get_plan_entries(&db.pool, merged_id)
+            .await
+            .unwrap();
+        let nodes: Vec<(i64, i64)> = merged
+            .iter()
+            .map(|e| (e.skill_type_id, e.planned_level))
+            .collect();
+        assert_eq!(
+            nodes,
+            vec![(SPACESHIP_COMMAND, 1), (SPACESHIP_COMMAND, 2), (GUNNERY, 1)]
+        );
+        let sort_orders: Vec<i64> = merged.iter().map(|e| e.sort_order).collect();
+        assert_eq!(sort_orders, vec![0, 1, 2]);
+
+        // Sources are unchanged.
+        let a_entries = db::skill_plans::get_plan_entries(&db.pool, a)
+            .await
+            .unwrap();
+        assert_eq!(
+            a_entries
+                .iter()
+                .map(|e| (e.skill_type_id, e.planned_level))
+                .collect::<Vec<_>>(),
+            vec![(SPACESHIP_COMMAND, 1), (SPACESHIP_COMMAND, 2)]
+        );
+        let b_entries = db::skill_plans::get_plan_entries(&db.pool, b)
+            .await
+            .unwrap();
+        assert_eq!(
+            b_entries
+                .iter()
+                .map(|e| (e.skill_type_id, e.planned_level))
+                .collect::<Vec<_>>(),
+            vec![(SPACESHIP_COMMAND, 2), (GUNNERY, 1)]
+        );
+    }
+
+    #[tokio::test]
+    async fn create_merged_skill_plan_rejects_fewer_than_two_distinct_sources() {
+        use crate::testdata::{fixtures, TestDb};
+
+        let db = TestDb::new_with_sde().await.unwrap();
+        let a = fixtures::create_skill_plan(&db.pool, "A").await;
+        fixtures::add_plan_entry(&db.pool, a, 3327, 1, "Planned").await;
+
+        // Same id twice is not two distinct sources.
+        let err = create_merged_skill_plan_inner(&db.pool, "Merge", None, &[a, a])
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("two distinct"));
+    }
+
+    #[tokio::test]
+    async fn merge_plans_into_appends_in_place_and_skips_present() {
+        use crate::testdata::{fixtures, TestDb};
+
+        const SPACESHIP_COMMAND: i64 = 3327;
+        const GUNNERY: i64 = 3300;
+
+        let db = TestDb::new_with_sde().await.unwrap();
+
+        // Target: Spaceship Command I, II.
+        let target = fixtures::create_skill_plan(&db.pool, "Target").await;
+        fixtures::add_plan_entry(&db.pool, target, SPACESHIP_COMMAND, 1, "Planned").await;
+        fixtures::add_plan_entry(&db.pool, target, SPACESHIP_COMMAND, 2, "Planned").await;
+
+        // Incoming: Spaceship Command II (overlap) + Gunnery I.
+        let incoming = fixtures::create_skill_plan(&db.pool, "Incoming").await;
+        fixtures::add_plan_entry(&db.pool, incoming, SPACESHIP_COMMAND, 2, "Planned").await;
+        fixtures::add_plan_entry(&db.pool, incoming, GUNNERY, 1, "Planned").await;
+
+        let added = merge_plans_into_inner(&db.pool, target, &[incoming])
+            .await
+            .unwrap();
+        assert_eq!(added, 1);
+
+        // Target grew in place: existing prefix unchanged, Gunnery I appended,
+        // overlap skipped, dense sort_order.
+        let entries = db::skill_plans::get_plan_entries(&db.pool, target)
+            .await
+            .unwrap();
+        let nodes: Vec<(i64, i64)> = entries
+            .iter()
+            .map(|e| (e.skill_type_id, e.planned_level))
+            .collect();
+        assert_eq!(
+            nodes,
+            vec![(SPACESHIP_COMMAND, 1), (SPACESHIP_COMMAND, 2), (GUNNERY, 1)]
+        );
+        assert_eq!(
+            entries.iter().map(|e| e.sort_order).collect::<Vec<_>>(),
+            vec![0, 1, 2]
+        );
+
+        // Incoming source is unchanged.
+        let incoming_entries = db::skill_plans::get_plan_entries(&db.pool, incoming)
+            .await
+            .unwrap();
+        assert_eq!(
+            incoming_entries
+                .iter()
+                .map(|e| (e.skill_type_id, e.planned_level))
+                .collect::<Vec<_>>(),
+            vec![(SPACESHIP_COMMAND, 2), (GUNNERY, 1)]
+        );
+    }
+
+    #[tokio::test]
+    async fn merge_plans_into_preserves_existing_entry_ids() {
+        use crate::testdata::{fixtures, TestDb};
+
+        const SPACESHIP_COMMAND: i64 = 3327;
+        const GUNNERY: i64 = 3300;
+
+        let db = TestDb::new_with_sde().await.unwrap();
+
+        let target = fixtures::create_skill_plan(&db.pool, "Target").await;
+        let id1 = fixtures::add_plan_entry(&db.pool, target, SPACESHIP_COMMAND, 1, "Planned").await;
+        let id2 = fixtures::add_plan_entry(&db.pool, target, SPACESHIP_COMMAND, 2, "Planned").await;
+
+        let incoming = fixtures::create_skill_plan(&db.pool, "Incoming").await;
+        fixtures::add_plan_entry(&db.pool, incoming, GUNNERY, 1, "Planned").await;
+
+        merge_plans_into_inner(&db.pool, target, &[incoming])
+            .await
+            .unwrap();
+
+        // Append-only: the target's original rows keep their entry_ids.
+        let entries = db::skill_plans::get_plan_entries(&db.pool, target)
+            .await
+            .unwrap();
+        assert_eq!(entries[0].entry_id, id1);
+        assert_eq!(entries[1].entry_id, id2);
+    }
+
+    #[tokio::test]
+    async fn merge_plans_into_first_occurrence_wins_keeps_target_tagging() {
+        use crate::testdata::{fixtures, TestDb};
+
+        const GUNNERY: i64 = 3300;
+
+        let db = TestDb::new_with_sde().await.unwrap();
+
+        // Target has Gunnery I tagged Prerequisite.
+        let target = fixtures::create_skill_plan(&db.pool, "Target").await;
+        fixtures::add_plan_entry(&db.pool, target, GUNNERY, 1, "Prerequisite").await;
+
+        // Incoming has Gunnery I tagged Planned — must NOT upgrade the target.
+        let incoming = fixtures::create_skill_plan(&db.pool, "Incoming").await;
+        fixtures::add_plan_entry(&db.pool, incoming, GUNNERY, 1, "Planned").await;
+
+        let added = merge_plans_into_inner(&db.pool, target, &[incoming])
+            .await
+            .unwrap();
+        assert_eq!(added, 0);
+
+        let entries = db::skill_plans::get_plan_entries(&db.pool, target)
+            .await
+            .unwrap();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].entry_type, "Prerequisite");
+    }
+
+    #[tokio::test]
+    async fn merge_plans_into_drops_incoming_remaps_preserves_target_remaps() {
+        use crate::skill_plans::Attributes;
+        use crate::testdata::{fixtures, TestDb};
+
+        const SPACESHIP_COMMAND: i64 = 3327;
+        const GUNNERY: i64 = 3300;
+
+        let db = TestDb::new_with_sde().await.unwrap();
+
+        let target = fixtures::create_skill_plan(&db.pool, "Target").await;
+        fixtures::add_plan_entry(&db.pool, target, SPACESHIP_COMMAND, 1, "Planned").await;
+        db::remaps::save_remap(
+            &db.pool,
+            None,
+            Some(target),
+            Some(SPACESHIP_COMMAND),
+            Some(1),
+            &Attributes::default(),
+        )
+        .await
+        .unwrap();
+
+        let incoming = fixtures::create_skill_plan(&db.pool, "Incoming").await;
+        fixtures::add_plan_entry(&db.pool, incoming, GUNNERY, 1, "Planned").await;
+        db::remaps::save_remap(
+            &db.pool,
+            None,
+            Some(incoming),
+            Some(GUNNERY),
+            Some(1),
+            &Attributes::default(),
+        )
+        .await
+        .unwrap();
+
+        merge_plans_into_inner(&db.pool, target, &[incoming])
+            .await
+            .unwrap();
+
+        // Target keeps its single remap; the incoming remap is not copied in.
+        let target_remaps = db::remaps::get_plan_remaps(&db.pool, target).await.unwrap();
+        assert_eq!(target_remaps.len(), 1);
+        assert_eq!(
+            target_remaps[0].after_skill_type_id,
+            Some(SPACESHIP_COMMAND)
+        );
+
+        // Incoming plan's remap is untouched.
+        let incoming_remaps = db::remaps::get_plan_remaps(&db.pool, incoming)
+            .await
+            .unwrap();
+        assert_eq!(incoming_remaps.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn merge_plans_into_fully_subsumed_is_noop() {
+        use crate::testdata::{fixtures, TestDb};
+
+        const SPACESHIP_COMMAND: i64 = 3327;
+
+        let db = TestDb::new_with_sde().await.unwrap();
+
+        let target = fixtures::create_skill_plan(&db.pool, "Target").await;
+        fixtures::add_plan_entry(&db.pool, target, SPACESHIP_COMMAND, 1, "Planned").await;
+        fixtures::add_plan_entry(&db.pool, target, SPACESHIP_COMMAND, 2, "Planned").await;
+
+        // Every incoming node is already in the target.
+        let incoming = fixtures::create_skill_plan(&db.pool, "Incoming").await;
+        fixtures::add_plan_entry(&db.pool, incoming, SPACESHIP_COMMAND, 1, "Planned").await;
+
+        let added = merge_plans_into_inner(&db.pool, target, &[incoming])
+            .await
+            .unwrap();
+        assert_eq!(added, 0);
+
+        let entries = db::skill_plans::get_plan_entries(&db.pool, target)
+            .await
+            .unwrap();
+        assert_eq!(entries.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn merge_plans_into_rejects_self_merge() {
+        use crate::testdata::{fixtures, TestDb};
+
+        let db = TestDb::new_with_sde().await.unwrap();
+        let target = fixtures::create_skill_plan(&db.pool, "Target").await;
+        fixtures::add_plan_entry(&db.pool, target, 3327, 1, "Planned").await;
+
+        let err = merge_plans_into_inner(&db.pool, target, &[target])
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("into itself"));
+    }
+
+    #[tokio::test]
+    async fn merge_plans_into_rejects_empty_sources() {
+        use crate::testdata::{fixtures, TestDb};
+
+        let db = TestDb::new_with_sde().await.unwrap();
+        let target = fixtures::create_skill_plan(&db.pool, "Target").await;
+        fixtures::add_plan_entry(&db.pool, target, 3327, 1, "Planned").await;
+
+        let err = merge_plans_into_inner(&db.pool, target, &[])
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("at least one"));
+    }
+
+    #[tokio::test]
+    async fn replace_plan_entries_restores_exact_snapshot() {
+        use crate::testdata::{fixtures, TestDb};
+
+        const SPACESHIP_COMMAND: i64 = 3327;
+        const GUNNERY: i64 = 3300;
+
+        let db = TestDb::new_with_sde().await.unwrap();
+
+        // Build a plan and capture its entries as the snapshot to restore.
+        let plan = fixtures::create_skill_plan(&db.pool, "Plan").await;
+        fixtures::add_plan_entry(&db.pool, plan, SPACESHIP_COMMAND, 1, "Planned").await;
+        fixtures::add_plan_entry(&db.pool, plan, SPACESHIP_COMMAND, 2, "Prerequisite").await;
+
+        let snapshot = db::skill_plans::get_plan_entries(&db.pool, plan)
+            .await
+            .unwrap();
+        let snapshot_signature: Vec<(i64, i64, i64, String, Option<String>)> = snapshot
+            .iter()
+            .map(|e| {
+                (
+                    e.skill_type_id,
+                    e.planned_level,
+                    e.sort_order,
+                    e.entry_type.clone(),
+                    e.notes.clone(),
+                )
+            })
+            .collect();
+
+        // Mutate the plan so its current state differs from the snapshot.
+        fixtures::add_plan_entry(&db.pool, plan, GUNNERY, 1, "Planned").await;
+        assert_eq!(
+            db::skill_plans::get_plan_entries(&db.pool, plan)
+                .await
+                .unwrap()
+                .len(),
+            3
+        );
+
+        // Restore the captured snapshot wholesale.
+        let rows: Vec<db::skill_plans::ReplacePlanEntry> = snapshot
+            .iter()
+            .map(|e| db::skill_plans::ReplacePlanEntry {
+                skill_type_id: e.skill_type_id,
+                planned_level: e.planned_level,
+                entry_type: e.entry_type.clone(),
+                notes: e.notes.clone(),
+            })
+            .collect();
+        db::skill_plans::replace_plan_entries(&db.pool, plan, &rows)
+            .await
+            .unwrap();
+
+        // Round-trip: every field but entry_id matches the original snapshot.
+        let restored = db::skill_plans::get_plan_entries(&db.pool, plan)
+            .await
+            .unwrap();
+        let restored_signature: Vec<(i64, i64, i64, String, Option<String>)> = restored
+            .iter()
+            .map(|e| {
+                (
+                    e.skill_type_id,
+                    e.planned_level,
+                    e.sort_order,
+                    e.entry_type.clone(),
+                    e.notes.clone(),
+                )
+            })
+            .collect();
+        assert_eq!(restored_signature, snapshot_signature);
+    }
+
+    #[tokio::test]
+    async fn replace_plan_entries_with_empty_snapshot_clears_plan() {
+        use crate::testdata::{fixtures, TestDb};
+
+        let db = TestDb::new_with_sde().await.unwrap();
+
+        let plan = fixtures::create_skill_plan(&db.pool, "Plan").await;
+        fixtures::add_plan_entry(&db.pool, plan, 3327, 1, "Planned").await;
+
+        db::skill_plans::replace_plan_entries(&db.pool, plan, &[])
+            .await
+            .unwrap();
+
+        assert!(db::skill_plans::get_plan_entries(&db.pool, plan)
+            .await
+            .unwrap()
+            .is_empty());
+    }
+
+    /// Find a dependent skill with exactly one requirement (`required_skill_id`
+    /// at level 1) whose prerequisite is itself a leaf (requires nothing). The
+    /// 2-node plan `[prereq@1, dependent@1]` is then a complete, valid plan and
+    /// the reverse order is a prerequisite-ordering violation — exactly what we
+    /// need to exercise the merge's ordering guarantees against real SDE data.
+    async fn find_prereq_pair(pool: &db::Pool) -> (i64, i64) {
+        let (dependent, prereq): (i64, i64) = sqlx::query_as(
+            "SELECT skill_type_id, required_skill_id
+             FROM sde_skill_requirements
+             WHERE required_level = 1
+               AND required_skill_id NOT IN (SELECT skill_type_id FROM sde_skill_requirements)
+               AND skill_type_id IN (
+                 SELECT skill_type_id FROM sde_skill_requirements
+                 GROUP BY skill_type_id HAVING COUNT(*) = 1
+               )
+             LIMIT 1",
+        )
+        .fetch_one(pool)
+        .await
+        .expect("test SDE should contain at least one simple prerequisite pair");
+        (dependent, prereq)
+    }
+
+    #[tokio::test]
+    async fn merge_plans_into_preserves_prerequisite_ordering() {
+        use crate::testdata::{fixtures, TestDb};
+
+        let db = TestDb::new_with_sde().await.unwrap();
+        let (dependent, prereq) = find_prereq_pair(&db.pool).await;
+
+        // Target supplies only the prerequisite; the incoming plan supplies the
+        // prereq (overlap) followed by the dependent. The dependent must land
+        // after the prerequisite that an earlier source established.
+        let target = fixtures::create_skill_plan(&db.pool, "Target").await;
+        fixtures::add_plan_entry(&db.pool, target, prereq, 1, "Planned").await;
+
+        let incoming = fixtures::create_skill_plan(&db.pool, "Incoming").await;
+        fixtures::add_plan_entry(&db.pool, incoming, prereq, 1, "Planned").await;
+        fixtures::add_plan_entry(&db.pool, incoming, dependent, 1, "Planned").await;
+
+        let added = merge_plans_into_inner(&db.pool, target, &[incoming])
+            .await
+            .unwrap();
+        assert_eq!(added, 1);
+
+        let nodes: Vec<(i64, i64)> = db::skill_plans::get_plan_entries(&db.pool, target)
+            .await
+            .unwrap()
+            .iter()
+            .map(|e| (e.skill_type_id, e.planned_level))
+            .collect();
+        let prereq_pos = nodes.iter().position(|n| *n == (prereq, 1)).unwrap();
+        let dependent_pos = nodes.iter().position(|n| *n == (dependent, 1)).unwrap();
+        assert!(
+            prereq_pos < dependent_pos,
+            "prerequisite must precede the dependent skill: {:?}",
+            nodes
+        );
+    }
+
+    #[tokio::test]
+    async fn create_merged_skill_plan_rejects_invalid_prerequisite_ordering() {
+        use crate::testdata::{fixtures, TestDb};
+
+        let db = TestDb::new_with_sde().await.unwrap();
+        let (dependent, prereq) = find_prereq_pair(&db.pool).await;
+
+        // A stray incomplete plan lists the dependent with its prerequisite
+        // missing; the other source supplies the prerequisite afterwards. First
+        // occurrence wins, so the merged order is [dependent, prereq] — an
+        // ordering violation the DAG guard must reject.
+        let a = fixtures::create_skill_plan(&db.pool, "A").await;
+        fixtures::add_plan_entry(&db.pool, a, dependent, 1, "Planned").await;
+        let b = fixtures::create_skill_plan(&db.pool, "B").await;
+        fixtures::add_plan_entry(&db.pool, b, prereq, 1, "Planned").await;
+
+        let err = create_merged_skill_plan_inner(&db.pool, "Bad", None, &[a, b])
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("invalid prerequisite ordering"));
+    }
+
+    #[tokio::test]
+    async fn create_merged_skill_plan_three_sources_first_occurrence_wins() {
+        use crate::testdata::{fixtures, TestDb};
+
+        const SPACESHIP_COMMAND: i64 = 3327;
+        const GUNNERY: i64 = 3300;
+
+        let db = TestDb::new_with_sde().await.unwrap();
+
+        let a = fixtures::create_skill_plan(&db.pool, "A").await;
+        fixtures::add_plan_entry(&db.pool, a, SPACESHIP_COMMAND, 1, "Planned").await;
+        let b = fixtures::create_skill_plan(&db.pool, "B").await;
+        fixtures::add_plan_entry(&db.pool, b, GUNNERY, 1, "Planned").await;
+        // C overlaps both earlier sources and contributes Spaceship Command II.
+        let c = fixtures::create_skill_plan(&db.pool, "C").await;
+        fixtures::add_plan_entry(&db.pool, c, SPACESHIP_COMMAND, 1, "Planned").await;
+        fixtures::add_plan_entry(&db.pool, c, GUNNERY, 1, "Planned").await;
+        fixtures::add_plan_entry(&db.pool, c, SPACESHIP_COMMAND, 2, "Planned").await;
+
+        let merged_id = create_merged_skill_plan_inner(&db.pool, "Merged", None, &[a, b, c])
+            .await
+            .unwrap();
+
+        let nodes: Vec<(i64, i64)> = db::skill_plans::get_plan_entries(&db.pool, merged_id)
+            .await
+            .unwrap()
+            .iter()
+            .map(|e| (e.skill_type_id, e.planned_level))
+            .collect();
+        assert_eq!(
+            nodes,
+            vec![(SPACESHIP_COMMAND, 1), (GUNNERY, 1), (SPACESHIP_COMMAND, 2)]
+        );
+    }
+
+    #[tokio::test]
+    async fn create_merged_skill_plan_rejects_empty_name() {
+        use crate::testdata::{fixtures, TestDb};
+
+        let db = TestDb::new_with_sde().await.unwrap();
+        let a = fixtures::create_skill_plan(&db.pool, "A").await;
+        fixtures::add_plan_entry(&db.pool, a, 3327, 1, "Planned").await;
+        let b = fixtures::create_skill_plan(&db.pool, "B").await;
+        fixtures::add_plan_entry(&db.pool, b, 3300, 1, "Planned").await;
+
+        let err = create_merged_skill_plan_inner(&db.pool, "   ", None, &[a, b])
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("name is required"));
+    }
+
+    #[tokio::test]
+    async fn create_merged_skill_plan_trims_name_and_description() {
+        use crate::testdata::{fixtures, TestDb};
+
+        let db = TestDb::new_with_sde().await.unwrap();
+        let a = fixtures::create_skill_plan(&db.pool, "A").await;
+        fixtures::add_plan_entry(&db.pool, a, 3327, 1, "Planned").await;
+        let b = fixtures::create_skill_plan(&db.pool, "B").await;
+        fixtures::add_plan_entry(&db.pool, b, 3300, 1, "Planned").await;
+
+        // Blank description collapses to NULL; name and description are trimmed.
+        let id = create_merged_skill_plan_inner(&db.pool, "  Trimmed  ", Some("   "), &[a, b])
+            .await
+            .unwrap();
+        let plan = db::skill_plans::get_skill_plan(&db.pool, id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(plan.name, "Trimmed");
+        assert_eq!(plan.description, None);
+
+        let c = fixtures::create_skill_plan(&db.pool, "C").await;
+        fixtures::add_plan_entry(&db.pool, c, 3327, 1, "Planned").await;
+        let id2 = create_merged_skill_plan_inner(&db.pool, "X", Some("  hello  "), &[a, c])
+            .await
+            .unwrap();
+        let plan2 = db::skill_plans::get_skill_plan(&db.pool, id2)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(plan2.description.as_deref(), Some("hello"));
+    }
+
+    #[tokio::test]
+    async fn create_merged_skill_plan_rejects_missing_source() {
+        use crate::testdata::{fixtures, TestDb};
+
+        let db = TestDb::new_with_sde().await.unwrap();
+        let a = fixtures::create_skill_plan(&db.pool, "A").await;
+        fixtures::add_plan_entry(&db.pool, a, 3327, 1, "Planned").await;
+
+        let err = create_merged_skill_plan_inner(&db.pool, "Merge", None, &[a, 999_999])
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("does not exist"));
+    }
+
+    #[tokio::test]
+    async fn merge_plans_into_rejects_missing_target() {
+        use crate::testdata::{fixtures, TestDb};
+
+        let db = TestDb::new_with_sde().await.unwrap();
+        let source = fixtures::create_skill_plan(&db.pool, "Source").await;
+        fixtures::add_plan_entry(&db.pool, source, 3327, 1, "Planned").await;
+
+        let err = merge_plans_into_inner(&db.pool, 999_999, &[source])
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("Target plan does not exist"));
+    }
+
+    #[tokio::test]
+    async fn merge_plans_into_rejects_missing_source() {
+        use crate::testdata::{fixtures, TestDb};
+
+        let db = TestDb::new_with_sde().await.unwrap();
+        let target = fixtures::create_skill_plan(&db.pool, "Target").await;
+        fixtures::add_plan_entry(&db.pool, target, 3327, 1, "Planned").await;
+
+        let err = merge_plans_into_inner(&db.pool, target, &[999_999])
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("does not exist"));
     }
 }
