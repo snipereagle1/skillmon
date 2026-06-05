@@ -245,16 +245,16 @@ export function useMergePlansInto() {
     },
     onSuccess: (data, params) => {
       const targetId = params.targetPlanId;
-      // Seed the freshly merged plan, then invalidate everything the target
-      // derives from its entries. The plans list itself is untouched (name,
-      // group, sort_order don't change), so it is not invalidated.
+      // Seed the freshly merged plan from the authoritative response, then
+      // invalidate everything else the target derives from its entries. The
+      // seeded key is not invalidated — the response is the full, current plan,
+      // so a refetch would only discard it and round-trip for the same data.
+      // The plans list itself is untouched (name, group, sort_order don't
+      // change), so it is not invalidated either.
       queryClient.setQueryData(
         queryKeys.skillPlanWithEntries(targetId),
         data.plan
       );
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.skillPlanWithEntries(targetId),
-      });
       queryClient.invalidateQueries({
         queryKey: queryKeys.skillPlanValidation(targetId),
       });
@@ -295,13 +295,12 @@ export function useReplacePlanEntries() {
     },
     onSuccess: (data, params) => {
       const planId = params.planId;
-      // Seed the restored plan, then invalidate everything it derives from its
-      // entries — the same set merge_plans_into touches, since this is the
-      // undo of that action.
+      // Seed the restored plan from the authoritative response, then invalidate
+      // everything else it derives from its entries — the same set
+      // merge_plans_into touches, since this is the undo of that action. The
+      // seeded key is not invalidated for the same reason as the merge: the
+      // response is already the full, current plan.
       queryClient.setQueryData(queryKeys.skillPlanWithEntries(planId), data);
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.skillPlanWithEntries(planId),
-      });
       queryClient.invalidateQueries({
         queryKey: queryKeys.skillPlanValidation(planId),
       });

@@ -1,3 +1,4 @@
+import { toast } from 'sonner';
 import { create } from 'zustand';
 
 export interface Action {
@@ -41,6 +42,13 @@ export const useUndoRedoStore = create<UndoRedoState>((set, get) => ({
         undoStack: state.undoStack.slice(0, -1),
         redoStack: [...state.redoStack, action],
       }));
+    } catch (err) {
+      // Leave the stack untouched so the user can retry, and surface the
+      // failure rather than letting a half-applied undo pass silently.
+      toast.error(
+        `Couldn't undo "${action.label}". The change was not reverted.`
+      );
+      throw err;
     } finally {
       set({ isPerformingAction: false });
     }
@@ -58,6 +66,13 @@ export const useUndoRedoStore = create<UndoRedoState>((set, get) => ({
         redoStack: state.redoStack.slice(0, -1),
         undoStack: [...state.undoStack, action],
       }));
+    } catch (err) {
+      // Leave the stack untouched so the user can retry, and surface the
+      // failure rather than letting a half-applied redo pass silently.
+      toast.error(
+        `Couldn't redo "${action.label}". The change was not reapplied.`
+      );
+      throw err;
     } finally {
       set({ isPerformingAction: false });
     }

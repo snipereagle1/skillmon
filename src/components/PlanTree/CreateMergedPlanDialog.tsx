@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { toast } from 'sonner';
 
 import {
   DndTreeView,
@@ -72,7 +73,6 @@ export function CreateMergedPlanDialog({
     return map;
   }, [plans]);
 
-  // Name prefilled from the selected plans; superseded once the user edits.
   const prefillName = useMemo(() => {
     const names = selectedIds
       .map((id) => planNameById.get(id))
@@ -135,7 +135,9 @@ export function CreateMergedPlanDialog({
 
   const renderItem = ({ item }: RenderItemParams) => {
     const isPlan = item.id.startsWith('plan:');
-    const planId = isPlan ? Number(item.id.split(':')[1]) : null;
+    const parsedId = isPlan ? Number(item.id.split(':')[1]) : null;
+    const planId =
+      parsedId != null && Number.isFinite(parsedId) ? parsedId : null;
     const checked = planId != null && selectedSet.has(planId);
     return (
       <span className="flex-1 flex items-center justify-between gap-2 min-w-0">
@@ -167,6 +169,9 @@ export function CreateMergedPlanDialog({
       onSuccess?.(planId);
     } catch (err) {
       console.error('Failed to create merged plan:', err);
+      toast.error(
+        err instanceof Error ? err.message : 'Failed to create merged plan'
+      );
     }
   };
 

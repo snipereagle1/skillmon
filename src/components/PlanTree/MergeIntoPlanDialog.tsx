@@ -144,7 +144,9 @@ export function MergeIntoPlanDialog({
 
   const renderItem = ({ item }: RenderItemParams) => {
     const isPlan = item.id.startsWith('plan:');
-    const planId = isPlan ? Number(item.id.split(':')[1]) : null;
+    const parsedId = isPlan ? Number(item.id.split(':')[1]) : null;
+    const planId =
+      parsedId != null && Number.isFinite(parsedId) ? parsedId : null;
     const checked = planId != null && selectedSet.has(planId);
     return (
       <span className="flex-1 flex items-center justify-between gap-2 min-w-0">
@@ -221,7 +223,10 @@ export function MergeIntoPlanDialog({
       }
       handleOpenChange(false);
     } catch (err) {
+      // Covers failures the inline mergeInto.isError block can't — the
+      // pre-merge snapshot fetch and the undo-tracking call.
       console.error('Failed to merge plans:', err);
+      toast.error(err instanceof Error ? err.message : 'Failed to merge plans');
     }
   };
 

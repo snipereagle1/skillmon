@@ -65,13 +65,16 @@ pub async fn get_all_skill_plans(pool: &Pool) -> Result<Vec<SkillPlan>> {
     Ok(plans)
 }
 
-pub async fn get_skill_plan(pool: &Pool, plan_id: i64) -> Result<Option<SkillPlan>> {
+pub async fn get_skill_plan<'a, E>(executor: E, plan_id: i64) -> Result<Option<SkillPlan>>
+where
+    E: sqlx::Executor<'a, Database = sqlx::Sqlite>,
+{
     let plan = sqlx::query_as::<_, SkillPlan>(
         "SELECT plan_id, name, description, auto_prerequisites, created_at, updated_at, group_id, sort_order
          FROM skill_plans WHERE plan_id = ?",
     )
     .bind(plan_id)
-    .fetch_optional(pool)
+    .fetch_optional(executor)
     .await?;
 
     Ok(plan)
@@ -108,7 +111,10 @@ pub async fn delete_skill_plan(pool: &Pool, plan_id: i64) -> Result<()> {
     Ok(())
 }
 
-pub async fn get_plan_entries(pool: &Pool, plan_id: i64) -> Result<Vec<SkillPlanEntry>> {
+pub async fn get_plan_entries<'a, E>(executor: E, plan_id: i64) -> Result<Vec<SkillPlanEntry>>
+where
+    E: sqlx::Executor<'a, Database = sqlx::Sqlite>,
+{
     let entries = sqlx::query_as::<_, SkillPlanEntry>(
         "SELECT entry_id, plan_id, skill_type_id, planned_level, sort_order, entry_type, notes
          FROM skill_plan_entries
@@ -116,7 +122,7 @@ pub async fn get_plan_entries(pool: &Pool, plan_id: i64) -> Result<Vec<SkillPlan
          ORDER BY sort_order",
     )
     .bind(plan_id)
-    .fetch_all(pool)
+    .fetch_all(executor)
     .await?;
 
     Ok(entries)
