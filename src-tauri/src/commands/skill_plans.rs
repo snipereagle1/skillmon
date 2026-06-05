@@ -290,6 +290,110 @@ pub async fn create_skill_plan(
         .map_err(|e| format!("Failed to create skill plan: {}", e))
 }
 
+#[tauri::command]
+pub async fn create_merged_skill_plan(
+    pool: State<'_, db::Pool>,
+    name: String,
+    description: Option<String>,
+    source_plan_ids: Vec<i64>,
+) -> Result<i64, String> {
+    create_merged_skill_plan_inner(&pool, &name, description.as_deref(), &source_plan_ids)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+async fn create_merged_skill_plan_inner(
+    pool: &db::Pool,
+    name: &str,
+    description: Option<&str>,
+    source_plan_ids: &[i64],
+) -> anyhow::Result<i64> {
+    let name = name.trim();
+    if name.is_empty() {
+        anyhow::bail!("Plan name is required");
+    }
+
+    let distinct: HashSet<i64> = source_plan_ids.iter().copied().collect();
+    if distinct.len() < 2 {
+        anyhow::bail!("Select at least two distinct source plans");
+    }
+
+    // Fetch each source's entries in stored order, preserving the caller's
+    // chosen source ordering. Verify each source exists first.
+    let mut sources: Vec<Vec<SkillmonPlanEntry>> = Vec::with_capacity(source_plan_ids.len());
+    for plan_id in source_plan_ids {
+        if db::skill_plans::get_skill_plan(pool, *plan_id)
+            .await?
+            .is_none()
+        {
+            anyhow::bail!("Source plan {} does not exist", plan_id);
+        }
+
+        let entries = db::skill_plans::get_plan_entries(pool, *plan_id).await?;
+
+        sources.push(
+            entries
+                .into_iter()
+                .map(|e| SkillmonPlanEntry {
+                    skill_type_id: e.skill_type_id,
+                    level: e.planned_level,
+                    entry_type: e.entry_type,
+                    notes: e.notes,
+                })
+                .collect(),
+        );
+    }
+
+    let merged = crate::skill_plans::merge::merge_plan_entries(&sources);
+
+    // Validate the merged ordering the same way the importer does. For valid
+    // sources this never fails, but it guards against a stray incomplete plan.
+    let mut dag = PlanDag::new();
+    let mut nodes = Vec::with_capacity(merged.len());
+    for entry in &merged {
+        let node = PlanNode {
+            skill_type_id: entry.skill_type_id,
+            level: entry.level,
+        };
+        dag.add_node(pool, node).await?;
+        nodes.push(node);
+    }
+    if !dag.validate(&nodes).is_valid {
+        anyhow::bail!("Merged plan has an invalid prerequisite ordering");
+    }
+
+    // Create the plan at root (group_id NULL, auto_prerequisites = true), then
+    // insert merged entries with dense sort_order in one transaction.
+    let plan_id = db::skill_plans::create_skill_plan(
+        pool,
+        name,
+        description.map(str::trim).filter(|s| !s.is_empty()),
+        true,
+    )
+    .await?;
+
+    let mut tx = pool.begin().await?;
+
+    for (index, entry) in merged.iter().enumerate() {
+        sqlx::query(
+            "INSERT INTO skill_plan_entries (plan_id, skill_type_id, planned_level, sort_order, entry_type, notes)
+             VALUES (?, ?, ?, ?, ?, ?)",
+        )
+        .bind(plan_id)
+        .bind(entry.skill_type_id)
+        .bind(entry.level)
+        .bind(index as i64)
+        .bind(&entry.entry_type)
+        .bind(&entry.notes)
+        .execute(&mut *tx)
+        .await?;
+    }
+
+    tx.commit().await?;
+
+    Ok(plan_id)
+}
+
 #[typeshare]
 #[derive(Debug, Clone, Serialize)]
 pub struct PreviewPlanFromCharacterResponse {
@@ -2090,5 +2194,92 @@ mod tests {
             .sum();
 
         assert_eq!(total_missing, sp_5);
+    }
+
+    #[tokio::test]
+    async fn create_merged_skill_plan_unions_sources_and_leaves_them_untouched() {
+        use crate::testdata::{fixtures, TestDb};
+
+        // Real, prerequisite-free skills (FK to sde_types): 3327 Spaceship
+        // Command, 3300 Gunnery.
+        const SPACESHIP_COMMAND: i64 = 3327;
+        const GUNNERY: i64 = 3300;
+
+        let db = TestDb::new_with_sde().await.unwrap();
+
+        // Source A: Spaceship Command levels I, II.
+        let a = fixtures::create_skill_plan(&db.pool, "A").await;
+        fixtures::add_plan_entry(&db.pool, a, SPACESHIP_COMMAND, 1, "Planned").await;
+        fixtures::add_plan_entry(&db.pool, a, SPACESHIP_COMMAND, 2, "Planned").await;
+
+        // Source B: Spaceship Command II (overlap) + Gunnery I.
+        let b = fixtures::create_skill_plan(&db.pool, "B").await;
+        fixtures::add_plan_entry(&db.pool, b, SPACESHIP_COMMAND, 2, "Planned").await;
+        fixtures::add_plan_entry(&db.pool, b, GUNNERY, 1, "Planned").await;
+
+        let merged_id = create_merged_skill_plan_inner(&db.pool, "Merge: A + B", None, &[a, b])
+            .await
+            .unwrap();
+
+        // New plan is at root with auto_prerequisites enabled.
+        let plan = db::skill_plans::get_skill_plan(&db.pool, merged_id)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(plan.name, "Merge: A + B");
+        assert_eq!(plan.group_id, None);
+        assert_eq!(plan.auto_prerequisites, 1);
+
+        // Merged entries: overlap once, dense sequential sort_order.
+        let merged = db::skill_plans::get_plan_entries(&db.pool, merged_id)
+            .await
+            .unwrap();
+        let nodes: Vec<(i64, i64)> = merged
+            .iter()
+            .map(|e| (e.skill_type_id, e.planned_level))
+            .collect();
+        assert_eq!(
+            nodes,
+            vec![(SPACESHIP_COMMAND, 1), (SPACESHIP_COMMAND, 2), (GUNNERY, 1)]
+        );
+        let sort_orders: Vec<i64> = merged.iter().map(|e| e.sort_order).collect();
+        assert_eq!(sort_orders, vec![0, 1, 2]);
+
+        // Sources are unchanged.
+        let a_entries = db::skill_plans::get_plan_entries(&db.pool, a)
+            .await
+            .unwrap();
+        assert_eq!(
+            a_entries
+                .iter()
+                .map(|e| (e.skill_type_id, e.planned_level))
+                .collect::<Vec<_>>(),
+            vec![(SPACESHIP_COMMAND, 1), (SPACESHIP_COMMAND, 2)]
+        );
+        let b_entries = db::skill_plans::get_plan_entries(&db.pool, b)
+            .await
+            .unwrap();
+        assert_eq!(
+            b_entries
+                .iter()
+                .map(|e| (e.skill_type_id, e.planned_level))
+                .collect::<Vec<_>>(),
+            vec![(SPACESHIP_COMMAND, 2), (GUNNERY, 1)]
+        );
+    }
+
+    #[tokio::test]
+    async fn create_merged_skill_plan_rejects_fewer_than_two_distinct_sources() {
+        use crate::testdata::{fixtures, TestDb};
+
+        let db = TestDb::new_with_sde().await.unwrap();
+        let a = fixtures::create_skill_plan(&db.pool, "A").await;
+        fixtures::add_plan_entry(&db.pool, a, 3327, 1, "Planned").await;
+
+        // Same id twice is not two distinct sources.
+        let err = create_merged_skill_plan_inner(&db.pool, "Merge", None, &[a, a])
+            .await
+            .unwrap_err();
+        assert!(err.to_string().contains("two distinct"));
     }
 }

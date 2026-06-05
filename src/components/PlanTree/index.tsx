@@ -5,6 +5,7 @@ import {
   Folder,
   FolderOpen,
   FolderPlus,
+  GitMerge,
   Pencil,
   Trash2,
 } from 'lucide-react';
@@ -95,6 +96,9 @@ export function PlanTree({
   const moveNodeMutation = useMoveNode();
 
   const openCreatePlan = usePlanTreeDialogStore((s) => s.openCreatePlan);
+  const openCreateMergedPlan = usePlanTreeDialogStore(
+    (s) => s.openCreateMergedPlan
+  );
   const openCreatePlanFromCharacter = usePlanTreeDialogStore(
     (s) => s.openCreatePlanFromCharacter
   );
@@ -266,6 +270,10 @@ export function PlanTree({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={openCreateMergedPlan}>
+                  <GitMerge className="size-4 mr-2" />
+                  Create Merged Plan
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={openCreatePlanFromCharacter}>
                   Create Plan from Character
                 </DropdownMenuItem>

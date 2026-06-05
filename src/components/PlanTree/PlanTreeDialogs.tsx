@@ -3,6 +3,7 @@ import { useNavigate, useParams } from '@tanstack/react-router';
 import { useDeleteSkillPlan } from '@/hooks/tauri/useSkillPlans';
 import { usePlanTreeDialogStore } from '@/stores/planTreeDialogStore';
 
+import { CreateMergedPlanDialog } from './CreateMergedPlanDialog';
 import { CreatePlanDialog } from './CreatePlanDialog';
 import { CreatePlanFromCharacterDialog } from './CreatePlanFromCharacterDialog';
 import { CreatePlanGroupDialog } from './CreatePlanGroupDialog';
@@ -43,6 +44,13 @@ export function PlanTreeDialogs() {
     <>
       <CreatePlanDialog
         open={dialog.kind === 'createPlan'}
+        onOpenChange={(open) => {
+          if (!open) closeDialog();
+        }}
+        onSuccess={handleCreateSuccess}
+      />
+      <CreateMergedPlanDialog
+        open={dialog.kind === 'createMergedPlan'}
         onOpenChange={(open) => {
           if (!open) closeDialog();
         }}

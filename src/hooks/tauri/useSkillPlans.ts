@@ -18,6 +18,13 @@ interface CreateSkillPlanParams {
   autoPrerequisites?: boolean;
 }
 
+interface CreateMergedSkillPlanParams {
+  [key: string]: unknown;
+  name: string;
+  description?: string;
+  sourcePlanIds: number[];
+}
+
 interface UpdateSkillPlanParams {
   [key: string]: unknown;
   planId: number;
@@ -137,6 +144,48 @@ export function useCreateSkillPlan() {
   return useMutation({
     mutationFn: async (params: CreateSkillPlanParams) => {
       return await invoke<number>('create_skill_plan', params);
+    },
+    onSuccess: (data) => {
+      queryClient.removeQueries({ queryKey: queryKeys.skillPlan(data) });
+      queryClient.removeQueries({
+        queryKey: queryKeys.skillPlanWithEntries(data),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.skillPlanValidation(data),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.planComparisonByPlan(data),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.planComparisonAll(data),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.exportSkillPlanText(data),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.exportSkillPlanXml(data),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.remaps.plan(data),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.skillPlanSimulation(data),
+      });
+      queryClient.removeQueries({
+        queryKey: queryKeys.skillPlanOptimization(data),
+      });
+
+      queryClient.invalidateQueries({ queryKey: queryKeys.skillPlans() });
+    },
+  });
+}
+
+export function useCreateMergedSkillPlan() {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (params: CreateMergedSkillPlanParams) => {
+      return await invoke<number>('create_merged_skill_plan', params);
     },
     onSuccess: (data) => {
       queryClient.removeQueries({ queryKey: queryKeys.skillPlan(data) });

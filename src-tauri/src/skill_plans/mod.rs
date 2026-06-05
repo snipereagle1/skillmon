@@ -1,4 +1,5 @@
 pub mod graph;
+pub mod merge;
 pub mod optimization;
 pub mod plan_from_character;
 pub mod simulation;
@@ -26,7 +27,7 @@ pub struct PlannedRemap {
 }
 
 #[typeshare]
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SkillmonPlanEntry {
     pub skill_type_id: i64_ts,
     pub level: i64_ts,
