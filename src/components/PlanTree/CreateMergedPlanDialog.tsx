@@ -40,6 +40,7 @@ import {
 import { useSortableList } from '@/hooks/useSortableList';
 import { assemblePlanTree, type PlanTreeNode } from '@/lib/planTree';
 import { groupNodeId, planNodeId } from '@/lib/planTreeDnd';
+import { cn } from '@/lib/utils';
 
 import { SortableSourceRow } from './SortableSourceRow';
 
@@ -142,7 +143,14 @@ export function CreateMergedPlanDialog({
     return (
       <span className="flex-1 flex items-center justify-between gap-2 min-w-0">
         <span className="truncate">{item.name}</span>
-        {checked && <Check className="size-4 shrink-0 text-primary" />}
+        <Check
+          className={cn(
+            'size-4 shrink-0 text-primary transition-[opacity,scale,filter] duration-200 ease-[cubic-bezier(0.2,0,0,1)]',
+            checked
+              ? 'opacity-100 scale-100 blur-0'
+              : 'opacity-0 scale-[0.25] blur-[4px]'
+          )}
+        />
       </span>
     );
   };
@@ -259,7 +267,7 @@ export function CreateMergedPlanDialog({
                       {createPortal(
                         <DragOverlay dropAnimation={null}>
                           {activeItem != null ? (
-                            <div className="flex items-center gap-2 rounded-md border bg-background px-2 py-1.5 text-sm shadow-md">
+                            <div className="flex items-center gap-2 rounded-sm border bg-background px-2 py-1.5 text-sm shadow-md">
                               <GripVertical className="size-4 text-muted-foreground" />
                               <span className="truncate">
                                 {planNameById.get(activeItem) ??

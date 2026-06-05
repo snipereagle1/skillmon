@@ -36,14 +36,14 @@ export function SortableSourceRow({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'group flex items-center gap-1 rounded-md border bg-background px-2 py-1.5 text-sm'
+        'group flex items-center gap-1 rounded-sm border bg-background px-2 py-1.5 text-sm'
       )}
     >
       <button
         type="button"
         {...attributes}
         {...listeners}
-        className="cursor-grab active:cursor-grabbing text-muted-foreground/60 hover:text-muted-foreground"
+        className="relative inline-flex items-center justify-center cursor-grab active:cursor-grabbing text-muted-foreground/60 transition-transform hover:text-muted-foreground active:scale-[0.96] before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
         aria-label="Reorder"
       >
         <GripVertical className="size-4" />
@@ -52,7 +52,7 @@ export function SortableSourceRow({
       <button
         type="button"
         onClick={onRemove}
-        className="text-muted-foreground/60 hover:text-destructive"
+        className="relative inline-flex items-center justify-center text-muted-foreground/60 transition-transform hover:text-destructive active:scale-[0.96] before:absolute before:left-1/2 before:top-1/2 before:size-10 before:-translate-x-1/2 before:-translate-y-1/2 before:content-['']"
         aria-label="Remove"
       >
         <X className="size-4" />
