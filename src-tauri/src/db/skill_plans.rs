@@ -35,16 +35,50 @@ pub async fn create_skill_plan(
     name: &str,
     description: Option<&str>,
     auto_prerequisites: bool,
+    group_id: Option<i64>,
 ) -> Result<i64> {
     let now = chrono::Utc::now().timestamp();
+
+    // Place the new plan at the end of its target folder (NULL = root). Sibling
+    // sort_order is shared between subfolders and plans under the same parent, so
+    // take the max across both tables.
+    let sort_order: i64 = match group_id {
+        Some(gid) => {
+            sqlx::query_scalar(
+                "SELECT COALESCE(MAX(so), -1) + 1 FROM (
+                     SELECT sort_order AS so FROM skill_plans WHERE group_id = ?
+                     UNION ALL
+                     SELECT sort_order AS so FROM plan_groups WHERE parent_group_id = ?
+                 )",
+            )
+            .bind(gid)
+            .bind(gid)
+            .fetch_one(pool)
+            .await?
+        }
+        None => {
+            sqlx::query_scalar(
+                "SELECT COALESCE(MAX(so), -1) + 1 FROM (
+                     SELECT sort_order AS so FROM skill_plans WHERE group_id IS NULL
+                     UNION ALL
+                     SELECT sort_order AS so FROM plan_groups WHERE parent_group_id IS NULL
+                 )",
+            )
+            .fetch_one(pool)
+            .await?
+        }
+    };
+
     let result = sqlx::query(
-        "INSERT INTO skill_plans (name, description, auto_prerequisites, created_at, updated_at) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO skill_plans (name, description, auto_prerequisites, created_at, updated_at, group_id, sort_order) VALUES (?, ?, ?, ?, ?, ?, ?)",
     )
     .bind(name)
     .bind(description)
     .bind(if auto_prerequisites { 1 } else { 0 })
     .bind(now)
     .bind(now)
+    .bind(group_id)
+    .bind(sort_order)
     .execute(pool)
     .await?;
 

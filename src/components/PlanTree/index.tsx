@@ -1,6 +1,7 @@
 import { useNavigate, useParams } from '@tanstack/react-router';
 import {
   ChevronDown,
+  FilePlus,
   FileText,
   Folder,
   FolderOpen,
@@ -183,6 +184,10 @@ export function PlanTree({
           children: node.children.map(build),
           contextMenuContent: showActions ? (
             <>
+              <ContextMenuItem onSelect={() => openCreatePlan(node.id)}>
+                <FilePlus className="size-3.5" />
+                New Plan Here
+              </ContextMenuItem>
               <ContextMenuItem
                 onSelect={() => openRenamePlanGroup(node.id, node.name)}
               >
@@ -223,6 +228,7 @@ export function PlanTree({
     tree,
     showActions,
     handlePlanClick,
+    openCreatePlan,
     openRenamePlanGroup,
     openDeletePlanGroup,
     openDeletePlan,
@@ -256,7 +262,10 @@ export function PlanTree({
       {showActions && (
         <div className="p-4 border-b border-border">
           <div className="flex w-full">
-            <Button onClick={openCreatePlan} className="flex-1 rounded-r-none">
+            <Button
+              onClick={() => openCreatePlan()}
+              className="flex-1 rounded-r-none"
+            >
               Create Plan
             </Button>
             <DropdownMenu>

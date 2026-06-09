@@ -18,6 +18,7 @@ interface CreateSkillPlanParams {
   name: string;
   description?: string;
   autoPrerequisites?: boolean;
+  groupId?: number | null;
 }
 
 interface CreateMergedSkillPlanParams {

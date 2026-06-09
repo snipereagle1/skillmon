@@ -187,6 +187,7 @@ async fn import_skill_plan_json_inner(
         &plan.name,
         plan.description.as_deref(),
         plan.auto_prerequisites,
+        None,
     )
     .await
     .map_err(|e| format!("Failed to create plan: {}", e))?;
@@ -320,8 +321,9 @@ pub async fn create_skill_plan(
     pool: State<'_, db::Pool>,
     name: String,
     description: Option<String>,
+    group_id: Option<i64>,
 ) -> Result<i64, String> {
-    db::skill_plans::create_skill_plan(&pool, &name, description.as_deref(), true)
+    db::skill_plans::create_skill_plan(&pool, &name, description.as_deref(), true, group_id)
         .await
         .map_err(|e| format!("Failed to create skill plan: {}", e))
 }
@@ -405,6 +407,7 @@ async fn create_merged_skill_plan_inner(
         name,
         description.map(str::trim).filter(|s| !s.is_empty()),
         true,
+        None,
     )
     .await?;
 
@@ -683,6 +686,7 @@ pub async fn create_plan_from_character(
             .map(|s| s.trim())
             .filter(|s| !s.is_empty()),
         true,
+        None,
     )
     .await
     .map_err(|e| format!("Failed to create plan: {}", e))?;
