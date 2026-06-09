@@ -63,8 +63,44 @@ pub async fn export_skill_plan_json(
     })
 }
 
+/// Decide what the UI sees when a skill-plan import fails. Actionable input
+/// errors (unknown skills, bad levels, validation) are returned verbatim so the
+/// user can fix their paste. Internal failures (DB writes, transactions, XML
+/// parsing) are hidden behind a generic message and their full detail is logged
+/// to the terminal — it is the only place that detail survives.
+fn log_import_error(format: &str, detail: String) -> String {
+    if is_user_facing_import_error(&detail) {
+        detail
+    } else {
+        eprintln!("skill plan import ({format}): {detail}");
+        "Failed to import skill plan".to_string()
+    }
+}
+
+fn is_user_facing_import_error(detail: &str) -> bool {
+    const USER_PREFIXES: [&str; 7] = [
+        "Unmatched skills:",
+        "No valid entries found",
+        "No entries found in XML",
+        "Invalid line format:",
+        "Invalid level in line:",
+        "Level must be between 1 and 5",
+        "Invalid plan:",
+    ];
+    USER_PREFIXES.iter().any(|p| detail.starts_with(p))
+}
+
 #[tauri::command]
 pub async fn import_skill_plan_json(
+    pool: State<'_, db::Pool>,
+    plan: SkillmonPlan,
+) -> Result<i64, String> {
+    import_skill_plan_json_inner(pool, plan)
+        .await
+        .map_err(|e| log_import_error("json", e))
+}
+
+async fn import_skill_plan_json_inner(
     pool: State<'_, db::Pool>,
     plan: SkillmonPlan,
 ) -> Result<i64, String> {
@@ -1414,41 +1450,69 @@ pub async fn reorder_plan_entries(
         .map_err(|e| format!("Failed to reorder plan entries: {}", e))
 }
 
-#[tauri::command]
-pub async fn import_skill_plan_text(
-    pool: State<'_, db::Pool>,
-    plan_id: i64,
-    text: String,
-) -> Result<SkillPlanWithEntriesResponse, String> {
-    let lines: Vec<&str> = text
-        .lines()
-        .map(|l| l.trim())
-        .filter(|l| !l.is_empty())
-        .collect();
+/// Parse pasted skill-plan text into `(skill_name, level)` pairs.
+///
+/// Accepts one entry per line with the level as the final whitespace-separated
+/// token, so both space-delimited and tab-delimited (spreadsheet / PyFA
+/// clipboard) exports parse, regardless of CR/LF endings or surrounding
+/// whitespace. Level-0 lines are skipped: PyFA's "copy to clipboard" exports
+/// every known skill, listing untrained ones at level 0.
+fn parse_skill_plan_text(text: &str) -> Result<Vec<(String, i64)>, String> {
+    let mut entries = Vec::new();
 
-    // Step 1: Collect all planned entries from import text
-    let mut planned_entries: Vec<(i64, i64)> = Vec::new();
-    let mut unmatched_skills = Vec::new();
-
-    for line in &lines {
-        let parts: Vec<&str> = line.split_whitespace().collect();
-        if parts.is_empty() {
+    for line in text.lines() {
+        let line = line.trim();
+        if line.is_empty() {
             continue;
         }
 
-        let level_str = parts
-            .last()
-            .ok_or_else(|| "Invalid line format".to_string())?;
+        let parts: Vec<&str> = line.split_whitespace().collect();
+        if parts.len() < 2 {
+            return Err(format!("Invalid line format: {}", line));
+        }
+
+        let level_str = parts[parts.len() - 1];
         let level: i64 = level_str
             .parse()
             .map_err(|_| format!("Invalid level in line: {}", line))?;
+
+        // PyFA exports untrained skills at level 0 — skip rather than reject.
+        if level == 0 {
+            continue;
+        }
 
         if !(1..=5).contains(&level) {
             return Err(format!("Level must be between 1 and 5 in line: {}", line));
         }
 
         let skill_name = parts[..parts.len() - 1].join(" ");
+        entries.push((skill_name, level));
+    }
 
+    Ok(entries)
+}
+
+#[tauri::command]
+pub async fn import_skill_plan_text(
+    pool: State<'_, db::Pool>,
+    plan_id: i64,
+    text: String,
+) -> Result<SkillPlanWithEntriesResponse, String> {
+    import_skill_plan_text_inner(pool, plan_id, text)
+        .await
+        .map_err(|e| log_import_error("text", e))
+}
+
+async fn import_skill_plan_text_inner(
+    pool: State<'_, db::Pool>,
+    plan_id: i64,
+    text: String,
+) -> Result<SkillPlanWithEntriesResponse, String> {
+    // Step 1: Collect all planned entries from import text
+    let mut planned_entries: Vec<(i64, i64)> = Vec::new();
+    let mut unmatched_skills = Vec::new();
+
+    for (skill_name, level) in parse_skill_plan_text(&text)? {
         let skill_type_id = db::skill_plans::get_skill_type_id_by_name(&pool, &skill_name)
             .await
             .map_err(|e| format!("Failed to lookup skill: {}", e))?;
@@ -1557,6 +1621,16 @@ pub async fn import_skill_plan_text(
 
 #[tauri::command]
 pub async fn import_skill_plan_xml(
+    pool: State<'_, db::Pool>,
+    plan_id: i64,
+    xml: String,
+) -> Result<SkillPlanWithEntriesResponse, String> {
+    import_skill_plan_xml_inner(pool, plan_id, xml)
+        .await
+        .map_err(|e| log_import_error("xml", e))
+}
+
+async fn import_skill_plan_xml_inner(
     pool: State<'_, db::Pool>,
     plan_id: i64,
     xml: String,
@@ -2393,6 +2467,86 @@ mod tests {
             .sum();
 
         assert_eq!(total_missing, sp_5);
+    }
+
+    #[test]
+    fn parse_text_handles_tab_separated_crlf_spreadsheet() {
+        // Spreadsheet paste: "Skill Name\tLevel" with CRLF line endings.
+        let text = "Capital Shield Operation\t4\r\nXL Cruise Missiles\t5\r\nFleet Command\t4";
+        let parsed = parse_skill_plan_text(text).unwrap();
+        assert_eq!(
+            parsed,
+            vec![
+                ("Capital Shield Operation".to_string(), 4),
+                ("XL Cruise Missiles".to_string(), 5),
+                ("Fleet Command".to_string(), 4),
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_text_skips_level_zero_skills_from_pyfa() {
+        // PyFA "copy to clipboard" exports every known skill, untrained ones at 0.
+        let text =
+            "Abyssal Ore Processing 0\nAcceleration Control 5\nAccounting 0\nLight Missiles 5";
+        let parsed = parse_skill_plan_text(text).unwrap();
+        assert_eq!(
+            parsed,
+            vec![
+                ("Acceleration Control".to_string(), 5),
+                ("Light Missiles".to_string(), 5),
+            ]
+        );
+    }
+
+    #[test]
+    fn parse_text_skips_level_zero_with_tab_separator() {
+        // Combined: tab-separated spreadsheet that also includes level-0 rows.
+        let text = "Accounting\t0\r\nCaldari Frigate\t5\r\n";
+        let parsed = parse_skill_plan_text(text).unwrap();
+        assert_eq!(parsed, vec![("Caldari Frigate".to_string(), 5)]);
+    }
+
+    #[test]
+    fn parse_text_rejects_level_above_five() {
+        let err = parse_skill_plan_text("Gunnery 6").unwrap_err();
+        assert!(err.contains("between 1 and 5"), "got: {err}");
+    }
+
+    #[test]
+    fn parse_text_rejects_non_numeric_level() {
+        let err = parse_skill_plan_text("Gunnery V").unwrap_err();
+        assert!(err.contains("Invalid level"), "got: {err}");
+    }
+
+    #[test]
+    fn user_facing_errors_pass_through_internal_ones_are_hidden() {
+        // Actionable input errors reach the user.
+        assert!(is_user_facing_import_error(
+            "Unmatched skills: Done Avionics, Evasive Manuevering"
+        ));
+        assert!(is_user_facing_import_error(
+            "Level must be between 1 and 5 in line: Gunnery 7"
+        ));
+        assert!(is_user_facing_import_error("Invalid plan: cycle detected"));
+        // Internal failures stay hidden behind the generic message.
+        assert!(!is_user_facing_import_error(
+            "Failed to lookup skill: pool timed out"
+        ));
+        assert!(!is_user_facing_import_error("Transaction failed: disk I/O"));
+        assert!(!is_user_facing_import_error(
+            "XML parsing error: unexpected EOF"
+        ));
+    }
+
+    #[test]
+    fn parse_text_ignores_blank_lines() {
+        let text = "\n\nGunnery 3\n\n   \nDrones 4\n";
+        let parsed = parse_skill_plan_text(text).unwrap();
+        assert_eq!(
+            parsed,
+            vec![("Gunnery".to_string(), 3), ("Drones".to_string(), 4)]
+        );
     }
 
     #[tokio::test]
