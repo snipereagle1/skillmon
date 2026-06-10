@@ -363,8 +363,7 @@ impl RefreshSupervisor {
                 let min_expires = expires_list.into_iter().min().unwrap_or(now + 300);
                 let secs_until = (min_expires - now).clamp(30, 3600);
                 let jitter_range = secs_until / 10;
-                let jitter =
-                    rand::thread_rng().gen_range(-jitter_range.max(1)..=jitter_range.max(1));
+                let jitter = rand::rng().random_range(-jitter_range.max(1)..=jitter_range.max(1));
                 let sleep_secs = (secs_until + jitter).clamp(30, 3600) as u64;
 
                 tokio::select! {
