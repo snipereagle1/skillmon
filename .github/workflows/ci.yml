@@ -1,0 +1,124 @@
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend (lint, typecheck, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      # Minimal Rust toolchain — only used to build typeshare-cli for `pnpm typegen`.
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache typeshare-cli
+        id: cache-typeshare-cli
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/typeshare
+          key: ${{ runner.os }}-typeshare-cli-1.13.4
+
+      - name: Install typeshare-cli
+        if: steps.cache-typeshare-cli.outputs.cache-hit != 'true'
+        run: cargo install typeshare-cli --version 1.13.4 --force
+
+      - name: Get pnpm store directory
+        shell: bash
+        id: pnpm-cache
+        run: echo "STORE_PATH=$(pnpm store path)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup pnpm cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: |
+            ${{ runner.os }}-pnpm-store-
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate TypeScript bindings
+        run: pnpm typegen
+
+      - name: Generate route tree
+        run: pnpm generate-route-tree
+
+      - name: Lint, typecheck, format
+        run: pnpm exec turbo run lint typecheck format:check
+
+      - name: Test
+        run: pnpm exec vitest run
+
+  rust:
+    name: Rust (clippy, fmt, test)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Cache oas3-gen
+        id: cache-oas3-gen
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/oas3-gen
+          key: ${{ runner.os }}-oas3-gen-0.22.1
+
+      - name: Install oas3-gen
+        if: steps.cache-oas3-gen.outputs.cache-hit != 'true'
+        run: cargo install oas3-gen --version 0.22.1 --force
+
+      # ESI client (esi/client.rs, esi/types.rs) is generated, not committed —
+      # the crate will not compile without it.
+      - name: Generate ESI client
+        run: bash scripts/generate-esi.sh
+
+      - name: Format check
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+
+      - name: Clippy
+        run: cargo clippy --manifest-path src-tauri/Cargo.toml -- -D warnings
+
+      - name: Test
+        run: cargo test --manifest-path src-tauri/Cargo.toml
+
+  ci:
+    name: ci
+    needs: [frontend, rust]
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo "All checks passed"

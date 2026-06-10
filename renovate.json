@@ -1,0 +1,59 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    ":semanticCommits",
+    ":semanticCommitTypeAll(chore)",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "timezone": "America/New_York",
+  "schedule": ["before 9am on monday"],
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
+  "rangeStrategy": "bump",
+  "dependencyDashboard": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 9am on monday"],
+    "automerge": true,
+    "platformAutomerge": true
+  },
+  "major": { "dependencyDashboardApproval": true },
+  "vulnerabilityAlerts": {
+    "schedule": ["at any time"],
+    "minimumReleaseAge": null
+  },
+  "packageRules": [
+    {
+      "description": "Auto-merge devDependency minor/patch/pin/digest on green CI",
+      "matchDepTypes": ["devDependencies"],
+      "matchUpdateTypes": ["minor", "patch", "pin", "digest"],
+      "automerge": true,
+      "platformAutomerge": true
+    },
+    { "groupName": "radix-ui", "matchPackageNames": ["@radix-ui/**"] },
+    { "groupName": "tanstack", "matchPackageNames": ["@tanstack/**"] },
+    {
+      "groupName": "tauri",
+      "matchPackageNames": [
+        "@tauri-apps/**",
+        "tauri",
+        "tauri-build",
+        "/^tauri-plugin-/"
+      ]
+    },
+    {
+      "groupName": "linting",
+      "matchPackageNames": [
+        "eslint",
+        "/^eslint-/",
+        "prettier",
+        "typescript-eslint",
+        "@typescript-eslint/**"
+      ]
+    },
+    { "groupName": "types", "matchPackageNames": ["@types/**"] }
+  ]
+}
