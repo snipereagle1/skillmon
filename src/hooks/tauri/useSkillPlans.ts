@@ -565,15 +565,35 @@ export function useImportSkillPlanText() {
       );
     },
     onSuccess: (data, params) => {
-      queryClient.setQueryData(
-        queryKeys.skillPlanWithEntries(params.planId),
-        data
-      );
+      const planId = params.planId;
+      // Seed the imported plan from the authoritative response, then invalidate
+      // everything else it derives from its entries — same set as
+      // replace_plan_entries / merge_plans_into. The seeded key is not
+      // invalidated: the response is already the full, current plan.
+      queryClient.setQueryData(queryKeys.skillPlanWithEntries(planId), data);
       queryClient.invalidateQueries({
-        queryKey: queryKeys.skillPlanWithEntries(params.planId),
+        queryKey: queryKeys.skillPlanValidation(planId),
       });
       queryClient.invalidateQueries({
-        queryKey: queryKeys.skillPlanValidation(params.planId),
+        queryKey: queryKeys.skillPlanSimulation(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillPlanOptimization(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonByPlan(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonAll(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.exportSkillPlanText(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.exportSkillPlanXml(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.remaps.plan(planId),
       });
     },
   });
@@ -590,15 +610,35 @@ export function useImportSkillPlanXml() {
       );
     },
     onSuccess: (data, params) => {
-      queryClient.setQueryData(
-        queryKeys.skillPlanWithEntries(params.planId),
-        data
-      );
+      const planId = params.planId;
+      // Seed the imported plan from the authoritative response, then invalidate
+      // everything else it derives from its entries — same set as
+      // replace_plan_entries / merge_plans_into. The seeded key is not
+      // invalidated: the response is already the full, current plan.
+      queryClient.setQueryData(queryKeys.skillPlanWithEntries(planId), data);
       queryClient.invalidateQueries({
-        queryKey: queryKeys.skillPlanWithEntries(params.planId),
+        queryKey: queryKeys.skillPlanValidation(planId),
       });
       queryClient.invalidateQueries({
-        queryKey: queryKeys.skillPlanValidation(params.planId),
+        queryKey: queryKeys.skillPlanSimulation(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.skillPlanOptimization(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonByPlan(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.planComparisonAll(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.exportSkillPlanText(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.exportSkillPlanXml(planId),
+      });
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.remaps.plan(planId),
       });
     },
   });
