@@ -122,3 +122,42 @@ pub fn calculate_sp_for_level(rank: i64, level: i32) -> i64 {
     let base_sp = (base.powf(exponent) * 250.0).ceil();
     (base_sp * rank as f64) as i64
 }
+
+/// SP required for a single skill level, excluding all lower levels.
+///
+/// `calculate_sp_for_level` is cumulative from 0, so summing it across the
+/// per-level rows of a plan (a skill stored as levels 1..=5) double-counts.
+/// Summing this slice instead telescopes back to the cumulative total.
+pub fn sp_for_level_slice(rank: i64, level: i32) -> i64 {
+    calculate_sp_for_level(rank, level) - calculate_sp_for_level(rank, level - 1)
+}
+
+#[cfg(test)]
+mod sp_slice_tests {
+    use super::*;
+
+    #[test]
+    fn slice_sums_to_cumulative() {
+        let rank = 5;
+        let slices: i64 = (1..=5).map(|l| sp_for_level_slice(rank, l)).sum();
+        assert_eq!(slices, calculate_sp_for_level(rank, 5));
+    }
+
+    #[test]
+    fn level_one_slice_is_full_level_one() {
+        let rank = 3;
+        assert_eq!(sp_for_level_slice(rank, 1), calculate_sp_for_level(rank, 1));
+    }
+
+    #[test]
+    fn each_slice_is_positive_and_increasing() {
+        let rank = 1;
+        let mut prev = 0;
+        for l in 1..=5 {
+            let slice = sp_for_level_slice(rank, l);
+            assert!(slice > 0, "level {l} slice not positive");
+            assert!(slice > prev, "level {l} slice not larger than previous");
+            prev = slice;
+        }
+    }
+}

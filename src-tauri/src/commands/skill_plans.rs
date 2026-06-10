@@ -784,7 +784,7 @@ pub async fn get_skill_plan_with_entries(
         let skill_attr = skill_attributes.get(&entry.skill_type_id);
         let rank = skill_attr.and_then(|attr| attr.rank);
         let skillpoints_for_level = if let Some(rank_val) = rank {
-            utils::calculate_sp_for_level(rank_val, entry.planned_level as i32)
+            utils::sp_for_level_slice(rank_val, entry.planned_level as i32)
         } else {
             0
         };
