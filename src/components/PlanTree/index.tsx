@@ -26,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { MAX_PLAN_GROUP_DEPTH } from '@/generated/types';
 import {
   useExpandedPlanGroups,
   usePersistExpandedPlanGroups,
@@ -46,11 +47,6 @@ import { usePlanTreeDialogStore } from '@/stores/planTreeDialogStore';
 import { PlanTreeDialogs } from './PlanTreeDialogs';
 
 type PlanItem = TreeNode;
-
-// Deepest 0-indexed depth a folder may occupy; a folder accepts a child folder
-// only while its own depth is strictly below this. Mirrors MAX_DEPTH in
-// src-tauri/src/db/plan_groups.rs and CreatePlanGroupDialog.tsx.
-const MAX_PLAN_GROUP_DEPTH = 2;
 
 function useExpandedGroupTreeState() {
   const { data: persistedExpanded } = useExpandedPlanGroups();

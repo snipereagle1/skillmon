@@ -18,10 +18,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { PlanGroup } from '@/generated/types';
+import { MAX_PLAN_GROUP_DEPTH, type PlanGroup } from '@/generated/types';
 import { useCreatePlanGroup, usePlanGroups } from '@/hooks/tauri/usePlanGroups';
 
-const MAX_PLAN_GROUP_DEPTH = 2;
 const ROOT_VALUE = '__root__';
 
 const toParentValue = (id: number | null) =>
@@ -135,7 +134,8 @@ export function CreatePlanGroupDialog({
           <DialogHeader>
             <DialogTitle>Create Folder</DialogTitle>
             <DialogDescription>
-              Folders organise plans into a tree (up to 3 levels deep).
+              Folders organise plans into a tree (up to{' '}
+              {MAX_PLAN_GROUP_DEPTH + 1} levels deep).
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
