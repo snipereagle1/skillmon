@@ -114,7 +114,7 @@ pub async fn build_plan_from_character(
             .get(&node.skill_type_id)
             .and_then(|a| a.rank)
             .unwrap_or(1);
-        estimated_sp += utils::calculate_sp_for_level(rank, node.level as i32);
+        estimated_sp += utils::sp_for_level_slice(rank, node.level as i32);
 
         let group_id = get_skill_group_id_cached(pool, node.skill_type_id, &mut group_id_cache)
             .await?
