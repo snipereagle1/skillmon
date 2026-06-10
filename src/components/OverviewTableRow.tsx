@@ -63,7 +63,7 @@ export function OverviewTableRow({ character }: OverviewTableRowProps) {
           </span>
           {!character.isOmega && (
             <span title="Alpha Clone">
-              <AlphaIcon className="h-4 w-4 text-primary-foreground" />
+              <AlphaIcon className="h-4 w-4 text-white" />
             </span>
           )}
         </div>
