@@ -47,6 +47,11 @@ import { PlanTreeDialogs } from './PlanTreeDialogs';
 
 type PlanItem = TreeNode;
 
+// Deepest 0-indexed depth a folder may occupy; a folder accepts a child folder
+// only while its own depth is strictly below this. Mirrors MAX_DEPTH in
+// src-tauri/src/db/plan_groups.rs and CreatePlanGroupDialog.tsx.
+const MAX_PLAN_GROUP_DEPTH = 2;
+
 function useExpandedGroupTreeState() {
   const { data: persistedExpanded } = useExpandedPlanGroups();
   const persistExpanded = usePersistExpandedPlanGroups();
@@ -172,7 +177,7 @@ export function PlanTree({
     isDropAllowed(sourceId, target, nodeIndex);
 
   const treeData: PlanItem[] = useMemo(() => {
-    const build = (node: PlanTreeNode): PlanItem => {
+    const build = (node: PlanTreeNode, depth: number): PlanItem => {
       if (node.kind === 'group') {
         return {
           id: groupNodeId(node.id),
@@ -181,13 +186,19 @@ export function PlanTree({
           openIcon: FolderOpen,
           draggable: true,
           droppable: true,
-          children: node.children.map(build),
+          children: node.children.map((child) => build(child, depth + 1)),
           contextMenuContent: showActions ? (
             <>
               <ContextMenuItem onSelect={() => openCreatePlan(node.id)}>
                 <FilePlus className="size-3.5" />
                 New Plan Here
               </ContextMenuItem>
+              {depth < MAX_PLAN_GROUP_DEPTH && (
+                <ContextMenuItem onSelect={() => openCreatePlanGroup(node.id)}>
+                  <FolderPlus className="size-3.5" />
+                  New Folder Here
+                </ContextMenuItem>
+              )}
               <ContextMenuItem
                 onSelect={() => openRenamePlanGroup(node.id, node.name)}
               >
@@ -223,12 +234,13 @@ export function PlanTree({
         ) : undefined,
       } satisfies PlanItem;
     };
-    return tree.map(build);
+    return tree.map((node) => build(node, 0));
   }, [
     tree,
     showActions,
     handlePlanClick,
     openCreatePlan,
+    openCreatePlanGroup,
     openRenamePlanGroup,
     openDeletePlanGroup,
     openDeletePlan,
@@ -286,7 +298,7 @@ export function PlanTree({
                 <DropdownMenuItem onClick={openCreatePlanFromCharacter}>
                   Create Plan from Character
                 </DropdownMenuItem>
-                <DropdownMenuItem onClick={openCreatePlanGroup}>
+                <DropdownMenuItem onClick={() => openCreatePlanGroup()}>
                   <FolderPlus className="size-4 mr-2" />
                   Create Folder
                 </DropdownMenuItem>

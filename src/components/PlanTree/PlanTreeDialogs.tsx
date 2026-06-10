@@ -78,6 +78,9 @@ export function PlanTreeDialogs() {
         onOpenChange={(open) => {
           if (!open) closeDialog();
         }}
+        initialParentGroupId={
+          dialog.kind === 'createPlanGroup' ? dialog.parentGroupId : null
+        }
       />
       <DeletePlanGroupDialog
         open={dialog.kind === 'deletePlanGroup'}
