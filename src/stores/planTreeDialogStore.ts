@@ -1,21 +1,22 @@
 import { create } from 'zustand';
 
+// On createPlan/createPlanGroup, a null groupId/parentGroupId means "create at root".
 export type PlanTreeDialog =
   | { kind: 'none' }
-  | { kind: 'createPlan' }
+  | { kind: 'createPlan'; groupId: number | null }
   | { kind: 'createMergedPlan' }
   | { kind: 'createPlanFromCharacter' }
-  | { kind: 'createPlanGroup' }
+  | { kind: 'createPlanGroup'; parentGroupId: number | null }
   | { kind: 'renamePlanGroup'; groupId: number; currentName: string }
   | { kind: 'deletePlanGroup'; groupId: number; name: string }
   | { kind: 'deletePlan'; planId: number; name: string };
 
 interface PlanTreeDialogState {
   dialog: PlanTreeDialog;
-  openCreatePlan: () => void;
+  openCreatePlan: (groupId?: number | null) => void;
   openCreateMergedPlan: () => void;
   openCreatePlanFromCharacter: () => void;
-  openCreatePlanGroup: () => void;
+  openCreatePlanGroup: (parentGroupId?: number | null) => void;
   openRenamePlanGroup: (groupId: number, currentName: string) => void;
   openDeletePlanGroup: (groupId: number, name: string) => void;
   openDeletePlan: (planId: number, name: string) => void;
@@ -24,11 +25,13 @@ interface PlanTreeDialogState {
 
 export const usePlanTreeDialogStore = create<PlanTreeDialogState>((set) => ({
   dialog: { kind: 'none' },
-  openCreatePlan: () => set({ dialog: { kind: 'createPlan' } }),
+  openCreatePlan: (groupId = null) =>
+    set({ dialog: { kind: 'createPlan', groupId } }),
   openCreateMergedPlan: () => set({ dialog: { kind: 'createMergedPlan' } }),
   openCreatePlanFromCharacter: () =>
     set({ dialog: { kind: 'createPlanFromCharacter' } }),
-  openCreatePlanGroup: () => set({ dialog: { kind: 'createPlanGroup' } }),
+  openCreatePlanGroup: (parentGroupId = null) =>
+    set({ dialog: { kind: 'createPlanGroup', parentGroupId } }),
   openRenamePlanGroup: (groupId, currentName) =>
     set({ dialog: { kind: 'renamePlanGroup', groupId, currentName } }),
   openDeletePlanGroup: (groupId, name) =>

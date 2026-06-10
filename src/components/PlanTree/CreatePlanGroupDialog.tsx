@@ -18,11 +18,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import type { PlanGroup } from '@/generated/types';
+import { MAX_PLAN_GROUP_DEPTH, type PlanGroup } from '@/generated/types';
 import { useCreatePlanGroup, usePlanGroups } from '@/hooks/tauri/usePlanGroups';
 
-const MAX_DEPTH = 2;
 const ROOT_VALUE = '__root__';
+
+const toParentValue = (id: number | null) =>
+  id == null ? ROOT_VALUE : String(id);
 
 interface CreatePlanGroupDialogProps {
   open: boolean;
@@ -64,7 +66,7 @@ function buildParentOptions(groups: PlanGroup[]): OptionRow[] {
         groupId: g.group_id,
         label: `${'  '.repeat(depth)}${g.name}`,
         depth,
-        disabled: depth >= MAX_DEPTH,
+        disabled: depth >= MAX_PLAN_GROUP_DEPTH,
       });
       walk(g.group_id, depth + 1);
     }
@@ -81,19 +83,27 @@ export function CreatePlanGroupDialog({
 }: CreatePlanGroupDialogProps) {
   const [name, setName] = useState('');
   const [parentValue, setParentValue] = useState<string>(
-    initialParentGroupId == null ? ROOT_VALUE : String(initialParentGroupId)
+    toParentValue(initialParentGroupId)
   );
   const { data: groups } = usePlanGroups();
   const createMutation = useCreatePlanGroup();
 
   const options = useMemo(() => buildParentOptions(groups ?? []), [groups]);
 
+  // Re-seed the parent selection from the folder the create was launched from
+  // each time the dialog transitions to open — done during render (not an
+  // effect) per React's "adjust state when a prop changes" guidance.
+  const [prevOpen, setPrevOpen] = useState(open);
+  if (open !== prevOpen) {
+    setPrevOpen(open);
+    if (open) {
+      setParentValue(toParentValue(initialParentGroupId));
+    }
+  }
+
   const handleOpenChange = (next: boolean) => {
     if (!next) {
       setName('');
-      setParentValue(
-        initialParentGroupId == null ? ROOT_VALUE : String(initialParentGroupId)
-      );
       createMutation.reset();
     }
     onOpenChange(next);
@@ -124,7 +134,8 @@ export function CreatePlanGroupDialog({
           <DialogHeader>
             <DialogTitle>Create Folder</DialogTitle>
             <DialogDescription>
-              Folders organise plans into a tree (up to 3 levels deep).
+              Folders organise plans into a tree (up to{' '}
+              {MAX_PLAN_GROUP_DEPTH + 1} levels deep).
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">

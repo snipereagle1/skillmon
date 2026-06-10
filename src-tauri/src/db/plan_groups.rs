@@ -7,7 +7,8 @@ use super::Pool;
 use crate::ts_types::i64_ts;
 
 /// Maximum allowed folder depth (groups live at depths 0, 1, 2).
-pub const MAX_DEPTH: i64 = 2;
+#[typeshare]
+pub const MAX_PLAN_GROUP_DEPTH: i64_ts = 2;
 
 #[typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize, FromRow)]
@@ -49,7 +50,7 @@ pub async fn list(pool: &Pool) -> Result<Vec<PlanGroup>> {
 }
 
 /// Creates a folder under `parent_group_id` (NULL = root). Trims `name` and
-/// rejects empty input. Enforces `MAX_DEPTH` against the parent's depth so the
+/// rejects empty input. Enforces `MAX_PLAN_GROUP_DEPTH` against the parent's depth so the
 /// tree never exceeds the configured nesting limit. Appends to the end of the
 /// parent's children by assigning the next free `sort_order`.
 pub async fn create(pool: &Pool, name: &str, parent_group_id: Option<i64>) -> Result<i64> {
@@ -77,10 +78,10 @@ pub async fn create(pool: &Pool, name: &str, parent_group_id: Option<i64>) -> Re
 
         let depth = parent_depth.ok_or_else(|| anyhow!("Parent folder {} not found", parent_id))?;
 
-        if depth >= MAX_DEPTH {
+        if depth >= MAX_PLAN_GROUP_DEPTH {
             return Err(anyhow!(
                 "Cannot create folder: maximum nesting depth of {} levels reached",
-                MAX_DEPTH + 1
+                MAX_PLAN_GROUP_DEPTH + 1
             ));
         }
 
@@ -212,7 +213,7 @@ pub async fn delete_group(pool: &Pool, group_id: i64, cascade_plans: bool) -> Re
 /// - for folder moves, the destination is not the moved folder itself nor any
 ///   of its descendants (cycle check);
 /// - for folder moves, the moved subtree's depth at the new location does not
-///   exceed `MAX_DEPTH`.
+///   exceed `MAX_PLAN_GROUP_DEPTH`.
 ///
 /// Renumbers both the new parent's children (placing the moved node at
 /// `new_sort_order`) and, if the parent changed, the old parent's children
@@ -297,7 +298,7 @@ pub async fn move_node(pool: &Pool, payload: MoveNodePayload) -> Result<()> {
             }
         }
 
-        // Depth check: subtree-depth of moved group + (new parent depth + 1) <= MAX_DEPTH.
+        // Depth check: subtree-depth of moved group + (new parent depth + 1) <= MAX_PLAN_GROUP_DEPTH.
         let subtree_depth: i64 = sqlx::query_scalar(
             "WITH RECURSIVE subtree(group_id, depth) AS (
                  SELECT group_id, 0 FROM plan_groups WHERE group_id = ?
@@ -312,10 +313,10 @@ pub async fn move_node(pool: &Pool, payload: MoveNodePayload) -> Result<()> {
         .await?;
 
         let moved_depth = new_parent_depth + 1;
-        if moved_depth + subtree_depth > MAX_DEPTH {
+        if moved_depth + subtree_depth > MAX_PLAN_GROUP_DEPTH {
             return Err(anyhow!(
                 "Cannot move folder: would exceed maximum nesting depth of {} levels",
-                MAX_DEPTH + 1
+                MAX_PLAN_GROUP_DEPTH + 1
             ));
         }
     }

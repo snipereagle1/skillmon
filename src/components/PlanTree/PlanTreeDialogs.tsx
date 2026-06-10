@@ -47,6 +47,7 @@ export function PlanTreeDialogs() {
         onOpenChange={(open) => {
           if (!open) closeDialog();
         }}
+        initialGroupId={dialog.kind === 'createPlan' ? dialog.groupId : null}
         onSuccess={handleCreateSuccess}
       />
       <CreateMergedPlanDialog
@@ -77,6 +78,9 @@ export function PlanTreeDialogs() {
         onOpenChange={(open) => {
           if (!open) closeDialog();
         }}
+        initialParentGroupId={
+          dialog.kind === 'createPlanGroup' ? dialog.parentGroupId : null
+        }
       />
       <DeletePlanGroupDialog
         open={dialog.kind === 'deletePlanGroup'}

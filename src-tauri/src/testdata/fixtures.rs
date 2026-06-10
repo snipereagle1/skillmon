@@ -17,7 +17,7 @@ struct JsonSkillPlanEntry {
 }
 
 pub async fn create_skill_plan(pool: &Pool, name: &str) -> i64 {
-    db::skill_plans::create_skill_plan(pool, name, None, false)
+    db::skill_plans::create_skill_plan(pool, name, None, false, None)
         .await
         .unwrap()
 }
