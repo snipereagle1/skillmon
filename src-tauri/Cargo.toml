@@ -44,7 +44,7 @@ anyhow = "1"
 async-trait = "0.1"
 reqwest = { version = "0.12", features = ["json", "multipart", "stream"] }
 futures-util = "0.3"
-base64 = "0.22"
+base64 = "0.22.1"
 sha2 = "0.10"
 rand = "0.9"
 jsonwebtoken = "10"
