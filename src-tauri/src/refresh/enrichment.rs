@@ -1206,7 +1206,6 @@ mod tests {
             training_start_sp: Some(0),
             level_start_sp: Some(0),
             level_end_sp: Some(sp_gained),
-            ..Default::default()
         }
     }
 
