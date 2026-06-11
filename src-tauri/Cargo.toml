@@ -55,7 +55,7 @@ axum = "0.7"
 hyper = { version = "1", features = ["server", "http1", "http2"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors"] }
-validator = { version = "0.18", features = ["derive"] }
+validator = { version = "0.20.0", features = ["derive"] }
 http = "1"
 oas3-gen-support = "0.22"
 serde_plain = "1"
