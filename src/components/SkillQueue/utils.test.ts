@@ -12,6 +12,19 @@ import {
 } from './utils';
 
 describe('formatTimeRemaining', () => {
+  // Freeze the clock so the `new Date()` inside formatTimeRemaining reads the
+  // same instant the test used to build its target date. Without this the two
+  // reads differ by a sub-second delta, differenceInSeconds truncates (e.g.
+  // 300s -> 299s), and "5m" renders as "4m 59s" — a flaky failure on slow CI.
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-01-15T00:00:00Z'));
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('returns "Paused" for null finish date', () => {
     expect(formatTimeRemaining(null)).toBe('Paused');
   });
