@@ -56,7 +56,7 @@ hyper = { version = "1", features = ["server", "http1", "http2"] }
 tower = "0.5"
 tower-http = { version = "0.6", features = ["cors"] }
 validator = { version = "0.20.0", features = ["derive"] }
-http = "1"
+http = "1.4.2"
 oas3-gen-support = "0.22"
 serde_plain = "1"
 zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
