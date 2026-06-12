@@ -5600,16 +5600,21 @@ dependencies = [
 
 [[package]]
 name = "tauri-plugin-playwright"
-version = "0.2.2"
+version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2de803dd4ac54e9457e45f5e3f1f654eab2581d8cd60a14defc18d66725fcea5"
+checksum = "567dd600843a165dcef0c510a0543de82f1f237bf3d4e1160652d630e8500877"
 dependencies = [
+ "cairo-rs",
+ "gio",
+ "glib",
+ "gtk",
  "log",
  "serde",
  "serde_json",
  "tauri",
  "tauri-plugin",
  "tokio",
+ "webkit2gtk",
 ]
 
 [[package]]
