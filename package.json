@@ -86,7 +86,7 @@
     "react-dom": "^19.2.7",
     "react-resizable-panels": "^2.1.7",
     "sonner": "^2.0.7",
-    "tailwind-merge": "^3.4.0",
+    "tailwind-merge": "^3.6.0",
     "ts-pattern": "^5.9.0",
     "vaul": "^1.1.2",
     "zustand": "^5.0.14"
