@@ -51,7 +51,7 @@ jsonwebtoken = "10.4.0"
 chrono = "0.4.45"
 urlencoding = "2.1.3"
 url = "2"
-axum = "0.7"
+axum = "0.8.9"
 hyper = { version = "1.10.1", features = ["server", "http1", "http2"] }
 tower = "0.5.3"
 tower-http = { version = "0.6.11", features = ["cors"] }
