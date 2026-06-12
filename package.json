@@ -4,7 +4,7 @@
   "license": "MIT",
   "author": "snipereagle1 <me@snipereagle.xyz>",
   "type": "module",
-  "packageManager": "pnpm@10.24.0",
+  "packageManager": "pnpm@10.34.1",
   "scripts": {
     "dev": "vite",
     "typecheck": "tsc --noEmit",
