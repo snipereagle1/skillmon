@@ -54,7 +54,7 @@ url = "2"
 axum = "0.7"
 hyper = { version = "1", features = ["server", "http1", "http2"] }
 tower = "0.5"
-tower-http = { version = "0.6", features = ["cors"] }
+tower-http = { version = "0.6.11", features = ["cors"] }
 validator = { version = "0.20.0", features = ["derive"] }
 http = "1.4.2"
 oas3-gen-support = "0.22"
