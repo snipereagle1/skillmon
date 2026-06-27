@@ -249,8 +249,9 @@ pub async fn get_skill_details(
             "SELECT attribute_id, display_name, name, unit_id FROM sde_dogma_attributes WHERE attribute_id IN ({})",
             placeholders
         );
-        let mut query_builder =
-            sqlx::query_as::<_, (i64, Option<String>, String, Option<i64>)>(&query);
+        let mut query_builder = sqlx::query_as::<_, (i64, Option<String>, String, Option<i64>)>(
+            sqlx::AssertSqlSafe(query.as_str()),
+        );
         for id in &dogma_attr_ids_to_query {
             query_builder = query_builder.bind(id);
         }

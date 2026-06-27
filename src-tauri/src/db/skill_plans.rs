@@ -259,7 +259,7 @@ pub async fn update_plan_entry(
         updates.join(", ")
     );
 
-    let mut query_builder = sqlx::query(&query);
+    let mut query_builder = sqlx::query(sqlx::AssertSqlSafe(query.as_str()));
 
     if let Some(level) = planned_level {
         query_builder = query_builder.bind(level);
