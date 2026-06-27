@@ -1695,11 +1695,12 @@ async fn import_skill_plan_xml_inner(
             }
             Ok(Event::Text(e)) => {
                 if in_notes {
-                    notes_text.push_str(
-                        e.unescape()
-                            .map_err(|e| format!("Failed to unescape XML text: {}", e))?
-                            .as_ref(),
-                    );
+                    let decoded = e
+                        .decode()
+                        .map_err(|e| format!("Failed to decode XML text: {}", e))?;
+                    let unescaped = quick_xml::escape::unescape(&decoded)
+                        .map_err(|e| format!("Failed to unescape XML text: {}", e))?;
+                    notes_text.push_str(unescaped.as_ref());
                 }
             }
             Ok(Event::End(e)) => {
