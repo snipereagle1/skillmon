@@ -5,7 +5,7 @@ use tokio::sync::Notify;
 use tokio::time::Duration;
 use tokio_util::sync::CancellationToken;
 
-use rand::Rng;
+use rand::RngExt;
 
 use crate::{auth, cache, db, esi, esi_helpers, notifications};
 
