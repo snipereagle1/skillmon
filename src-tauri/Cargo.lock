@@ -4810,7 +4810,7 @@ dependencies = [
  "log",
  "oas3-gen-support",
  "quick-xml 0.37.5",
- "rand 0.9.3",
+ "rand 0.10.1",
  "reqwest 0.12.28",
  "serde",
  "serde_json",
