@@ -107,32 +107,23 @@ pub async fn sync_character_clones_to_db(
     let mut matched_clone_location_update: Option<(String, i64)> = None;
 
     for jump_clone in &clones_data.jump_clones {
-        if let Some(obj) = jump_clone.as_object() {
-            let clone_id = obj.get("jump_clone_id").and_then(|v| v.as_i64());
-            let location_id = obj.get("location_id").and_then(|v| v.as_i64()).unwrap_or(0);
-            let location_type_str = obj
-                .get("location_type")
-                .and_then(|v| v.as_str())
-                .unwrap_or("station");
-            let implants = obj
-                .get("implants")
-                .and_then(|v| v.as_array())
-                .map(|arr| arr.iter().filter_map(|v| v.as_i64()).collect::<Vec<_>>())
-                .unwrap_or_default();
+        let location_type_str = match jump_clone.location_type {
+            esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Station => "station",
+            esi::CharactersCharacterIdClonesGetHomeLocationLocationType::Structure => "structure",
+        };
+        let location_id = jump_clone.location_id;
 
-            let _ =
-                resolve_clone_location(pool, client, location_type_str, location_id, rate_limits)
-                    .await;
+        let _ =
+            resolve_clone_location(pool, client, location_type_str, location_id, rate_limits).await;
 
-            clones_to_store.push((
-                clone_id,
-                None,
-                location_type_str.to_string(),
-                location_id,
-                false,
-                implants,
-            ));
-        }
+        clones_to_store.push((
+            Some(jump_clone.jump_clone_id),
+            None,
+            location_type_str.to_string(),
+            location_id,
+            false,
+            jump_clone.implants.clone(),
+        ));
     }
 
     let mut current_implants_sorted = current_implants.clone();

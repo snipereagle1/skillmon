@@ -96,13 +96,13 @@ jobs:
         uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
         with:
           path: ~/.cargo/bin/oas3-gen
-          key: ${{ runner.os }}-oas3-gen-0.22.1
+          key: ${{ runner.os }}-oas3-gen-0.26.1
 
       - name: Install oas3-gen
         if: steps.cache-oas3-gen.outputs.cache-hit != 'true'
-        run: cargo install oas3-gen --version 0.22.1 --force
+        run: cargo install oas3-gen --version 0.26.1 --force
 
-      # ESI client (esi/client.rs, esi/types.rs) is generated, not committed —
+      # ESI client (esi/generated/) is generated, not committed —
       # the crate will not compile without it.
       - name: Generate ESI client
         run: bash scripts/generate-esi.sh

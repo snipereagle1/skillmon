@@ -8,15 +8,14 @@ paths:
 
 ## Overview
 
-The ESI client (`src-tauri/src/esi/`) is auto-generated from the EVE Online OpenAPI schema. Use `./scripts/generate-esi.sh` to regenerate. Never edit `client.rs` or `types.rs` manually.
+The ESI client (`src-tauri/src/esi/`) is auto-generated from the EVE Online OpenAPI schema. Use `./scripts/generate-esi.sh` to regenerate. Never edit anything under `generated/` manually.
 
 ## Files
 
 | File | Description |
 |------|-------------|
-| `mod.rs` | Module exports, `BASE_URL`, `BASE_SCOPES` |
-| `client.rs` | **Generated** — do not edit |
-| `types.rs` | **Generated** — do not edit |
+| `mod.rs` | Module exports; re-exports `generated::*` (client, types, `BASE_URL`) |
+| `generated/` | **Generated** (`oas3-gen` client-mod: `mod.rs`/`client.rs`/`types.rs`) — do not edit; gitignored |
 | `scopes.rs` | `EsiScope` enum, `BASE_SCOPES` constant |
 | `cached.rs` | `fetch_cached()` — unified caching + rate limit tracking |
 | `openapi.json` | Cached OpenAPI schema |
