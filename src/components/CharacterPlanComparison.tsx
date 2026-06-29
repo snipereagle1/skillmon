@@ -172,107 +172,110 @@ export function CharacterPlanComparison({
               <p className="text-muted-foreground">Failed to load comparison</p>
             </div>
           ))
-          .with({ comparison: P.select(P.not(P.nullish)) }, (comp) => (
-            <div className="flex flex-col h-full min-h-0">
-              <div className="border-b border-border p-4 space-y-3 shrink-0">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1 min-w-0">
-                    <h2 className="h-card truncate">
-                      <Link
-                        to="/plans/$planId"
-                        params={{ planId: String(comp.plan.plan_id) }}
-                        search={{ tab: 'comparison' }}
-                        className="underline decoration-dotted decoration-(--brand) underline-offset-4 hover:decoration-solid focus-visible:decoration-solid focus-visible:outline-none"
+          .with({ comparison: P.select(P.not(P.nullish)) }, (comp) => {
+            if (!comp) return null;
+            return (
+              <div className="flex flex-col h-full min-h-0">
+                <div className="border-b border-border p-4 space-y-3 shrink-0">
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1 min-w-0">
+                      <h2 className="h-card truncate">
+                        <Link
+                          to="/plans/$planId"
+                          params={{ planId: String(comp.plan.plan_id) }}
+                          search={{ tab: 'comparison' }}
+                          className="underline decoration-dotted decoration-(--brand) underline-offset-4 hover:decoration-solid focus-visible:decoration-solid focus-visible:outline-none"
+                        >
+                          {comp.plan.name}
+                        </Link>
+                      </h2>
+                      {comp.plan.description && (
+                        <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
+                          {comp.plan.description}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-4 gap-4">
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground">
+                        Total Skills
+                      </div>
+                      <div className="text-lg font-semibold">{stats.total}</div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground">
+                        Complete
+                      </div>
+                      <div className="text-lg font-semibold text-status-training">
+                        {stats.complete}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground">
+                        In Progress
+                      </div>
+                      <div className="text-lg font-semibold text-status-paused">
+                        {stats.in_progress}
+                      </div>
+                    </div>
+                    <div className="space-y-1">
+                      <div className="text-xs text-muted-foreground">
+                        Not Started
+                      </div>
+                      <div className="text-lg font-semibold text-muted-foreground">
+                        {stats.not_started}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="pt-2 border-t border-border flex items-center justify-between">
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">
+                        Total Missing SP:{' '}
+                      </span>
+                      <span className="font-semibold text-status-paused">
+                        {formatSkillpoints(stats.totalMissingSP)}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-x-2 shrink-0">
+                      <Label
+                        htmlFor="untrained-only"
+                        className="text-xs text-muted-foreground"
                       >
-                        {comp.plan.name}
-                      </Link>
-                    </h2>
-                    {comp.plan.description && (
-                      <p className="text-sm text-muted-foreground mt-1 line-clamp-1">
-                        {comp.plan.description}
-                      </p>
-                    )}
-                  </div>
-                </div>
-                <div className="grid grid-cols-4 gap-4">
-                  <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">
-                      Total Skills
-                    </div>
-                    <div className="text-lg font-semibold">{stats.total}</div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">
-                      Complete
-                    </div>
-                    <div className="text-lg font-semibold text-status-training">
-                      {stats.complete}
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">
-                      In Progress
-                    </div>
-                    <div className="text-lg font-semibold text-status-paused">
-                      {stats.in_progress}
-                    </div>
-                  </div>
-                  <div className="space-y-1">
-                    <div className="text-xs text-muted-foreground">
-                      Not Started
-                    </div>
-                    <div className="text-lg font-semibold text-muted-foreground">
-                      {stats.not_started}
-                    </div>
-                  </div>
-                </div>
-                <div className="pt-2 border-t border-border flex items-center justify-between">
-                  <div className="text-sm">
-                    <span className="text-muted-foreground">
-                      Total Missing SP:{' '}
-                    </span>
-                    <span className="font-semibold text-status-paused">
-                      {formatSkillpoints(stats.totalMissingSP)}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-x-2 shrink-0">
-                    <Label
-                      htmlFor="untrained-only"
-                      className="text-xs text-muted-foreground"
-                    >
-                      Untrained only
-                    </Label>
-                    <Switch
-                      id="untrained-only"
-                      checked={showUntrainedOnly}
-                      onCheckedChange={setShowUntrainedOnly}
-                    />
-                  </div>
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto">
-                {sortedEntries.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center h-32 gap-y-2">
-                    <p className="text-muted-foreground">
-                      {showUntrainedOnly
-                        ? 'No untrained skills in this plan'
-                        : 'No entries in this plan'}
-                    </p>
-                  </div>
-                ) : (
-                  <div>
-                    {sortedEntries.map((entry) => (
-                      <ComparisonEntryRow
-                        key={entry.entry_id}
-                        entry={entry}
-                        characterId={characterId}
+                        Untrained only
+                      </Label>
+                      <Switch
+                        id="untrained-only"
+                        checked={showUntrainedOnly}
+                        onCheckedChange={setShowUntrainedOnly}
                       />
-                    ))}
+                    </div>
                   </div>
-                )}
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                  {sortedEntries.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-32 gap-y-2">
+                      <p className="text-muted-foreground">
+                        {showUntrainedOnly
+                          ? 'No untrained skills in this plan'
+                          : 'No entries in this plan'}
+                      </p>
+                    </div>
+                  ) : (
+                    <div>
+                      {sortedEntries.map((entry) => (
+                        <ComparisonEntryRow
+                          key={entry.entry_id}
+                          entry={entry}
+                          characterId={characterId}
+                        />
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
           .exhaustive()}
       </div>
     </div>
