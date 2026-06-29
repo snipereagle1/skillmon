@@ -250,22 +250,22 @@ export function PlanEditor({ planId }: PlanEditorProps) {
 
   // Effect to validate proposed order while dragging
   useEffect(() => {
-    if (isDragging) {
-      const timeoutId = setTimeout(async () => {
-        try {
-          const result = await validateReorderMutation.mutateAsync({
-            planId,
-            entryIds: localItems.map((e) => e.entry_id),
-          });
-          setProposedValidation(result);
-        } catch (err) {
-          console.error('Failed to validate proposed order:', err);
-        }
-      }, 200);
-      return () => clearTimeout(timeoutId);
-    } else {
+    if (!isDragging) return;
+    const timeoutId = setTimeout(async () => {
+      try {
+        const result = await validateReorderMutation.mutateAsync({
+          planId,
+          entryIds: localItems.map((e) => e.entry_id),
+        });
+        setProposedValidation(result);
+      } catch (err) {
+        console.error('Failed to validate proposed order:', err);
+      }
+    }, 200);
+    return () => {
+      clearTimeout(timeoutId);
       setProposedValidation(null);
-    }
+    };
   }, [localItems, isDragging, planId, validateReorderMutation]);
 
   const handleExportJson = async () => {
