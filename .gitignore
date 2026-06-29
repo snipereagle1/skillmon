@@ -42,3 +42,4 @@ src-tauri/tests/fixtures/sde_cache/
 .claude/settings.local.json
 src-tauri/capabilities/e2e.json
 .claude/design/
+.claude/worktrees/
