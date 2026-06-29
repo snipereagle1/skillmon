@@ -58,7 +58,18 @@ export default [
       'react/react-in-jsx-scope': 'off',
       'react-refresh/only-export-components': [
         'warn',
-        { allowConstantExport: true },
+        {
+          allowConstantExport: true,
+          extraHOCs: [
+            'createFileRoute',
+            'createLazyFileRoute',
+            'createRootRoute',
+            'createRootRouteWithContext',
+            'createLink',
+            'createRoute',
+            'createLazyRoute',
+          ],
+        },
       ],
 
       'simple-import-sort/imports': 'error',
