@@ -32,7 +32,7 @@ jobs:
           node-version: '24.16.0'
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
 
       - name: Update version files
         shell: bash
@@ -84,7 +84,7 @@ jobs:
           sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential curl wget file libxdo-dev libssl-dev libayatana-appindicator3-dev librsvg2-dev
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@4be7066ada62dd38de10e7b70166bc74ed198c30 # stable
         with:
           targets: ${{ matrix.target }}
 
@@ -165,7 +165,7 @@ jobs:
       - name: Type check
         run: pnpm typecheck
 
-      - uses: tauri-apps/tauri-action@v0
+      - uses: tauri-apps/tauri-action@84b9d35b5fc46c1e45415bdb6144030364f7ebc5 # v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           EVE_CLIENT_ID: ${{ secrets.EVE_CLIENT_ID }}
@@ -186,7 +186,7 @@ jobs:
     steps:
       - name: Discord notification (Success)
         if: ${{ needs.prepare.result == 'success' && needs.build.result == 'success' }}
-        uses: cabrera-evil/discord-notify-action@v1.0.2
+        uses: cabrera-evil/discord-notify-action@0a056a9869e96d4383a3c4bb8a80ea0348755365 # v1.0.2
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK }}
           title: '🚀 Skillmon v${{ inputs.version }} is ready!'
@@ -197,7 +197,7 @@ jobs:
 
       - name: Discord notification (Failure)
         if: ${{ needs.prepare.result == 'failure' || needs.build.result == 'failure' }}
-        uses: cabrera-evil/discord-notify-action@v1.0.2
+        uses: cabrera-evil/discord-notify-action@0a056a9869e96d4383a3c4bb8a80ea0348755365 # v1.0.2
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK }}
           title: '❌ Skillmon v${{ inputs.version }} Release Failed'
