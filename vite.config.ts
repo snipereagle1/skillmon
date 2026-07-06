@@ -1,4 +1,5 @@
 import { defineConfig } from 'vite';
+import { configDefaults } from 'vitest/config';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { tanstackRouter } from '@tanstack/router-plugin/vite';
@@ -22,6 +23,8 @@ export default defineConfig(async () => ({
     globals: true,
     environment: 'node',
     setupFiles: [],
+    // .claude/worktrees holds full repo checkouts — don't run their test copies
+    exclude: [...configDefaults.exclude, '.claude/**'],
   },
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
