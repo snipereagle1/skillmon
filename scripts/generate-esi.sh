@@ -27,11 +27,6 @@ echo "Generating ESI client module..."
 rm -rf "$GEN_DIR"
 oas3-gen generate client-mod -i openapi.json -o "$GEN_DIR" --exclude get_meta_changelog --no-ordered-collections
 
-# Work around oas3-gen 0.26.1 bug: x_compatibility_date is a required (non-Option)
-# NaiveDate header, but the generated HeaderMap conversion wraps it in `if let Some(..)`.
-echo "Fixing x_compatibility_date header generation..."
-perl -0pi -e 's/if let Some\(value\) = &headers\.x_compatibility_date \{/\{ let value = &headers.x_compatibility_date;/g' "$GEN_DIR/types.rs" "$GEN_DIR/client.rs"
-
 # The generated mod.rs allows several clippy lints but not every style lint the code
 # trips (needless_return, needless_question_mark, ...). A module-level allow propagates
 # to the child modules, so one blanket allow on this never-hand-edited module makes

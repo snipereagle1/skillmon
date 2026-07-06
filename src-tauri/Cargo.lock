@@ -3073,9 +3073,8 @@ dependencies = [
 
 [[package]]
 name = "oas3-gen-support"
-version = "0.26.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "639ee7295c66ace90f674d51f5b23ec6c18ea53acf23b029831d05ec2b00b639"
+version = "0.26.2"
+source = "git+https://github.com/snipereagle1/oas3-gen?branch=fix%2F92-required-header-default#6ab3421ee39be7700dc9327ac2b67fa9691630a7"
 dependencies = [
  "better_default",
  "bon",
@@ -3083,7 +3082,7 @@ dependencies = [
  "eventsource-stream",
  "futures-core",
  "http",
- "quick-xml 0.40.1",
+ "quick-xml 0.38.4",
  "reqwest",
  "serde",
  "serde_json",
@@ -3917,6 +3916,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b66c2058c55a409d601666cffe35f04333cf1013010882cec174a7467cd4e21c"
 dependencies = [
  "memchr",
+ "serde",
 ]
 
 [[package]]
@@ -3926,7 +3926,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2474bd2e5029e7ccb6abb2ba48cf2383a333851dedf495901544281590c7da7f"
 dependencies = [
  "memchr",
- "serde",
 ]
 
 [[package]]
