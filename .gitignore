@@ -25,8 +25,7 @@ dist-ssr
 .fallow/
 
 # Generated ESI code
-src-tauri/src/esi/client.rs
-src-tauri/src/esi/types.rs
+src-tauri/src/esi/generated/
 src-tauri/src/esi/openapi.json
 
 # Generated TypeScript bindings

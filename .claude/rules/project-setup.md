@@ -33,7 +33,7 @@ Do not run a full build solely to regenerate frontend bindings — use `pnpm typ
 
 ## ESI Client Generation
 
-The ESI client (`src-tauri/src/esi/client.rs`, `types.rs`) is auto-generated from the EVE Online OpenAPI schema. Only regenerate when the ESI API schema changes.
+The ESI client (`src-tauri/src/esi/generated/`) is auto-generated from the EVE Online OpenAPI schema. Only regenerate when the ESI API schema changes.
 
 ```bash
 ./scripts/generate-esi.sh

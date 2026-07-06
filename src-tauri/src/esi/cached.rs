@@ -83,7 +83,10 @@ pub async fn fetch_cached<T: serde::de::DeserializeOwned>(
 
     let mut req_builder = client.get(url);
     req_builder = req_builder.header(ACCEPT_LANGUAGE, "en");
-    req_builder = req_builder.header("x-compatibility-date", "2020-01-01");
+    // Must match the compatibility date the ESI schema is generated against in
+    // scripts/generate-esi.sh — otherwise ESI returns responses shaped differently
+    // than the generated types expect.
+    req_builder = req_builder.header("x-compatibility-date", "2026-06-09");
     req_builder = req_builder.header("x-tenant", "tranquility");
 
     // If we have an ETag (even if expired), use it for conditional request

@@ -84,4 +84,4 @@ Components land in `src/components/ui/` automatically. Config is in `components.
 
 - `src/generated/` (types only) — run `pnpm typegen` after any Rust struct change
 - `routeTree.gen.ts` — managed by the TanStack Router Vite plugin
-- `src-tauri/src/esi/client.rs`, `types.rs` — run `./scripts/generate-esi.sh` to regenerate
+- `src-tauri/src/esi/generated/` (`oas3-gen` client-mod output) — run `./scripts/generate-esi.sh` to regenerate
