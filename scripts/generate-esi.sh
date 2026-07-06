@@ -27,11 +27,7 @@ echo "Generating ESI client module..."
 rm -rf "$GEN_DIR"
 oas3-gen generate client-mod -i openapi.json -o "$GEN_DIR" --exclude get_meta_changelog --no-ordered-collections
 
-# The generated mod.rs allows several clippy lints but not every style lint the code
-# trips (needless_return, needless_question_mark, ...). A module-level allow propagates
-# to the child modules, so one blanket allow on this never-hand-edited module makes
-# `clippy -D warnings` pass.
-echo "Suppressing clippy warnings on generated code..."
-perl -pi -e '$_ = "#![allow(clippy::all)]\n" . $_ if $. == 1' "$GEN_DIR/mod.rs"
+# Clippy suppression for the generated code lives on the `mod generated;` declaration
+# in src/esi/mod.rs (`#[allow(clippy::all)]`) — no post-generation patching needed.
 
 echo "Done! Generated ESI module in $GEN_DIR"
