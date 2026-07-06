@@ -1,6 +1,7 @@
 #!/bin/bash
 FILE=$(jq -r '.tool_input.file_path // empty' 2>/dev/null)
 [[ -z "$FILE" ]] && exit 0
+cd "${CLAUDE_PROJECT_DIR:-$(git rev-parse --show-toplevel)}" || exit 0
 if [[ "$FILE" == *.ts || "$FILE" == *.tsx || "$FILE" == *.js ]]; then
   pnpm prettier --write "$FILE" 2>/dev/null || true
   pnpm eslint --fix "$FILE" 2>/dev/null || true
