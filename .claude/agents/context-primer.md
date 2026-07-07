@@ -1,7 +1,7 @@
 ---
 name: context-primer
 description: |
-  Read-only domain-context loader for skillmon. Compresses the EVE glossary, layer CONTEXT.md files, and ADRs into a short brief for a specific task. Use PROACTIVELY at the start of any non-trivial feature, refactor, or review task — before planning or delegating build work. NOT a code-search agent — it primes vocabulary and architectural constraints, not file locations.
+  Read-only domain-context loader for skillmon. Compresses the EVE glossary, layer CONTEXT.md files, and ADRs into a short brief for a specific task. Use PROACTIVELY as the FIRST step whenever: (1) a task will add, redesign, or refactor a feature (launch this before planning or delegating to builder agents); (2) the user asks "why is X built this way" or about a past architectural decision; (3) a task involves EVE domain concepts (skill plans, plan groups, clones, remaps, skill queue, attributes, omega status) whose canonical vocabulary or constraints matter. NOT a code-search agent — it primes vocabulary and architectural constraints, not file locations.
 
   <example>
   user: "Let's redesign how skill plan groups work"
