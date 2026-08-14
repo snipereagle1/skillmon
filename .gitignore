@@ -42,3 +42,6 @@ src-tauri/tests/fixtures/sde_cache/
 src-tauri/capabilities/e2e.json
 .claude/design/
 .claude/worktrees/
+
+# Repo-local build tools (cargo install --root .tools)
+.tools/

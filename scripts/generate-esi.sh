@@ -6,6 +6,15 @@ REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 ESI_DIR="$REPO_ROOT/src-tauri/src/esi"
 GEN_DIR="$ESI_DIR/generated"
 
+# Prefer a repo-local oas3-gen so the tool need not be installed globally.
+PATH="$REPO_ROOT/.tools/bin:$PATH"
+
+if ! command -v oas3-gen >/dev/null; then
+    echo "oas3-gen not found. Install it into the repo with:" >&2
+    echo "  cargo install --root \"$REPO_ROOT/.tools\" oas3-gen --version 0.27.0" >&2
+    exit 1
+fi
+
 cd "$ESI_DIR"
 
 # Pin the schema to a specific ESI compatibility date. This MUST match the
