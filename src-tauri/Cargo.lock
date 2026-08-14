@@ -3073,8 +3073,9 @@ dependencies = [
 
 [[package]]
 name = "oas3-gen-support"
-version = "0.26.2"
-source = "git+https://github.com/snipereagle1/oas3-gen?branch=fix%2F92-required-header-default#6ab3421ee39be7700dc9327ac2b67fa9691630a7"
+version = "0.27.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ce36dfb38c48a36fb8fef42404269f7bf1beb98ba18b9a5293dea748e3d5897b"
 dependencies = [
  "better_default",
  "bon",
@@ -3082,14 +3083,14 @@ dependencies = [
  "eventsource-stream",
  "futures-core",
  "http",
- "quick-xml 0.38.4",
+ "quick-xml 0.40.1",
  "reqwest",
  "serde",
  "serde_json",
  "serde_path_to_error",
  "serde_with",
  "thiserror 2.0.18",
- "validator",
+ "validator 0.21.0",
 ]
 
 [[package]]
@@ -3916,7 +3917,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b66c2058c55a409d601666cffe35f04333cf1013010882cec174a7467cd4e21c"
 dependencies = [
  "memchr",
- "serde",
 ]
 
 [[package]]
@@ -3926,6 +3926,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2474bd2e5029e7ccb6abb2ba48cf2383a333851dedf495901544281590c7da7f"
 dependencies = [
  "memchr",
+ "serde",
 ]
 
 [[package]]
@@ -4934,7 +4935,7 @@ dependencies = [
  "url",
  "urlencoding",
  "uuid",
- "validator",
+ "validator 0.20.0",
  "zip 8.6.0",
 ]
 
@@ -6513,6 +6514,20 @@ dependencies = [
  "serde_json",
  "url",
  "validator_derive",
+]
+
+[[package]]
+name = "validator"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c3d68c6633c483df6780cc5277a417c7c2d1bceee2649d06c8ab6b0fd2dd3c81"
+dependencies = [
+ "idna",
+ "regex",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "url",
 ]
 
 [[package]]
