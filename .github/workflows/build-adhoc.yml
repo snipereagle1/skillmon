@@ -87,11 +87,11 @@ jobs:
           path: |
             ~/.cargo/bin/oas3-gen
             ~/.cargo/bin/oas3-gen.exe
-          key: ${{ runner.os }}-oas3-gen-fork-fix-92
+          key: ${{ runner.os }}-oas3-gen-0.27.0
 
       - name: Install oas3-gen
         if: steps.cache-oas3-gen.outputs.cache-hit != 'true'
-        run: cargo install --git https://github.com/snipereagle1/oas3-gen --branch fix/92-required-header-default oas3-gen --force
+        run: cargo install oas3-gen --version 0.27.0 --force
 
       - name: Cache typeshare-cli
         id: cache-typeshare-cli

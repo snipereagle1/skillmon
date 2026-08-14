@@ -57,7 +57,7 @@ tower = "0.5.3"
 tower-http = { version = "0.6.11", features = ["cors"] }
 validator = { version = "0.20.0", features = ["derive"] }
 http = "1.4.2"
-oas3-gen-support = { git = "https://github.com/snipereagle1/oas3-gen", branch = "fix/92-required-header-default" }
+oas3-gen-support = "0.27.0"
 serde_plain = "1.0.2"
 serde_with = "3.21"
 uuid = { version = "1.23", features = ["serde"] }
