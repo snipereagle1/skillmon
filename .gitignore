@@ -45,3 +45,5 @@ src-tauri/capabilities/e2e.json
 
 # Repo-local build tools (cargo install --root .tools)
 .tools/
+
+.enola/

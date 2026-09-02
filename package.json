@@ -12,7 +12,7 @@
     "build": "vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "typegen": "typeshare src-tauri/src --lang typescript --output-file src/generated/types.ts",
+    "typegen": "PATH=\"$PWD/.tools/bin:$PATH\" typeshare src-tauri/src --lang typescript --output-file src/generated/types.ts",
     "tauri:dev": "pnpm typegen && dotenvx run --quiet -- tauri dev",
     "tauri:build": "pnpm typegen && dotenvx run --quiet -- tauri build",
     "test": "TZ=UTC vitest run",
