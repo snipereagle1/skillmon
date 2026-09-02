@@ -166,7 +166,7 @@ pub async fn get_cached_character_location(
     client: &reqwest::Client,
     character_id: i64,
     rate_limits: &esi::RateLimitStore,
-) -> Result<Option<esi::CharactersCharacterIdLocationGet>> {
+) -> Result<Option<esi::CharactersLocation>> {
     let endpoint_path = format!("characters/{}/location", character_id);
     let cache_key = cache::build_cache_key(&endpoint_path, character_id);
     esi::fetch_cached(
@@ -185,7 +185,7 @@ pub async fn get_cached_character_ship(
     client: &reqwest::Client,
     character_id: i64,
     rate_limits: &esi::RateLimitStore,
-) -> Result<Option<esi::CharactersCharacterIdShipGet>> {
+) -> Result<Option<esi::CharactersShip>> {
     let endpoint_path = format!("characters/{}/ship", character_id);
     let cache_key = cache::build_cache_key(&endpoint_path, character_id);
     esi::fetch_cached(
@@ -204,7 +204,7 @@ pub async fn get_cached_character_online(
     client: &reqwest::Client,
     character_id: i64,
     rate_limits: &esi::RateLimitStore,
-) -> Result<Option<esi::CharactersCharacterIdOnlineGet>> {
+) -> Result<Option<esi::CharactersOnline>> {
     let endpoint_path = format!("characters/{}/online", character_id);
     let cache_key = cache::build_cache_key(&endpoint_path, character_id);
     esi::fetch_cached(
