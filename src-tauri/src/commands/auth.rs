@@ -44,13 +44,7 @@ pub async fn start_eve_login(
     pool: State<'_, db::Pool>,
 ) -> Result<String, String> {
     let client_id = get_eve_client_id().map_err(|e| e.to_string())?;
-    let callback_url = std::env::var("EVE_CALLBACK_URL").unwrap_or_else(|_| {
-        if tauri::is_dev() {
-            "http://localhost:1421/callback".to_string()
-        } else {
-            "eveauth-skillmon://callback".to_string()
-        }
-    });
+    let callback_url = auth::callback_url();
 
     let mut scopes: Vec<crate::esi::EsiScope> = crate::esi::BASE_SCOPES.to_vec();
 
