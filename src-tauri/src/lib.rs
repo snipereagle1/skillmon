@@ -322,7 +322,8 @@ pub fn run() {
             }
             "quit" => {
                 let app_handle = app.clone();
-                tokio::spawn(async move {
+                // Menu events fire on the main thread, outside the Tokio runtime.
+                tauri::async_runtime::spawn(async move {
                     let handles = app_handle
                         .state::<Mutex<refresh::RefreshSupervisor>>()
                         .lock()
