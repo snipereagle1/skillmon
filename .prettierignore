@@ -21,6 +21,7 @@ pnpm-lock.yaml
 # Tooling configs
 .claude/**
 .codegraph/**
+.enola/**
 
 # SDE data
 sde/*.jsonl

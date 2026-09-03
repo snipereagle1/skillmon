@@ -884,8 +884,7 @@ pub async fn enrich_location_db_only(
             .await
             .ok()
             .flatten()?;
-        serde_json::from_str::<crate::esi::CharactersCharacterIdLocationGet>(&entry.response_body)
-            .ok()?
+        serde_json::from_str::<crate::esi::CharactersLocation>(&entry.response_body).ok()?
     };
 
     let solar_system_id = location.solar_system_id;
