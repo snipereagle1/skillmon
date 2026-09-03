@@ -22,17 +22,23 @@ pub struct AuthState {
 /// EVE SSO rejects a token exchange whose `redirect_uri` differs from the one in
 /// the authorization request, so every call site resolves the URL here.
 pub fn callback_url() -> String {
-    std::env::var("EVE_CALLBACK_URL").unwrap_or_else(|_| default_callback_url(tauri::is_dev()))
+    resolve_callback_url(std::env::var("EVE_CALLBACK_URL").ok(), tauri::is_dev())
 }
 
-fn default_callback_url(is_dev: bool) -> String {
-    if is_dev {
-        // Served by the local callback server in `auth::callback_server`.
-        "http://localhost:1421/callback".to_string()
-    } else {
-        // A page on skillmon.app that bounces the browser to the
-        // `eveauth-skillmon://callback` deep link, preserving the query string.
-        "https://skillmon.app/callback".to_string()
+fn resolve_callback_url(override_url: Option<String>, is_dev: bool) -> String {
+    match override_url {
+        // A bare `EVE_CALLBACK_URL=` line sets the variable to an empty string,
+        // which EVE SSO would reject with an opaque error.
+        Some(url) if !url.is_empty() => url,
+        _ if is_dev => {
+            // Served by the local callback server in `auth::callback_server`.
+            "http://localhost:1421/callback".to_string()
+        }
+        _ => {
+            // A page on skillmon.app that bounces the browser to the
+            // `eveauth-skillmon://callback` deep link, preserving the query string.
+            "https://skillmon.app/callback".to_string()
+        }
     }
 }
 
@@ -315,11 +321,33 @@ mod tests {
 
     #[test]
     fn packaged_builds_use_the_website_callback_page() {
-        assert_eq!(default_callback_url(false), "https://skillmon.app/callback");
+        assert_eq!(
+            resolve_callback_url(None, false),
+            "https://skillmon.app/callback"
+        );
     }
 
     #[test]
     fn dev_builds_use_the_local_callback_server() {
-        assert_eq!(default_callback_url(true), "http://localhost:1421/callback");
+        assert_eq!(
+            resolve_callback_url(None, true),
+            "http://localhost:1421/callback"
+        );
+    }
+
+    #[test]
+    fn the_env_override_wins() {
+        assert_eq!(
+            resolve_callback_url(Some("http://127.0.0.1:9000/cb".to_string()), false),
+            "http://127.0.0.1:9000/cb"
+        );
+    }
+
+    #[test]
+    fn an_empty_env_override_falls_back_to_the_default() {
+        assert_eq!(
+            resolve_callback_url(Some(String::new()), false),
+            "https://skillmon.app/callback"
+        );
     }
 }
