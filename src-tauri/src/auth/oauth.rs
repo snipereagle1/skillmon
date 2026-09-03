@@ -19,6 +19,23 @@ pub struct AuthState {
     pub state: String,
 }
 
+/// EVE SSO rejects a token exchange whose `redirect_uri` differs from the one in
+/// the authorization request, so every call site resolves the URL here.
+pub fn callback_url() -> String {
+    std::env::var("EVE_CALLBACK_URL").unwrap_or_else(|_| default_callback_url(tauri::is_dev()))
+}
+
+fn default_callback_url(is_dev: bool) -> String {
+    if is_dev {
+        // Served by the local callback server in `auth::callback_server`.
+        "http://localhost:1421/callback".to_string()
+    } else {
+        // A page on skillmon.app that bounces the browser to the
+        // `eveauth-skillmon://callback` deep link, preserving the query string.
+        "https://skillmon.app/callback".to_string()
+    }
+}
+
 pub fn generate_auth_url(
     client_id: &str,
     scopes: &[EsiScope],
@@ -290,4 +307,19 @@ pub async fn check_token_scopes(
         .collect();
 
     Ok(missing_scopes)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn packaged_builds_use_the_website_callback_page() {
+        assert_eq!(default_callback_url(false), "https://skillmon.app/callback");
+    }
+
+    #[test]
+    fn dev_builds_use_the_local_callback_server() {
+        assert_eq!(default_callback_url(true), "http://localhost:1421/callback");
+    }
 }

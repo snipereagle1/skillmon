@@ -165,13 +165,7 @@ pub fn run() {
                     let _ = app_handle.emit("startup-complete", ());
                 });
 
-                let callback_url = std::env::var("EVE_CALLBACK_URL").unwrap_or_else(|_| {
-                    if tauri::is_dev() {
-                        "http://localhost:1421/callback".to_string()
-                    } else {
-                        "eveauth-skillmon://callback".to_string()
-                    }
-                });
+                let callback_url = auth::callback_url();
 
                 if callback_url.starts_with("http://") {
                     let app_handle = app.handle().clone();
@@ -212,7 +206,7 @@ pub fn run() {
 
                                 if let (Some(code), Some(state)) = (code, state) {
                                     let app_handle = app_handle.clone();
-                                    let callback_url = "eveauth-skillmon://callback".to_string();
+                                    let callback_url = auth::callback_url();
                                     tauri::async_runtime::spawn(async move {
                                         if let Err(e) = commands::auth::handle_oauth_callback(
                                             app_handle.clone(),
@@ -290,7 +284,7 @@ pub fn run() {
                                     app_handle.clone(),
                                     code,
                                     state,
-                                    "eveauth-skillmon://callback",
+                                    &auth::callback_url(),
                                 )
                                 .await
                                 {

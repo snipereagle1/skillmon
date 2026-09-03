@@ -28,9 +28,11 @@ OAuth 2.0 with EVE Online SSO. Tokens stored in the local SQLite database.
 - See `src-tauri/src/auth/callback_server.rs`
 
 ### Production
-- Deep link: `eveauth-skillmon://callback`
-- Configured in `tauri.conf.json` under `plugins.deep-link.desktop.schemes`
-- Handled by `tauri-plugin-deep-link`
+- Callback URL registered with EVE: `https://skillmon.app/callback` (configurable via `EVE_CALLBACK_URL`)
+- That page redirects the browser to the `eveauth-skillmon://callback` deep link, preserving the query string, and tells the user the tab can be closed
+- Scheme configured in `tauri.conf.json` under `plugins.deep-link.desktop.schemes`, handled by `tauri-plugin-deep-link`
+
+Both branches resolve through `auth::callback_url()` — EVE SSO rejects a token exchange whose `redirect_uri` differs from the authorization request's.
 
 ## State Management
 
