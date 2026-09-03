@@ -66,7 +66,12 @@ pub async fn init_db(app: &tauri::AppHandle) -> Result<Pool> {
 
     fs::create_dir_all(&app_data_dir).context("failed to create app data directory")?;
 
-    let db_path = app_data_dir.join("database.sqlite");
+    // Dev and the installed app share an app data dir, so keep their databases apart.
+    let db_path = app_data_dir.join(if cfg!(debug_assertions) {
+        "database-dev.sqlite"
+    } else {
+        "database.sqlite"
+    });
 
     let options = SqliteConnectOptions::new()
         .filename(&db_path)
