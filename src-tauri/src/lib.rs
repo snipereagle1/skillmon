@@ -169,10 +169,11 @@ pub fn run() {
 
                 if callback_url.starts_with("http://") {
                     let app_handle = app.handle().clone();
-                    let port = callback_url
-                        .strip_prefix("http://localhost:")
-                        .and_then(|s| s.split('/').next())
-                        .and_then(|s| s.parse::<u16>().ok())
+                    // Must match the port EVE redirects the browser to, so parse it
+                    // out of the callback URL rather than assuming `localhost:PORT`.
+                    let port = url::Url::parse(&callback_url)
+                        .ok()
+                        .and_then(|url| url.port_or_known_default())
                         .unwrap_or(1421);
 
                     tauri::async_runtime::spawn(async move {
