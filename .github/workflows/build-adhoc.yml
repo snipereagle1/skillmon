@@ -137,9 +137,11 @@ jobs:
         run: pnpm typecheck
 
       - name: Build Tauri app
+        shell: bash
         env:
           EVE_CLIENT_ID: ${{ secrets.EVE_CLIENT_ID }}
-        run: pnpm tauri build
+        # Unsigned test build: no updater artifacts, so no signing key needed.
+        run: pnpm tauri build --config '{"bundle":{"createUpdaterArtifacts":false}}'
 
       - name: Upload installer (Windows)
         if: matrix.os == 'windows-latest'
