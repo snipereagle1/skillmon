@@ -1,22 +1,22 @@
-# Issue tracker: GitHub
+# Issue tracker: Linear
 
-Issues and PRDs for this repo live as GitHub issues. Use the `gh` CLI for all operations.
+Issues and PRDs for this repo live in the **Skillmon** team in Linear (`https://linear.app/skillmon`). Use the `linear-skillmon` MCP server for all operations.
+
+GitHub Issues is the former tracker. Every open issue has been copied into Linear; each Linear issue links back to its GitHub source. Do not file new issues on GitHub.
 
 ## Conventions
 
-- **Create an issue**: `gh issue create --title "..." --body "..."`. Use a heredoc for multi-line bodies.
-- **Read an issue**: `gh issue view <number> --comments`, filtering comments by `jq` and also fetching labels.
-- **List issues**: `gh issue list --state open --json number,title,body,labels,comments --jq '[.[] | {number, title, body, labels: [.labels[].name], comments: [.comments[].body]}]'` with appropriate `--label` and `--state` filters.
-- **Comment on an issue**: `gh issue comment <number> --body "..."`
-- **Apply / remove labels**: `gh issue edit <number> --add-label "..."` / `--remove-label "..."`
-- **Close**: `gh issue close <number> --comment "..."`
-
-Infer the repo from `git remote -v` — `gh` does this automatically when run inside a clone.
+- **Create an issue**: `save_issue` with `team: "Skillmon"`, `title`, `description` (markdown), and `labels`.
+- **Read an issue**: `get_issue` with the identifier (e.g. `SKI-23`); `list_comments` for the discussion.
+- **List issues**: `list_issues` with `team: "Skillmon"`, filtered by `label`, `state`, or `query`.
+- **Comment on an issue**: `save_comment` with `issueId`.
+- **Apply / remove labels**: `save_issue` with the identifier and the full `labels` array.
+- **Close**: `save_issue` with `state: "Done"` (or `"Canceled"`).
 
 ## When a skill says "publish to the issue tracker"
 
-Create a GitHub issue.
+Create a Linear issue in the Skillmon team.
 
 ## When a skill says "fetch the relevant ticket"
 
-Run `gh issue view <number> --comments`.
+Run `get_issue` for the identifier, then `list_comments`.

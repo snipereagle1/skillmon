@@ -33,7 +33,7 @@ pnpm verify          # typegen + (turbo) lint + lint:rust + typecheck + format c
 
 ### Issue tracker
 
-Issues live in GitHub Issues (`snipereagle1/skillmon`). See `docs/agents/issue-tracker.md`.
+Issues live in Linear (Skillmon team). See `docs/agents/issue-tracker.md`.
 
 ### Triage labels
 

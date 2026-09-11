@@ -19,7 +19,7 @@
         "TAURI_MCP_SOCKET": "/tmp/tauri-playwright.sock"
       }
     },
-    "linear": {
+    "linear-skillmon": {
       "type": "http",
       "url": "https://mcp.linear.app/mcp"
     }
