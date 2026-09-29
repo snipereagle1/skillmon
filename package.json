@@ -124,5 +124,12 @@
     "typescript-eslint": "^8.62.0",
     "vite": "^8.0.16",
     "vitest": "^4.1.8"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "esbuild",
+      "msw",
+      "unrs-resolver"
+    ]
   }
 }
