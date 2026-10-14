@@ -128,6 +128,7 @@ function RootComponent() {
           items={[
             { to: '/overview', label: 'Overview' },
             { to: '/characters', label: 'Characters' },
+            { to: '/history', label: 'History' },
             ...(locationsEnabled
               ? [{ to: '/location' as const, label: 'Location' }]
               : []),

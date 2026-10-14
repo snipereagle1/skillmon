@@ -22,3 +22,14 @@ pub async fn force_refresh_skill_queue(
 
     Ok(())
 }
+
+#[tauri::command]
+pub async fn get_skill_training_history(
+    pool: State<'_, db::Pool>,
+    character_id: Option<i64>,
+    limit: i64,
+) -> Result<Vec<db::skill_history::CompletedSkill>, String> {
+    db::skill_history::get_skill_history(&pool, character_id, limit)
+        .await
+        .map_err(|e| format!("Failed to load skill training history: {}", e))
+}

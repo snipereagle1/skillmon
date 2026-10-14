@@ -326,6 +326,19 @@ pub async fn enrich_queue(
         !raw_queue.is_empty() && raw_queue.iter().all(|item| item.finish_date.is_none());
 
     let now = chrono::Utc::now();
+
+    let completed: Vec<(i64, i64, i64)> = raw_queue
+        .iter()
+        .filter_map(|item| {
+            item.finish_date
+                .filter(|fd| *fd <= now)
+                .map(|fd| (item.skill_id, item.finished_level, fd.timestamp()))
+        })
+        .collect();
+    if let Err(e) = db::skill_history::record_completed_skills(pool, character_id, &completed).await
+    {
+        eprintln!("refresh: record skill history {}: {}", character_id, e);
+    }
     let mut progress_map: HashMap<i64, i64> = HashMap::new();
 
     let queue: Vec<events::SkillQueueItem> = raw_queue

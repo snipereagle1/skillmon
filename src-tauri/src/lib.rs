@@ -353,6 +353,7 @@ pub fn run() {
             commands::accounts::reorder_characters_in_account,
             commands::accounts::reorder_unassigned_characters,
             commands::skill_queues::force_refresh_skill_queue,
+            commands::skill_queues::get_skill_training_history,
             commands::skills::get_sde_skills_with_groups,
             commands::skills::get_skill_details,
             commands::sde::refresh_sde,
