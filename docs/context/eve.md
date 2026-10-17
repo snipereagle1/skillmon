@@ -32,6 +32,10 @@ Game concepts used across the skillmon codebase. Load this before any frontend o
 
 **Skill plan** — a user-defined ordered list of skills to train, with target levels. skillmon validates prerequisites, simulates training time, and can optimise attribute remaps.
 
+**Choice group** — an entry in a skill plan that is satisfied by any one of its **options**, each a single skill at a target level (e.g. "any one of Amarr / Caldari / Gallente / Minmatar Cruiser V" for a pilot who will fly whichever race's recon). A character who already has any option at or above its level has satisfied the group. Otherwise skillmon picks options jointly across all of a plan's choice groups, choosing the combination with the least total remaining training time for that character, and the user can override any group's pick per character. Two choice groups in one plan may not have the same set of options. The game itself has no "one of" requirement; a choice group expresses the plan author's intent.
+
+**Option** — one alternative inside a choice group: a single skill and target level.
+
 **Plan merge** — combining the entries of several skill plans into one, in a user-chosen order, deduplicating by skill-level. Source plans' entries are appended in their stored order; a skill-level already present from an earlier source is skipped (**first occurrence wins** — its entry type and notes are kept, no later duplicate upgrades it). Source plans are never modified. Source plans' remaps are dropped. Two modes:
 
 - **Merge to new plan (Mode 1)** — produces a brand-new plan from the union of two or more sources. No plan is the authority; merge order is just the order the user arranges the sources.
