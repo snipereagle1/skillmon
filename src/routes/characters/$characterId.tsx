@@ -103,6 +103,11 @@ function CharacterDetailLayout() {
                 label: 'Skills',
               },
               {
+                to: '/characters/$characterId/history',
+                params: { characterId },
+                label: 'History',
+              },
+              {
                 to: '/characters/$characterId/clones',
                 params: { characterId },
                 label: 'Clones',

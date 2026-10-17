@@ -75,6 +75,9 @@ export const queryKeys = {
 
   sdeSkills: () => ['sdeSkills'] as const,
 
+  skillTrainingHistory: (characterId: number | null, limit: number) =>
+    ['skillTrainingHistory', characterId, limit] as const,
+
   appSettings: () => ['app-settings'] as const,
   expandedPlanGroups: () => ['expanded-plan-groups'] as const,
   excludedComparisonCharacters: () =>
