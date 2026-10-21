@@ -19,6 +19,7 @@ pub mod notifications;
 pub mod plan_groups;
 pub mod remaps;
 pub mod sde;
+pub mod skill_history;
 pub mod skill_plans;
 pub mod tokens;
 
