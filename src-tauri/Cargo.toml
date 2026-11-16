@@ -61,7 +61,7 @@ oas3-gen-support = "0.27.0"
 serde_plain = "1.0.2"
 serde_with = "3.21"
 uuid = { version = "1.23", features = ["serde"] }
-zip = { version = "8.6.0", default-features = false, features = ["deflate"] }
+zip = { version = "9.0.0", default-features = false, features = ["deflate"] }
 quick-xml = "0.40"
 dotenvy = "0.15.7"
 tauri-plugin-updater = "2.10.1"
